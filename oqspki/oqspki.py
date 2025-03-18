@@ -20,6 +20,8 @@ PublicKeyDER ::= SEQUENCE {
 """
 from __future__ import annotations
 import enum
+import base64
+from io import BytesIO
 from oqs import (
     KeyEncapsulation, Signature, MechanismNotEnabledError,
     get_enabled_kem_mechanisms, get_enabled_sig_mechanisms
@@ -125,3 +127,24 @@ def generate_keypair_der(algname: str) -> tuple[PublicKeyDER, PrivateKeyDER]:
     encode_privkey_der(privkey_encoder, privkey, algname)
 
     return pubkey_encoder.output(), privkey_encoder.output()
+
+def bytes_to_pem(data: bytes, label: str="CERTIFICATE") -> bytes:
+    """Shamelessly ripped from https://github.com/thomwiggers/mk-cert/blob/232648e/encoder.py#L218
+    """
+    buf = BytesIO()
+    buf.write(b"-----BEGIN ")
+    buf.write(label.encode("UTF-8"))
+    buf.write(b"-----\n")
+
+    base64buf = BytesIO(base64.b64encode(data))
+    line = base64buf.read(64)
+    while line:
+        buf.write(line)
+        buf.write(b"\n")
+        line = base64buf.read(64)
+
+    buf.write(b"-----END ")
+    buf.write(label.encode("UTF-8"))
+    buf.write(b"-----\n")
+    return buf.getvalue()
+
