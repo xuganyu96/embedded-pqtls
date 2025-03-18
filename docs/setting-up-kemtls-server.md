@@ -14,7 +14,7 @@ The original authors used [ad-hoc scripts](https://github.com/thomwiggers/mk-cer
 Generate raw key pair, encode using [ASN.1](https://en.wikipedia.org/wiki/ASN.1#Example), write to `name.pub.der` and `name.priv.der`. This conatins raw bytes encoding the raw bytes of the keypair and some minimal metadata such as "which algorithm it is"
 - `oqspki verify --pubkey <pubkey> --privkey <privkey>`  
 Verify that the keypair is legitimate
-- `oqspki b64encode --in <key.der> --out <key.pem>`  
+- `oqspki pemencode --in <key.der> --out <key.pem> --label "PRIVATE KEY"`  
 Primarily used to encode a binary key file to base-64 encoded PEM file; not sure if it is useful?
 - `oqspki x509req --pubkey <pem/der> --subj "/C=Canada..." --out <CSR file>`  
 Create a certificate signing request

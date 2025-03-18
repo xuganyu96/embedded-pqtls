@@ -4,36 +4,37 @@ import asn1
 PubKeyDer = bytes
 PrivKeyDer = bytes
 
+
 def keypair(algname: str) -> tuple[PubKeyDer, PrivKeyDer]:
-    """Given algorihtm name, return a randomly generated DER-encoded pubkey privkey
-    """
+    """Given algorihtm name, return a randomly generated DER-encoded pubkey privkey"""
     print(algname)
     return b"", b""
 
+
 def der_to_pem(data: bytes, header: str = "CERTIFICATE") -> str:
-    """Convert DER-encoded data into PEM string
-    """
+    """Convert DER-encoded data into PEM string"""
     return ""
 
 
 def x509request() -> str:
-    """Generate X.509 Certificate Signing Request (CSR) from public key and subject info
-    """
+    """Generate X.509 Certificate Signing Request (CSR) from public key and subject info"""
     return ""
 
+
 def x509sign() -> str:
-    """Issue X.509 Certificate using the request and CA's private key
-    """
+    """Issue X.509 Certificate using the request and CA's private key"""
     return ""
+
 
 def inspect() -> str:
     """Print data info to stdout"""
     return ""
 
+
 def verify():
-    """Verify that the public key and private key are a valid pair
-    """
+    """Verify that the public key and private key are a valid pair"""
     pass
+
 
 if __name__ == "__main__":
     print(f"liboqs-python {OQS_VERSION}")

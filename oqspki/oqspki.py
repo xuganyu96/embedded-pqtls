@@ -18,25 +18,29 @@ PublicKeyDER ::= SEQUENCE {
     pk BIT STRING
 }
 """
+
 from __future__ import annotations
 import enum
 import base64
 from io import BytesIO
 from oqs import (
-    KeyEncapsulation, Signature, MechanismNotEnabledError,
-    get_enabled_kem_mechanisms, get_enabled_sig_mechanisms
+    KeyEncapsulation,
+    Signature,
+    MechanismNotEnabledError,
+    get_enabled_kem_mechanisms,
+    get_enabled_sig_mechanisms,
 )
 import asn1
 
 PublicKeyBytes = PrivateKeyBytes = PublicKeyDER = PrivateKeyDER = bytes
+
 
 class KeyPairType(enum.Enum):
     KEM = 0
     SIGNATURE = 1
 
     def instantiate(self, name: str) -> KeyEncapsulation | Signature:
-        """Assume that name is legitimate, return the mechanism according to self's type
-        """
+        """Assume that name is legitimate, return the mechanism according to self's type"""
         if self == KeyPairType.KEM:
             return KeyEncapsulation(name)
         else:
@@ -45,10 +49,13 @@ class KeyPairType(enum.Enum):
 
 # TODO: the OIDs of algorithms are not standardized so we will simply make them up
 ENABLED_ALGORITHMS = [
-    (KeyPairType.KEM, name) for name in get_enabled_kem_mechanisms()
-] + [
-    (KeyPairType.SIGNATURE, name) for name in get_enabled_sig_mechanisms()
+    (oid_int, key_type, name)
+    for oid_int, (key_type, name) in enumerate(
+        [(KeyPairType.KEM, name) for name in get_enabled_kem_mechanisms()]
+        + [(KeyPairType.SIGNATURE, name) for name in get_enabled_sig_mechanisms()]
+    )
 ]
+
 
 # For testing purpose only
 class NiceKEM(KeyEncapsulation):
@@ -64,56 +71,75 @@ class NiceKEM(KeyEncapsulation):
     def export_secret_key(self) -> bytes:
         return b"420420"
 
+
 # Taken from https://github.com/thomwiggers/mk-cert/blob/232648ed7bb73fa286969e94/encoder.py#L201
 OID_PREFIX = "1.2.6.1.4.1.311.89.2"
+
 
 def get_algorithm_oid_suffix(algname: str) -> str:
     if algname == NiceKEM.ALGNAME:
         return NiceKEM.OID_SUFFIX
-    for oid, (_, name) in enumerate(ENABLED_ALGORITHMS):
+    for oid, _, name in ENABLED_ALGORITHMS:
         if name == algname:
             return str(oid + 69)
     raise MechanismNotEnabledError(f"{algname} not enabled; check ENABLED_ALGORITHMS")
 
-def get_algorithm(algname: str) -> KeyEncapsulation | Signature:
-    """Return an instance of KeyEncapsulation or Signature according to name
-    """
+
+def get_algorithm_by_name(algname: str) -> KeyEncapsulation | Signature:
+    """Return an instance of KeyEncapsulation or Signature according to name"""
     if algname == NiceKEM.ALGNAME:
         return NiceKEM()
-    for keypair_type, name in ENABLED_ALGORITHMS:
+    for _, keypair_type, name in ENABLED_ALGORITHMS:
         if name == algname:
             return keypair_type.instantiate(name)
     raise MechanismNotEnabledError(f"{algname} not enabled; check ENABLED_ALGORITHMS")
 
+
+def get_algorithm_by_oid_suffix(oid_suffix: str) -> KeyEncapsulation | Signature:
+    """Return an instance of KeyEncapsulation or Signature according to name"""
+    if oid_suffix == NiceKEM.OID_SUFFIX:
+        return NiceKEM()
+    for oid_int, keypair_type, name in ENABLED_ALGORITHMS:
+        if str(oid_int) == oid_suffix:
+            return keypair_type.instantiate(name)
+    raise MechanismNotEnabledError(
+        f"OID {OID_PREFIX}.{oid_suffix} not enabled; check ENABLED_ALGORITHMS"
+    )
+
+
 def generate_keypair_bytes(algname: str) -> tuple[PublicKeyBytes, PrivateKeyBytes]:
     """Return raw bytes of a freshly sampled keypair"""
-    alg = get_algorithm(algname)
+    alg = get_algorithm_by_name(algname)
     pk = alg.generate_keypair()
     sk = alg.export_secret_key()
     return pk, sk
 
+
 def encode_algorithm_identifier(encoder: asn1.Encoder, algname: str):
-    """Encode according to AlgorithmIdentifier
-    """
+    """Encode according to AlgorithmIdentifier"""
     with encoder.construct(asn1.Numbers.Sequence):
-        encoder.write(".".join([OID_PREFIX, get_algorithm_oid_suffix(algname)]), asn1.Numbers.ObjectIdentifier)
+        encoder.write(
+            ".".join([OID_PREFIX, get_algorithm_oid_suffix(algname)]),
+            asn1.Numbers.ObjectIdentifier,
+        )
+
 
 def encode_pubkey_der(encoder: asn1.Encoder, pubkey: PublicKeyBytes, algname: str):
-    """Encode according to PublicKeyDER
-    """
+    """Encode according to PublicKeyDER"""
     with encoder.construct(asn1.Numbers.Sequence):
         encode_algorithm_identifier(encoder, algname)
         encoder.write(pubkey, asn1.Numbers.BitString)
 
+
 def encode_privkey_der(encoder: asn1.Encoder, privkey: PrivateKeyBytes, algname: str):
-    """Encode according to PrivateKeyDER
-    """
+    """Encode according to PrivateKeyDER"""
     with encoder.construct(asn1.Numbers.Sequence):
-        # NOTE: not sure why this is here? copied from 
+        # NOTE: not sure why this is here? copied from
         #   https://github.com/thomwiggers/mk-cert/blob/232648ed7bb73fa286969e/encoder.py#L198
         encoder.write(0, asn1.Numbers.Integer)
         encode_algorithm_identifier(encoder, algname)
         encoder.write(privkey, asn1.Numbers.OctetString)
+
 
 def generate_keypair_der(algname: str) -> tuple[PublicKeyDER, PrivateKeyDER]:
     """Generate fresh keypair according to the input algorithm name and encode them using DER
@@ -128,9 +154,9 @@ def generate_keypair_der(algname: str) -> tuple[PublicKeyDER, PrivateKeyDER]:
 
     return pubkey_encoder.output(), privkey_encoder.output()
 
-def bytes_to_pem(data: bytes, label: str="CERTIFICATE") -> bytes:
-    """Shamelessly ripped from https://github.com/thomwiggers/mk-cert/blob/232648e/encoder.py#L218
-    """
+
+def bytes_to_pem(data: bytes, label: str = "CERTIFICATE") -> bytes:
+    """Shamelessly ripped from https://github.com/thomwiggers/mk-cert/blob/232648e/encoder.py#L218"""
     buf = BytesIO()
     buf.write(b"-----BEGIN ")
     buf.write(label.encode("UTF-8"))
@@ -147,4 +173,3 @@ def bytes_to_pem(data: bytes, label: str="CERTIFICATE") -> bytes:
     buf.write(label.encode("UTF-8"))
     buf.write(b"-----\n")
     return buf.getvalue()
-
