@@ -12,7 +12,7 @@ cd kemtls-experiment
 cd measuring
 ./scripts/create-experimental-setup.sh \
     "Kyber512"  \ # KEX
-    "Dilithium2"  \ # Leaf
+    "Kyber512"  \ # Leaf
     "Dilithium2" \ # Intermediate
     "Dilithium2" \ # Root
 # TODO what about client auth and keycache?
