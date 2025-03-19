@@ -15,7 +15,7 @@ DEBUG = False
 
 HOSTNAMES = list(
     map(lambda x: x.encode(), os.environ.get("HOSTNAMES", "servername").split(","))
-)
+) + [b"localhost", b"127.0.0.1"]
 
 subenv = os.environ.copy()
 if "RUST_MIN_STACK" not in subenv:
