@@ -143,6 +143,6 @@ int main() {
 Compile with GCC:
 
 ```bash
-gcc -O3 -Wall -lwolfssl main.c -o main.out
+gcc -O3 -Wall main.c -lwolfssl -o main.out
 ./main.out
 ```
