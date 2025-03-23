@@ -3,10 +3,10 @@ LDFLAGS=-lwolfssl
 
 .PHONY: examples clean
 
-examples: examples/tls13-client-with-sniffer \
+examples: examples/tls13-client \
 	examples/tcp-client
 
-examples/tls13-client-with-sniffer: examples/tls13-client-with-sniffer.c
+examples/tls13-client: examples/tls13-client.c
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@.out
 
 examples/tcp-client: examples/tcp-client.c
