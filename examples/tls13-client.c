@@ -8,6 +8,11 @@
 
 #define DEFAULT_HOSTNAME "www.github.com"
 #define PORT 443
+#define HTTP_REQUEST "GET /octocat HTTP/1.1\r\n" \
+"Host: api.github.com\r\n" \
+"User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:136.0) Gecko/20100101 Firefox/136.0\r\n" \
+"Accept: application/json\r\n" \
+"Connection: close\r\n\r\n"
 
 static int net_connect(const char *host, int port) {
   struct sockaddr_in server_addr;
@@ -94,6 +99,19 @@ int main(int argc, char **argv) {
   }
 
   printf("Handshake succeeded %s\n", hostname);
+  int txsize = wolfSSL_write(ssl, HTTP_REQUEST, strlen(HTTP_REQUEST));
+  if (txsize < 0) {
+    printf("Failed to write HTTP request to %s\n", hostname);
+  } else {
+    printf("Wrote %d bytes from %s\n", txsize, hostname);
+  }
+  uint8_t app_readbuf[65535];
+  // Read in a loop until wolfSSL_read returns 0, indicating the end of the
+  // message
+  int readsize = wolfSSL_read(ssl, app_readbuf, sizeof(app_readbuf));
+  while (readsize < sizeof(app_readbuf)
+    && wolfSSL_read(ssl, app_readbuf + readsize, sizeof(app_readbuf) - readsize) > 0);
+  printf("%s\n", app_readbuf);
 
   // Clean up
   wolfSSL_shutdown(ssl);
