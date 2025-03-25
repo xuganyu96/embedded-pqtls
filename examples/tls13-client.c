@@ -1,3 +1,7 @@
+/**
+* Example TLS 1.3 client.
+* Usage: ./examples/tls13-client.out api.github.com
+*/
 #include "wolfssl/options.h"
 #include "wolfssl/ssl.h"
 #include <arpa/inet.h>
@@ -50,7 +54,7 @@ int main(int argc, char **argv) {
   // Initialize WolfSSL
   wolfSSL_Init();
   // wolfSSL_Debugging_ON();  // uncomment if we need extra debug input
-  ctx = wolfSSL_CTX_new(wolfTLS_client_method());
+  ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
   if (!ctx) {
     printf("Failed to create WolfSSL context\n");
     return -1;
