@@ -1,7 +1,7 @@
 /**
-* Example TLS 1.3 client.
-* Usage: ./examples/tls13-client.out api.github.com
-*/
+ * Example TLS 1.3 client.
+ * Usage: ./examples/tls13-client.out api.github.com
+ */
 #include "wolfssl/options.h"
 #include "wolfssl/ssl.h"
 #include <arpa/inet.h>
@@ -10,22 +10,24 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define DEFAULT_HOSTNAME "www.github.com"
+#define DEFAULT_HOSTNAME "api.github.com"
 #define PORT 443
-#define HTTP_REQUEST "GET /octocat HTTP/1.1\r\n" \
-"Host: api.github.com\r\n" \
-"User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:136.0) Gecko/20100101 Firefox/136.0\r\n" \
-"Accept: application/json\r\n" \
-"Connection: close\r\n\r\n"
+#define HTTP_REQUEST                                                           \
+  "GET /octocat HTTP/1.1\r\n"                                                  \
+  "Host: api.github.com\r\n"                                                   \
+  "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:136.0) "       \
+  "Gecko/20100101 Firefox/136.0\r\n"                                           \
+  "Accept: application/json\r\n"                                               \
+  "Connection: close\r\n\r\n"
 
-static int net_connect(const char *host, int port) {
+static int tcp_connect(const char *host, int port) {
   struct sockaddr_in server_addr;
   struct hostent *server;
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0)
     return -1;
 
-  server = gethostbyname(host);
+  server = gethostbyname(host); // TODO: use getaddrinfo instead
   if (!server)
     return -1;
 
@@ -42,7 +44,7 @@ static int net_connect(const char *host, int port) {
   return sockfd;
 }
 
-static void net_cleanup(int sockfd) { close(sockfd); }
+static void tcp_close(int sockfd) { close(sockfd); }
 
 int main(int argc, char **argv) {
   char *hostname = (argc < 2) ? DEFAULT_HOSTNAME : argv[1];
@@ -55,17 +57,17 @@ int main(int argc, char **argv) {
   wolfSSL_Init();
   // wolfSSL_Debugging_ON();  // uncomment if we need extra debug input
   ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
+  wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
   if (!ctx) {
     printf("Failed to create WolfSSL context\n");
     return -1;
   }
-  
-  // Root certificates downloaded from 
+
+  // Root certificates downloaded from
   // https://ccadb.my.salesforce-sites.com/mozilla/IncludedRootsPEMTxt?TrustBitsInclude=Websites
   if (wolfSSL_CTX_load_verify_locations(
-          ctx, "./examples/mozilla-trusted-ca.pem", 0) != SSL_SUCCESS) {
-    fprintf(stderr, "Error loading ./ca-cert.pem,"
-                    " please check the file.\n");
+          ctx, "./examples/mozilla-trusted-ca.pem", NULL) != SSL_SUCCESS) {
+    fprintf(stderr, "Error loading root certificates please check the file.\n");
     exit(EXIT_FAILURE);
   }
 
@@ -80,8 +82,7 @@ int main(int argc, char **argv) {
   // wolfSSL_set_verify(ssl, WOLFSSL_VERIFY_NONE, NULL);
 
   // Connect to server
-  sockfd = net_connect(hostname, PORT);
-  if (sockfd < 0) {
+  if ((sockfd = tcp_connect(hostname, PORT)) < 0) {
     printf("Failed to connect to server\n");
     wolfSSL_free(ssl);
     wolfSSL_CTX_free(ctx);
@@ -92,11 +93,16 @@ int main(int argc, char **argv) {
   wolfSSL_set_fd(ssl, sockfd);
 
   // Perform SSL handshake
-  if (wolfSSL_connect(ssl) != WOLFSSL_SUCCESS) {
-    int err = wolfSSL_get_error(ssl, 0);
+  int ssl_conn_ret;
+  if ((ssl_conn_ret = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
+    // https://www.wolfssl.com/documentation/manuals/wolfssl/chapter08.html
+    // Examples shows errmsg only needs 80 bytes
+    char errmsg[80];
+    int err = wolfSSL_get_error(ssl, ssl_conn_ret);
     printf("TLS handshake failed: %d\n", err);
-    printf("Error string: %s\n", wolfSSL_ERR_error_string(err, NULL));
-    net_cleanup(sockfd);
+    wolfSSL_ERR_error_string(err, errmsg);
+    printf("Error string: %s\n", errmsg);
+    tcp_close(sockfd);
     wolfSSL_free(ssl);
     wolfSSL_CTX_free(ctx);
     return -1;
@@ -109,17 +115,18 @@ int main(int argc, char **argv) {
   } else {
     printf("Wrote %d bytes from %s\n", txsize, hostname);
   }
-  uint8_t app_readbuf[65535];
-  // Read in a loop until wolfSSL_read returns 0, indicating the end of the
-  // message
-  int readsize = wolfSSL_read(ssl, app_readbuf, sizeof(app_readbuf));
-  while (readsize < sizeof(app_readbuf)
-    && wolfSSL_read(ssl, app_readbuf + readsize, sizeof(app_readbuf) - readsize) > 0);
-  printf("%s\n", app_readbuf);
+  uint8_t rxbuf[65535];
+  size_t rxbuflen = 0;
+  size_t readlen;
+  while ((readlen = wolfSSL_read(ssl, rxbuf + rxbuflen,
+                                 sizeof(rxbuf) - rxbuflen)) > 0) {
+    rxbuflen += readlen;
+  }
+  printf("%s\n", rxbuf);
 
   // Clean up
   wolfSSL_shutdown(ssl);
-  net_cleanup(sockfd);
+  tcp_close(sockfd);
   wolfSSL_free(ssl);
   wolfSSL_CTX_free(ctx);
   wolfSSL_Cleanup();
