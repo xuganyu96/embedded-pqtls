@@ -19,6 +19,13 @@ else()
     message(FATAL_ERROR "Error: environment variable WIFI_PASSWORD is not set."
     "Did you source ${CMAKE_CURRENT_LIST_DIR}/.env?")
 endif()
+if(DEFINED ENV{TEST_TCP_SERVER_IP})
+    set(TEST_TCP_SERVER_IP $ENV{TEST_TCP_SERVER_IP})
+    message("Wifi PASSWORD set to ${TEST_TCP_SERVER_IP}")
+else()
+    message(FATAL_ERROR "Error: environment variable TEST_TCP_SERVER_IP is not set."
+    "Did you source ${CMAKE_CURRENT_LIST_DIR}/.env?")
+endif()
 
 include(pico_sdk_import.cmake)
 project(pico-pqtls C CXX ASM)
@@ -42,9 +49,10 @@ add_executable(tcp_client src/tcp_client.c ${COMMON_SRC})
 pico_enable_stdio_uart(tcp_client 0)
 pico_enable_stdio_usb(tcp_client 1)
 target_link_libraries(tcp_client pico_stdlib pico_cyw43_arch_lwip_poll)
-target_compile_definitions(tcp_client  PRIVATE
+target_compile_definitions(tcp_client PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
 )
 pico_add_extra_outputs(tcp_client)
 
