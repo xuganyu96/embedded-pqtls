@@ -1,6 +1,10 @@
 #ifndef _UTILS_H
 #define _UTILS_H
 #include <stdint.h>
+#include <pico/assert.h>
+
+// Change to something else if needed
+#define DEBUG_printf printf
 
 /**
  * Perform a countdown

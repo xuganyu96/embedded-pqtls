@@ -4,34 +4,30 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(PICO_BOARD pico2_w CACHE STRING "Board type")
 
-# Use environment variables WIFI_SSID and WIFI_PASSWORD to set wifi parameters
-if(DEFINED ENV{WIFI_SSID})
-    set(WIFI_SSID $ENV{WIFI_SSID})
-    message("Wifi SSID set to ${WIFI_SSID}")
-else()
-    message(FATAL_ERROR "Error: environment variable WIFI_SSID is not set."
-    "Did you source ${CMAKE_CURRENT_LIST_DIR}/.env?")
-endif()
-if(DEFINED ENV{WIFI_PASSWORD})
-    set(WIFI_PASSWORD $ENV{WIFI_PASSWORD})
-    message("Wifi PASSWORD set to ${WIFI_PASSWORD}")
-else()
-    message(FATAL_ERROR "Error: environment variable WIFI_PASSWORD is not set."
-    "Did you source ${CMAKE_CURRENT_LIST_DIR}/.env?")
-endif()
-if(DEFINED ENV{TEST_TCP_SERVER_IP})
-    set(TEST_TCP_SERVER_IP $ENV{TEST_TCP_SERVER_IP})
-    message("Wifi PASSWORD set to ${TEST_TCP_SERVER_IP}")
-else()
-    message(FATAL_ERROR "Error: environment variable TEST_TCP_SERVER_IP is not set."
-    "Did you source ${CMAKE_CURRENT_LIST_DIR}/.env?")
-endif()
+# Define a helper macro
+macro(require_env_var VAR_NAME)
+    if(DEFINED ENV{${VAR_NAME}})
+        set(${VAR_NAME} $ENV{${VAR_NAME}})
+        message(STATUS "${VAR_NAME} set to ${${VAR_NAME}}")
+    else()
+        message(FATAL_ERROR "Error: environment variable ${VAR_NAME} is not set."
+            " Did you source ${CMAKE_CURRENT_LIST_DIR}/.env?")
+    endif()
+endmacro()
+
+# Use it for required variables
+require_env_var(WIFI_SSID)
+require_env_var(WIFI_PASSWORD)
+require_env_var(TEST_TCP_SERVER_IP)
+require_env_var(TEST_TCP_SERVER_PORT)
 
 include(pico_sdk_import.cmake)
 project(pico-pqtls C CXX ASM)
 pico_sdk_init()
+
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
+include_directories(${CMAKE_CURRENT_LIST_DIR}/config)
+include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 
 file(GLOB COMMON_SRC src/common/*.c)
 
@@ -56,3 +52,14 @@ target_compile_definitions(tcp_client PRIVATE
 )
 pico_add_extra_outputs(tcp_client)
 
+add_executable(tcp_stream src/tcp_stream.c ${COMMON_SRC})
+pico_enable_stdio_uart(tcp_stream 0)
+pico_enable_stdio_usb(tcp_stream 1)
+target_link_libraries(tcp_stream pico_stdlib pico_cyw43_arch_lwip_poll)
+target_compile_definitions(tcp_stream PRIVATE
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
+    TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
+)
+pico_add_extra_outputs(tcp_stream)
