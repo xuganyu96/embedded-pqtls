@@ -2,7 +2,7 @@
 #include <pico/stdlib.h>
 #include <stdio.h>
 
-#include "utils.h"
+#include "pico-pqtls/utils.h"
 
 void countdown_s(int dur) {
   for (int i = dur; i > 0; i--) {

@@ -13,5 +13,6 @@ void countdown_s(int dur);
  *
  * Calling this method will call cyw43_arch_poll()
  */
-void ensure_wifi_connection_blocking(const char *ssid, const char *pw, uint32_t auth);
+void ensure_wifi_connection_blocking(const char *ssid, const char *pw,
+                                     uint32_t auth);
 #endif

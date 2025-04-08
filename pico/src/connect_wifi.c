@@ -2,7 +2,7 @@
 #include <pico/stdlib.h>
 #include <stdio.h>
 
-#include "common/utils.h"
+#include "pico-pqtls/utils.h"
 
 int main() {
   stdio_init_all();
