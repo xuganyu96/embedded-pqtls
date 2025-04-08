@@ -30,7 +30,7 @@ int main(void) {
 
     err = PICO_PQTLS_tcp_stream_connect(stream, TEST_TCP_SERVER_IP,
                                         TEST_TCP_SERVER_PORT);
-    if (err == ERR_OK) {
+    if (err == ERR_OK && stream->connected) {
       DEBUG_printf("Connected to %s:%d\n", TEST_TCP_SERVER_IP,
                    TEST_TCP_SERVER_PORT);
     } else {

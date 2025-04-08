@@ -24,7 +24,7 @@ static err_t tcp_result(PICO_PQTLS_tcp_stream_t *sock, int status) {
  * - Uses tcp_output() to push data down the stack.
  */
 static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
-  DEBUG_printf("Polling TCP\n");
+  DEBUG_printf("tcp_stream_poll\n");
   // PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
 
   // if (!state || !state->connected) {
@@ -64,22 +64,22 @@ static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
 }
 
 static err_t tcp_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
-  PICO_PQTLS_tcp_stream_t *sock = (PICO_PQTLS_tcp_stream_t *)arg;
+  DEBUG_printf("callback: tcp_stream_sent %u\n", len);
+  PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
+  state->sent_len += len;
 
-  sock->sent_len += len;
+  if (state->sent_len >= BUF_SIZE) {
 
-  if (sock->sent_len >= BUF_SIZE) {
-
-    // TODO: I don't want to the testy stuff
-    // sock->run_count++;
-    // if (sock->run_count >= 10) {
-    //   tcp_result(arg, 0);
-    //   return ERR_OK;
-    // }
+    state->run_count++;
+    if (state->run_count >= 999999) {
+      tcp_result(arg, 0);
+      return ERR_OK;
+    }
 
     // We should receive a new buffer from the server
-    sock->buffer_len = 0;
-    sock->sent_len = 0;
+    state->buffer_len = 0;
+    state->sent_len = 0;
+    DEBUG_printf("Waiting for buffer from server\n");
   }
 
   return ERR_OK;
@@ -87,6 +87,7 @@ static err_t tcp_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
 
 static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
                              err_t err) {
+  DEBUG_printf("callback: tcp_stream_recv\n");
   PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
   if (!p) {
     return tcp_result(arg, -1);
@@ -123,6 +124,7 @@ static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
 }
 
 static void tcp_stream_err(void *arg, err_t err) {
+  DEBUG_printf("callback: tcp_stream_err\n");
   if (err != ERR_ABRT) {
     DEBUG_printf("tcp_stream_err %d\n", err);
     tcp_result(arg, err);
@@ -130,23 +132,24 @@ static void tcp_stream_err(void *arg, err_t err) {
 }
 
 static err_t tcp_stream_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
-  PICO_PQTLS_tcp_stream_t *sock = (PICO_PQTLS_tcp_stream_t *)arg;
+  DEBUG_printf("callback: tcp_stream_connected\n");
+  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
 
   if (err != ERR_OK) {
     DEBUG_printf("connect failed %d\n", err);
     return tcp_result(arg, err);
   }
-  sock->connected = true;
+  stream->connected = true;
   return ERR_OK;
 }
 
 PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void) {
-  PICO_PQTLS_tcp_stream_t *stream = malloc(sizeof(PICO_PQTLS_tcp_stream_t));
+  PICO_PQTLS_tcp_stream_t *stream = calloc(1, sizeof(PICO_PQTLS_tcp_stream_t));
   if (!stream) {
     DEBUG_printf("Failed to allocate for stream\n");
     return NULL;
   }
-  memset(stream, 0, sizeof(PICO_PQTLS_tcp_stream_t));
+  // memset(stream, 0, sizeof(PICO_PQTLS_tcp_stream_t));
   stream->tcp_pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
   if (!stream->tcp_pcb) {
     DEBUG_printf("Failed to allocate for tcp_pcb\n");
@@ -161,7 +164,7 @@ PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void) {
 
   // set the callbacks
   tcp_arg(stream->tcp_pcb, stream);
-  tcp_poll(stream->tcp_pcb, tcp_stream_poll, 1);
+  tcp_poll(stream->tcp_pcb, tcp_stream_poll, 10);
   tcp_sent(stream->tcp_pcb, tcp_stream_sent);
   tcp_recv(stream->tcp_pcb, tcp_stream_recv);
   tcp_err(stream->tcp_pcb, tcp_stream_err);
