@@ -30,9 +30,9 @@ endif()
 include(pico_sdk_import.cmake)
 project(pico-pqtls C CXX ASM)
 pico_sdk_init()
-
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
+include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
+
 file(GLOB COMMON_SRC src/common/*.c)
 
 add_executable(connect_wifi src/connect_wifi.c ${COMMON_SRC})

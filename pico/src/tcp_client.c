@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "pico-pqtls/utils.h"
+#include "common/utils.h"
 
 #if !defined(TEST_TCP_SERVER_IP)
 #error TEST_TCP_SERVER_IP not defined
