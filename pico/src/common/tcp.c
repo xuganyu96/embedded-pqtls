@@ -4,6 +4,8 @@
 #include <lwip/pbuf.h>
 #include <lwip/tcp.h>
 #include <pico/cyw43_arch.h>
+#include <pico/stdlib.h>
+#include <pico/types.h>
 #include <string.h>
 
 /**
@@ -55,15 +57,20 @@ static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
 }
 
 static err_t tcp_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
-  DEBUG_printf("callback: tcp_stream_sent %u\n", len);
-  PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
-  state->sent_len += len;
+  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
 
-  if (state->sent_len >= BUF_SIZE) {
+  stream->sent_len += len;
+  if (stream->sent_len >= BUF_SIZE) {
+
+    // stream->run_count++;
+    // if (stream->run_count >= TEST_ITERATIONS) {
+    //   tcp_result(arg, 0);
+    //   return ERR_OK;
+    // }
+
     // We should receive a new buffer from the server
-    state->buffer_len = 0;
-    state->sent_len = 0;
-    DEBUG_printf("Waiting for buffer from server\n");
+    stream->tx_buflen = 0;
+    stream->sent_len = 0;
   }
 
   return ERR_OK;
@@ -71,40 +78,21 @@ static err_t tcp_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
 
 static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
                              err_t err) {
-  DEBUG_printf("callback: tcp_stream_recv\n");
-  PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
-  if (!p) {
-    DEBUG_printf("pbuf is NULL\n");
-    return ERR_ARG;
+  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
+  cyw43_arch_poll();
+  if (!p) { // peer has hung up
+    stream->complete = true;
+    return ERR_OK;
   }
-  // this method is callback from lwIP, so cyw43_arch_lwip_begin is not
-  // required, however you can use this method to cause an assertion in debug
-  // mode, if this method is called when cyw43_arch_lwip_begin IS needed
-  cyw43_arch_lwip_check();
-  if (p->tot_len > 0) {
-    DEBUG_printf("recv %d err %d\n", p->tot_len, err);
-    for (struct pbuf *q = p; q != NULL; q = q->next) {
-      // DUMP_BYTES(q->payload, q->len);
-    }
-    // Receive the buffer
-    const uint16_t buffer_left = BUF_SIZE - state->buffer_len;
-    state->buffer_len += pbuf_copy_partial(
-        p, state->buffer + state->buffer_len,
-        p->tot_len > buffer_left ? buffer_left : p->tot_len, 0);
-    tcp_recved(tpcb, p->tot_len);
+  size_t to_copy = MIN(BUF_SIZE - stream->rx_buflen, p->tot_len);
+  if (to_copy > 0) {
+    // TODO: what if to_copy is less than p->tot_len? Since we will free p
+    // afterwards, will data be lost?
+    pbuf_copy_partial(p, stream->rx_buf + stream->rx_buflen, to_copy, 0);
+    stream->rx_buflen += to_copy;
+    tcp_recved(tpcb, to_copy);
   }
   pbuf_free(p);
-
-  // If we have received the whole buffer, send it back to the server
-  if (state->buffer_len == BUF_SIZE) {
-    DEBUG_printf("Writing %d bytes to server\n", state->buffer_len);
-    err_t err =
-        tcp_write(tpcb, state->buffer, state->buffer_len, TCP_WRITE_FLAG_COPY);
-    if (err != ERR_OK) {
-      DEBUG_printf("Failed to write data %d\n", err);
-      return err;
-    }
-  }
   return ERR_OK;
 }
 
@@ -123,6 +111,7 @@ static err_t tcp_stream_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
     return err;
   }
   stream->connected = true;
+  cyw43_arch_poll();
   return ERR_OK;
 }
 
@@ -140,10 +129,10 @@ PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void) {
     free(stream);
     return NULL;
   }
-  stream->buffer_len = 0;
+  stream->rx_buflen = 0;
+  stream->tx_buflen = 0;
   stream->sent_len = 0;
   stream->complete = false;
-  stream->run_count = 0;
   stream->connected = false;
 
   // set the callbacks
@@ -180,7 +169,7 @@ err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,
                port);
   err = tcp_connect(stream->tcp_pcb, &stream->remote_addr, port,
                     tcp_stream_connected);
-  DEBUG_printf("tcp_connect returned %d\n", err);
+  // DEBUG_printf("tcp_connect returned %d\n", err);
   // continue polling until the callback is executed
   uint32_t elapsed = 0;
   while (!stream->connected && elapsed < timeout_ms) {
@@ -196,7 +185,41 @@ err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,
 }
 
 int PICO_PQTLS_tcp_stream_read(PICO_PQTLS_tcp_stream_t *stream, uint8_t *buf,
-                               size_t buflen);
+                               size_t buflen) {
+  cyw43_arch_poll();
+  if (stream->rx_buflen == 0) {
+    return 0;
+  }
+  size_t to_copy = MIN(buflen, stream->rx_buflen);
+  if (to_copy > 0) {
+    memcpy(buf, stream->rx_buf, to_copy);
+    memmove(stream->rx_buf, stream->rx_buf + to_copy,
+            stream->rx_buflen - to_copy);
+    stream->rx_buflen -= to_copy;
+  }
+  return to_copy;
+}
+
+int PICO_PQTLS_tcp_stream_read_exact(PICO_PQTLS_tcp_stream_t *stream,
+                                     uint8_t *buf, size_t len,
+                                     uint32_t timeout_ms) {
+  size_t received = 0;
+  uint32_t start = to_ms_since_boot(get_absolute_time());
+
+  while (received < len &&
+         (to_ms_since_boot(get_absolute_time()) - start) < timeout_ms) {
+    int fraglen =
+        PICO_PQTLS_tcp_stream_read(stream, buf + received, len - received);
+    if (fraglen < 0) {
+      return -1;
+    }
+    received += fraglen;
+    sleep_ms(1);
+  }
+
+  return received;
+}
+
 int PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
                                 const uint8_t *buf, size_t buflen);
 

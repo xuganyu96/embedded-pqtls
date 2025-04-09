@@ -1,3 +1,18 @@
+/**
+ * Example TCP client
+ *
+ * NOTE: April 9, 2025
+ * There is an interesting panic that I ran into. The server uses `nc -lv 8000`
+ * to listen for incoming TCP connection. First run the server, then start the
+ * Pico, at which time the Pico will repeatedly establish connection, then
+ * gracefully terminate it. The second step is to stop the server, at which
+ * point the Pico should start reporting "failing to connect", which is still
+ * ok. For the third time, start the server again, then **the Pico will make one
+ * successful connection before panic**: Connecting to 129.97.229.167:8000
+ * tcp_connect returned 0
+ * *** PANIC ***
+ * tcp_input: TIME-WAIT pcb->state == TIME-WAIT
+ */
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
 #include <stdio.h>
@@ -9,8 +24,9 @@
 #define TCP_CONNECT_TIMEOUT_MS 1000
 
 int main(void) {
+  uint8_t app_buf[512];
   stdio_init_all();
-  // countdown_s(10);
+  countdown_s(10);
 
   if (cyw43_arch_init()) {
     printf("cyw43_arch_init failed\n");
@@ -41,8 +57,14 @@ int main(void) {
       DEBUG_printf("Failed to establish connection within %d ms (err=%d)\n",
                    TCP_CONNECT_TIMEOUT_MS, err);
       PICO_PQTLS_tcp_stream_close(stream);
-      sleep_ms(2000);
-      continue;
+      goto sleep;
+    }
+
+    int hellolen = PICO_PQTLS_tcp_stream_read_exact(stream, app_buf,
+                                                    strlen("hello"), 1000);
+    if (hellolen > 0) {
+      app_buf[hellolen] = 0; // Null-terminate the received string
+      DEBUG_printf("Received %d bytes: %s\n", hellolen, app_buf);
     }
 
     err = PICO_PQTLS_tcp_stream_close(stream);
@@ -54,6 +76,8 @@ int main(void) {
       DEBUG_printf("FATAL: UNREACHABLE!\n");
       return -1;
     }
+
+  sleep:
     sleep_ms(2000);
   }
 }
