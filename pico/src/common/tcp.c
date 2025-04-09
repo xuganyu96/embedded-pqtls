@@ -86,14 +86,18 @@ static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
     stream->rx_buflen += to_copy;
     tcp_recved(tpcb, to_copy);
   }
+  // TODO: Copy only to_copy, but leave p unfreed and buffer the rest on next
+  // recv.
   pbuf_free(p);
   return ERR_OK;
 }
 
 static void tcp_stream_err(void *arg, err_t err) {
-  DEBUG_printf("callback: tcp_stream_err\n");
+  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
+  stream->connected = false;
+  stream->complete = true;
   if (err != ERR_ABRT) {
-    DEBUG_printf("tcp_stream_err %d\n", err);
+    DEBUG_printf("Non-abort error (err %d)\n", err);
   }
 }
 
@@ -125,7 +129,6 @@ PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void) {
   }
   stream->rx_buflen = 0;
   stream->tx_buflen = 0;
-  stream->sent_len = 0;
   stream->complete = false;
   stream->connected = false;
 
@@ -163,7 +166,11 @@ err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,
                port);
   err = tcp_connect(stream->tcp_pcb, &stream->remote_addr, port,
                     tcp_stream_connected);
-  // DEBUG_printf("tcp_connect returned %d\n", err);
+  if (err != ERR_OK) {
+    // no need to wait for connection callback, but clean up of pcb and stream
+    // will be left to the user calling tcp_stream_close(stream)
+    return err;
+  }
   // continue polling until the callback is executed
   uint32_t elapsed = 0;
   while (!stream->connected && elapsed < timeout_ms) {
@@ -223,13 +230,15 @@ PICO_PQTLS_tcp_stream_read_exact(PICO_PQTLS_tcp_stream_t *stream, uint8_t *dst,
     } else if (result == TCP_RESULT_TIMEOUT || result == TCP_RESULT_ERROR) {
       return result;
     } else if (result == TCP_RESULT_EOF) {
-      return total == 0 ? TCP_RESULT_EOF : TCP_RESULT_OK;
+      return TCP_RESULT_EOF;
     }
   }
 
   return TCP_RESULT_OK;
 }
 
+// TODO: Add tcp_stream_flush() and let callers choose when to flush. Only flush
+// automatically on: timeouts, buffer full, or stream close
 PICO_PQTLS_tcp_err_t
 PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
                             const uint8_t *data, size_t len,
@@ -251,6 +260,8 @@ PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
       err_t err = tcp_output(stream->tcp_pcb);
       if (err != ERR_OK)
         return TCP_RESULT_ERROR;
+      // TODO: Use sleep_us(100) or exponential backoff for better performance
+      // vs CPU usage.
       sleep_ms(1);
       if (timeout_ms > 0 &&
           absolute_time_diff_us(start, get_absolute_time()) / 1000 >=

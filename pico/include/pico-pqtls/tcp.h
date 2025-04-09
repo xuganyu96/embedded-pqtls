@@ -24,7 +24,6 @@ typedef struct PICO_PQTLS_tcp_stream {
   uint8_t tx_buf[TCP_STREAM_BUF_SIZE];
   size_t tx_buflen;
   size_t tx_buf_sent;
-  size_t sent_len;
   bool complete;
   bool connected;
 } PICO_PQTLS_tcp_stream_t;
