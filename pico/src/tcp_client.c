@@ -1,3 +1,6 @@
+/**
+* Working TCP client example: connect to TCP_SERVER_IP at TCP_SERVER_PORT, then hang up
+*/
 #include <lwip/pbuf.h>
 #include <lwip/tcp.h>
 #include <pico/cyw43_arch.h>
@@ -90,7 +93,7 @@ static err_t tcp_client_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
     return tcp_result(arg, err);
   }
   state->connected = true;
-  DEBUG_printf("Waiting for buffer from server\n");
+  DEBUG_printf("Connected! Waiting for buffer from server\n");
   return ERR_OK;
 }
 
@@ -146,6 +149,7 @@ err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
 static bool tcp_client_open(TCP_CLIENT_T *state) {
   DEBUG_printf("Connecting to %s port %u\n", ip4addr_ntoa(&state->remote_addr),
                TEST_TCP_SERVER_PORT);
+  DEBUG_printf("IP address type: %d\n", IP_GET_TYPE(&state->remote_addr));
   state->tcp_pcb = tcp_new_ip_type(IP_GET_TYPE(&state->remote_addr));
   if (!state->tcp_pcb) {
     DEBUG_printf("failed to create pcb\n");

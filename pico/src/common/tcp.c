@@ -144,12 +144,13 @@ static err_t tcp_stream_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
 }
 
 PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void) {
-  PICO_PQTLS_tcp_stream_t *stream = calloc(1, sizeof(PICO_PQTLS_tcp_stream_t));
+  PICO_PQTLS_tcp_stream_t *stream = malloc(sizeof(PICO_PQTLS_tcp_stream_t));
   if (!stream) {
     DEBUG_printf("Failed to allocate for stream\n");
     return NULL;
   }
   // memset(stream, 0, sizeof(PICO_PQTLS_tcp_stream_t));
+  // DEBUG_printf("IP address type: %d\n", IPADDR_TYPE_V4);
   stream->tcp_pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
   if (!stream->tcp_pcb) {
     DEBUG_printf("Failed to allocate for tcp_pcb\n");
@@ -193,8 +194,11 @@ err_t PICO_PQTLS_tcp_stream_connect(PICO_PQTLS_tcp_stream_t *stream,
     return ERR_ARG;
   }
   cyw43_arch_lwip_begin();
+  DEBUG_printf("Connecting to %s:%d\n", ip4addr_ntoa(&stream->remote_addr),
+               port);
   err = tcp_connect(stream->tcp_pcb, &stream->remote_addr, port,
                     tcp_stream_connected);
+  DEBUG_printf("tcp_connect returned %d\n", err);
   cyw43_arch_lwip_end();
   return err;
 }
