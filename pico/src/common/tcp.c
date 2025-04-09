@@ -5,6 +5,7 @@
 #include <lwip/tcp.h>
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
+#include <pico/time.h>
 #include <pico/types.h>
 #include <string.h>
 
@@ -184,40 +185,56 @@ err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,
   return err;
 }
 
-int PICO_PQTLS_tcp_stream_read(PICO_PQTLS_tcp_stream_t *stream, uint8_t *buf,
-                               size_t buflen) {
-  cyw43_arch_poll();
-  if (stream->rx_buflen == 0) {
-    return 0;
-  }
-  size_t to_copy = MIN(buflen, stream->rx_buflen);
-  if (to_copy > 0) {
-    memcpy(buf, stream->rx_buf, to_copy);
-    memmove(stream->rx_buf, stream->rx_buf + to_copy,
-            stream->rx_buflen - to_copy);
-    stream->rx_buflen -= to_copy;
-  }
-  return to_copy;
-}
+PICO_PQTLS_tcp_err_t PICO_PQTLS_tcp_stream_read(PICO_PQTLS_tcp_stream_t *stream,
+                                                uint8_t *buf, size_t buflen,
+                                                size_t *outlen,
+                                                uint32_t timeout) {
+  if (!stream || !stream->connected || !buf || buflen == 0 || !outlen)
+    return TCP_RESULT_ERROR;
 
-int PICO_PQTLS_tcp_stream_read_exact(PICO_PQTLS_tcp_stream_t *stream,
-                                     uint8_t *buf, size_t len,
-                                     uint32_t timeout_ms) {
-  size_t received = 0;
-  uint32_t start = to_ms_since_boot(get_absolute_time());
+  absolute_time_t start = get_absolute_time();
 
-  while (received < len &&
-         (to_ms_since_boot(get_absolute_time()) - start) < timeout_ms) {
-    int fraglen =
-        PICO_PQTLS_tcp_stream_read(stream, buf + received, len - received);
-    if (fraglen < 0) {
-      return -1;
+  while (stream->rx_buflen == 0 && !stream->complete) {
+    cyw43_arch_poll();
+    if (timeout > 0 &&
+        to_ms_since_boot(get_absolute_time()) - to_ms_since_boot(start) >
+            timeout) {
+      return TCP_RESULT_TIMEOUT;
     }
-    received += fraglen;
     sleep_ms(1);
   }
 
-  return received;
+  if (stream->rx_buflen == 0 && stream->complete) {
+    return TCP_RESULT_EOF;
+  }
+  size_t to_copy = MIN(buflen, stream->rx_buflen);
+  memcpy(buf, stream->rx_buf, to_copy);
+  memmove(stream->rx_buf, stream->rx_buf + to_copy,
+          stream->rx_buflen - to_copy);
+  stream->rx_buflen -= to_copy;
+  *outlen = to_copy;
+  return TCP_RESULT_OK;
+}
+
+PICO_PQTLS_tcp_err_t
+PICO_PQTLS_tcp_stream_read_exact(PICO_PQTLS_tcp_stream_t *stream, uint8_t *dst,
+                                 size_t len, uint32_t timeout_ms) {
+  size_t total = 0;
+
+  while (total < len) {
+    size_t n = 0;
+    PICO_PQTLS_tcp_err_t result = PICO_PQTLS_tcp_stream_read(
+        stream, dst + total, len - total, &n, timeout_ms);
+    if (result == TCP_RESULT_OK) {
+      total += n;
+    } else if (result == TCP_RESULT_TIMEOUT || result == TCP_RESULT_ERROR) {
+      return result;
+    } else if (result == TCP_RESULT_EOF) {
+      return total == 0 ? TCP_RESULT_EOF : TCP_RESULT_OK;
+    }
+  }
+
+  return TCP_RESULT_OK;
 }
 
 int PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,

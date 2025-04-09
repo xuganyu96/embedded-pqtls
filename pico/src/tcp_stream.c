@@ -20,8 +20,8 @@
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
 
-// This is a safe choice; 700 will fail sometimes
 #define TCP_CONNECT_TIMEOUT_MS 1000
+#define TCP_READ_TIMEOUT_MS 10000
 
 int main(void) {
   uint8_t app_buf[512];
@@ -36,6 +36,8 @@ int main(void) {
   cyw43_arch_enable_sta_mode();
 
   err_t err;
+  size_t outlen;
+  PICO_PQTLS_tcp_err_t tcp_err;
 
   while (1) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
@@ -60,11 +62,13 @@ int main(void) {
       goto sleep;
     }
 
-    int hellolen = PICO_PQTLS_tcp_stream_read_exact(stream, app_buf,
-                                                    strlen("hello"), 1000);
-    if (hellolen > 0) {
-      app_buf[hellolen] = 0; // Null-terminate the received string
-      DEBUG_printf("Received %d bytes: %s\n", hellolen, app_buf);
+    tcp_err = PICO_PQTLS_tcp_stream_read(stream, app_buf, sizeof(app_buf),
+                                         &outlen, TCP_READ_TIMEOUT_MS);
+    if (tcp_err == TCP_RESULT_OK) {
+      app_buf[outlen] = 0; // Null-terminate the received string
+      printf("Received %d bytes: %s\n", outlen, app_buf);
+    } else {
+      printf("Read error: %d\n", tcp_err);
     }
 
     err = PICO_PQTLS_tcp_stream_close(stream);
