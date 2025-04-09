@@ -6,16 +6,6 @@
 #include <pico/cyw43_arch.h>
 #include <string.h>
 
-static err_t tcp_result(PICO_PQTLS_tcp_stream_t *sock, int status) {
-  if (status == 0) {
-    DEBUG_printf("test success\n");
-  } else {
-    DEBUG_printf("test failed %d\n", status);
-  }
-  sock->complete = true;
-  return 0;
-}
-
 /**
  * The polling callback in lwIP is your chance to handle periodic tasks for a
  * TCP connection—especially when the connection is idle:
@@ -25,6 +15,7 @@ static err_t tcp_result(PICO_PQTLS_tcp_stream_t *sock, int status) {
  */
 static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
   DEBUG_printf("tcp_stream_poll\n");
+  cyw43_arch_poll();
   // PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
 
   // if (!state || !state->connected) {
@@ -69,13 +60,6 @@ static err_t tcp_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
   state->sent_len += len;
 
   if (state->sent_len >= BUF_SIZE) {
-
-    state->run_count++;
-    if (state->run_count >= 999999) {
-      tcp_result(arg, 0);
-      return ERR_OK;
-    }
-
     // We should receive a new buffer from the server
     state->buffer_len = 0;
     state->sent_len = 0;
@@ -90,7 +74,8 @@ static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
   DEBUG_printf("callback: tcp_stream_recv\n");
   PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
   if (!p) {
-    return tcp_result(arg, -1);
+    DEBUG_printf("pbuf is NULL\n");
+    return ERR_ARG;
   }
   // this method is callback from lwIP, so cyw43_arch_lwip_begin is not
   // required, however you can use this method to cause an assertion in debug
@@ -117,7 +102,7 @@ static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
         tcp_write(tpcb, state->buffer, state->buffer_len, TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
       DEBUG_printf("Failed to write data %d\n", err);
-      return tcp_result(arg, -1);
+      return err;
     }
   }
   return ERR_OK;
@@ -127,17 +112,15 @@ static void tcp_stream_err(void *arg, err_t err) {
   DEBUG_printf("callback: tcp_stream_err\n");
   if (err != ERR_ABRT) {
     DEBUG_printf("tcp_stream_err %d\n", err);
-    tcp_result(arg, err);
   }
 }
 
 static err_t tcp_stream_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
-  DEBUG_printf("callback: tcp_stream_connected\n");
+  // DEBUG_printf("callback: tcp_stream_connected\n");
   PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
-
   if (err != ERR_OK) {
     DEBUG_printf("connect failed %d\n", err);
-    return tcp_result(arg, err);
+    return err;
   }
   stream->connected = true;
   return ERR_OK;
@@ -175,9 +158,6 @@ PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void) {
 
 void PICO_PQTLS_tcp_stream_free(PICO_PQTLS_tcp_stream_t *stream) {
   if (stream) {
-    if (stream->tcp_pcb) {
-      free(stream->tcp_pcb);
-    }
     free(stream);
   }
 }
@@ -186,8 +166,10 @@ void PICO_PQTLS_tcp_stream_free(PICO_PQTLS_tcp_stream_t *stream) {
  * If fail, caller is responsible for freeing the stream with
  * PICO_PQTLS_tcp_stream_free()
  */
-err_t PICO_PQTLS_tcp_stream_connect(PICO_PQTLS_tcp_stream_t *stream,
-                                    const char *server_ipv4, uint16_t port) {
+err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,
+                                               const char *server_ipv4,
+                                               uint16_t port,
+                                               uint32_t timeout_ms) {
   err_t err = ERR_OK;
   if (ip4addr_aton(server_ipv4, &stream->remote_addr) != 1) {
     DEBUG_printf("%s is not valid address\n", server_ipv4);
@@ -199,7 +181,17 @@ err_t PICO_PQTLS_tcp_stream_connect(PICO_PQTLS_tcp_stream_t *stream,
   err = tcp_connect(stream->tcp_pcb, &stream->remote_addr, port,
                     tcp_stream_connected);
   DEBUG_printf("tcp_connect returned %d\n", err);
+  // continue polling until the callback is executed
+  uint32_t elapsed = 0;
+  while (!stream->connected && elapsed < timeout_ms) {
+    cyw43_arch_poll();
+    sleep_ms(10);
+    elapsed += 10;
+  }
   cyw43_arch_lwip_end();
+  if (!stream->connected) {
+    return ERR_TIMEOUT;
+  }
   return err;
 }
 

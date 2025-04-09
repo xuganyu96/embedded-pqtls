@@ -22,8 +22,9 @@ typedef struct PICO_PQTLS_tcp_stream {
 
 PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void);
 void PICO_PQTLS_tcp_stream_free(PICO_PQTLS_tcp_stream_t *stream);
-err_t PICO_PQTLS_tcp_stream_connect(PICO_PQTLS_tcp_stream_t *stream,
-                                    const char *server_ipv4, uint16_t port);
+err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,
+                                               const char *server_ipv4,
+                                               uint16_t port, uint32_t timeout);
 int PICO_PQTLS_tcp_stream_read(PICO_PQTLS_tcp_stream_t *stream, uint8_t *buf,
                                size_t buflen);
 int PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
