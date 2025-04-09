@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BUF_SIZE (2048)
+#define TCP_STREAM_BUF_SIZE (2048)
 
 typedef enum PICO_PQTLS_tcp_err {
   TCP_RESULT_OK = 0,  // Success
@@ -19,9 +19,9 @@ typedef enum PICO_PQTLS_tcp_err {
 typedef struct PICO_PQTLS_tcp_stream {
   struct tcp_pcb *tcp_pcb;
   ip_addr_t remote_addr;
-  uint8_t rx_buf[BUF_SIZE];
+  uint8_t rx_buf[TCP_STREAM_BUF_SIZE];
   size_t rx_buflen;
-  uint8_t tx_buf[BUF_SIZE];
+  uint8_t tx_buf[TCP_STREAM_BUF_SIZE];
   size_t tx_buflen;
   size_t tx_buf_sent;
   size_t sent_len;
@@ -41,7 +41,9 @@ PICO_PQTLS_tcp_err_t PICO_PQTLS_tcp_stream_read(PICO_PQTLS_tcp_stream_t *stream,
 PICO_PQTLS_tcp_err_t
 PICO_PQTLS_tcp_stream_read_exact(PICO_PQTLS_tcp_stream_t *stream, uint8_t *dst,
                                  size_t len, uint32_t timeout_ms);
-int PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
-                                const uint8_t *buf, size_t buflen);
+PICO_PQTLS_tcp_err_t
+PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
+                            const uint8_t *data, size_t len,
+                            uint32_t timeout_ms);
 err_t PICO_PQTLS_tcp_stream_close(PICO_PQTLS_tcp_stream_t *stream);
 #endif

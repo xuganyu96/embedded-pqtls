@@ -22,6 +22,7 @@
 
 #define TCP_CONNECT_TIMEOUT_MS 1000
 #define TCP_READ_TIMEOUT_MS 10000
+#define CLIENT_GREETING "Client says: Hi mom!\n"
 
 int main(void) {
   uint8_t app_buf[512];
@@ -69,6 +70,15 @@ int main(void) {
       printf("Received %d bytes: %s\n", outlen, app_buf);
     } else {
       printf("Read error: %d\n", tcp_err);
+    }
+
+    tcp_err = PICO_PQTLS_tcp_stream_write(
+        stream, (const uint8_t *)CLIENT_GREETING, strlen(CLIENT_GREETING) + 1,
+        TCP_READ_TIMEOUT_MS);
+    if (tcp_err == TCP_RESULT_OK) {
+      printf("Sent %d bytes\n", strlen(CLIENT_GREETING) + 1);
+    } else {
+      printf("Write error: %d\n", tcp_err);
     }
 
     err = PICO_PQTLS_tcp_stream_close(stream);

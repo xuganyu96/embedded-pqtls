@@ -9,6 +9,35 @@
 #include <pico/types.h>
 #include <string.h>
 
+static void tcp_stream_flush_send_buffer(PICO_PQTLS_tcp_stream_t *stream) {
+  if (!stream || !stream->connected || stream->tx_buflen == 0)
+    return;
+
+  while (stream->tx_buf_sent < stream->tx_buflen) {
+    size_t unsent = stream->tx_buflen - stream->tx_buf_sent;
+    size_t can_send = tcp_sndbuf(stream->tcp_pcb);
+
+    size_t chunk = MIN(unsent, can_send);
+    if (chunk == 0)
+      break;
+
+    err_t err = tcp_write(stream->tcp_pcb, stream->tx_buf + stream->tx_buf_sent,
+                          chunk, TCP_WRITE_FLAG_COPY);
+    if (err != ERR_OK)
+      break;
+
+    stream->tx_buf_sent += chunk;
+  }
+
+  tcp_output(stream->tcp_pcb);
+
+  // If all sent, reset buffer
+  if (stream->tx_buf_sent == stream->tx_buflen) {
+    stream->tx_buf_sent = 0;
+    stream->tx_buflen = 0;
+  }
+}
+
 /**
  * The polling callback in lwIP is your chance to handle periodic tasks for a
  * TCP connection—especially when the connection is idle:
@@ -19,30 +48,8 @@
 static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
   DEBUG_printf("tcp_stream_poll\n");
   cyw43_arch_poll();
-  // PICO_PQTLS_tcp_stream_t *state = (PICO_PQTLS_tcp_stream_t *)arg;
-
-  // if (!state || !state->connected) {
-  //   return ERR_OK;
-  // }
-
-  // // If there's unsent data, try to send it
-  // if (state->sent_len < state->buffer_len) {
-  //   int remaining = state->buffer_len - state->sent_len;
-  //   const void *data = state->buffer + state->sent_len;
-
-  //   err_t err = tcp_write(tpcb, data, remaining, TCP_WRITE_FLAG_COPY);
-  //   if (err == ERR_OK) {
-  //     state->sent_len += remaining;
-  //     tcp_output(tpcb); // Push the data immediately
-  //   } else if (err == ERR_MEM) {
-  //     // Memory temporarily unavailable – try again later
-  //     return ERR_OK;
-  //   } else {
-  //     // Other error – close connection
-  //     tcp_abort(tpcb);
-  //     return ERR_ABRT;
-  //   }
-  // }
+  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
+  tcp_stream_flush_send_buffer(stream);
 
   // // If everything has been sent and marked complete, close the connection
   // if (state->complete && state->sent_len >= state->buffer_len) {
@@ -59,21 +66,7 @@ static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
 
 static err_t tcp_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
   PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
-
-  stream->sent_len += len;
-  if (stream->sent_len >= BUF_SIZE) {
-
-    // stream->run_count++;
-    // if (stream->run_count >= TEST_ITERATIONS) {
-    //   tcp_result(arg, 0);
-    //   return ERR_OK;
-    // }
-
-    // We should receive a new buffer from the server
-    stream->tx_buflen = 0;
-    stream->sent_len = 0;
-  }
-
+  tcp_stream_flush_send_buffer(stream);
   return ERR_OK;
 }
 
@@ -85,7 +78,7 @@ static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
     stream->complete = true;
     return ERR_OK;
   }
-  size_t to_copy = MIN(BUF_SIZE - stream->rx_buflen, p->tot_len);
+  size_t to_copy = MIN(TCP_STREAM_BUF_SIZE - stream->rx_buflen, p->tot_len);
   if (to_copy > 0) {
     // TODO: what if to_copy is less than p->tot_len? Since we will free p
     // afterwards, will data be lost?
@@ -237,8 +230,65 @@ PICO_PQTLS_tcp_stream_read_exact(PICO_PQTLS_tcp_stream_t *stream, uint8_t *dst,
   return TCP_RESULT_OK;
 }
 
-int PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
-                                const uint8_t *buf, size_t buflen);
+PICO_PQTLS_tcp_err_t
+PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
+                            const uint8_t *data, size_t len,
+                            uint32_t timeout_ms) {
+  if (!stream || !stream->connected || !data || len == 0) {
+    return TCP_RESULT_ERROR;
+  }
+
+  size_t total_sent = 0;
+  absolute_time_t start = get_absolute_time();
+
+  while (total_sent < len) {
+    // Determine space in the buffer
+    size_t space = TCP_STREAM_BUF_SIZE - stream->tx_buflen;
+    if (space == 0) {
+      // Give lwip time to asynchronously call tcp_stream_sent, which will flush
+      // unsent data and reset stream->tx_buflen to 0
+      cyw43_arch_poll();
+      err_t err = tcp_output(stream->tcp_pcb);
+      if (err != ERR_OK)
+        return TCP_RESULT_ERROR;
+      sleep_ms(1);
+      if (timeout_ms > 0 &&
+          absolute_time_diff_us(start, get_absolute_time()) / 1000 >=
+              timeout_ms) {
+        return TCP_RESULT_TIMEOUT;
+      }
+      continue;
+    }
+
+    // Copy as much as we can into the TX buffer
+    size_t to_copy = MIN(len - total_sent, space);
+    memcpy(stream->tx_buf + stream->tx_buflen, data + total_sent, to_copy);
+    stream->tx_buflen += to_copy;
+    total_sent += to_copy;
+
+    // Try to write to TCP
+    size_t send_now = stream->tx_buflen;
+    err_t err = tcp_write(stream->tcp_pcb, stream->tx_buf, send_now,
+                          TCP_WRITE_FLAG_COPY);
+
+    if (err == ERR_OK) {
+      stream->tx_buflen = 0;
+      tcp_output(stream->tcp_pcb);
+    } else if (err == ERR_MEM) {
+      // Not enough room in TCP buffer, wait a bit
+      sleep_ms(1);
+      if (timeout_ms > 0 &&
+          absolute_time_diff_us(start, get_absolute_time()) / 1000 >=
+              timeout_ms) {
+        return TCP_RESULT_TIMEOUT;
+      }
+    } else {
+      return TCP_RESULT_ERROR;
+    }
+  }
+
+  return TCP_RESULT_OK;
+}
 
 /**
  * This method will free the stream on success

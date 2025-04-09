@@ -39,7 +39,7 @@ void ensure_wifi_connection_blocking(const char *ssid, const char *pw,
       DEBUG_printf("Connected!\n");
     }
   }
-  printf("WiFi is up\n");
+  // printf("WiFi is up\n");
   cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
   cyw43_arch_poll();
 }
