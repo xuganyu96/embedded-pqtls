@@ -119,3 +119,20 @@ target_link_libraries(bench_wolfcrypt
     pico_cyw43_arch_lwip_poll
 )
 pico_add_extra_outputs(bench_wolfcrypt)
+
+add_executable(tls_client src/tls_client.c ${COMMON_SRC})
+pico_enable_stdio_uart(tls_client 0)
+pico_enable_stdio_usb(tls_client 1)
+target_link_libraries(tls_client
+    wolfssl
+    pico_stdlib
+    pico_rand
+    pico_cyw43_arch_lwip_poll
+)
+target_compile_definitions(tls_client PRIVATE
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
+    TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
+)
+pico_add_extra_outputs(tls_client)
