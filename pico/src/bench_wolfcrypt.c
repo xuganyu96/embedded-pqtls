@@ -23,18 +23,25 @@
 #include <pico/stdlib.h>
 
 #include "wolfcrypt/benchmark/benchmark.h"
+#include "wolfssl/ssl.h"
+#include "wolfssl/wolfcrypt/random.h"
+
 #include "pico-pqtls/utils.h"
 
 int main(void) {
   stdio_init_all();
   countdown_s(5);
+  wolfSSL_Init();
+  wolfSSL_Debugging_ON();
+  DEBUG_printf("System clock = %dMHz\n\n", clock_get_hz(clk_sys) / 1000000);
+  WC_RNG rng;
+  wc_InitRng(&rng);
+  INFO_printf("Initialized RNG\n");
 
   int ret;
-
-  while(1) {
-    DEBUG_printf("System clock = %dMHz\n\n", clock_get_hz(clk_sys) / 1000000);
+  while (1) {
     ret = benchmark_test(NULL);
-    DEBUG_printf("End: %d\n", ret);
+    DEBUG_printf("Bench finished: %d\n", ret);
     sleep_ms(1000);
   }
 }

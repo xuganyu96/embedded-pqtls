@@ -19,17 +19,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-/* Example wolfSSL user settings with #if 0/1 gates to enable/disable algorithms and features.
- * This file is included with wolfssl/wolfcrypt/settings.h when WOLFSSL_USER_SETTINGS is defined.
- * Based on IDE/GCC-ARM/Headers/user_settings.h
+/* Example wolfSSL user settings with #if 0/1 gates to enable/disable algorithms
+ * and features. This file is included with wolfssl/wolfcrypt/settings.h when
+ * WOLFSSL_USER_SETTINGS is defined. Based on
+ * IDE/GCC-ARM/Headers/user_settings.h
  */
 
 #ifndef WOLFSSL_USER_SETTINGS_H
 #define WOLFSSL_USER_SETTINGS_H
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 #include <stdio.h>
@@ -67,7 +67,7 @@ extern time_t myTime(time_t *);
 /* Math Configuration */
 /* ------------------------------------------------------------------------- */
 /* Wolf Single Precision Math */
-#if 1
+#if 0
 #define WOLFSSL_HAVE_SP_RSA
 #define WOLFSSL_HAVE_SP_DH
 #define WOLFSSL_HAVE_SP_ECC
@@ -109,7 +109,6 @@ extern time_t myTime(time_t *);
 /* ------------------------------------------------------------------------- */
 /* RSA */
 #undef NO_RSA
-#define NO_RSA  // TODO: RSA seems to be very slow!
 #if 0
 #ifdef USE_FAST_MATH
 /* Maximum math bits (Max RSA key bits * 2) */
@@ -132,15 +131,14 @@ extern time_t myTime(time_t *);
 
 /* DH */
 #undef NO_DH
-#define NO_DH  // TODO: FFDH is too slow
 #if 1
 /* Use table for DH instead of -lm (math) lib dependency */
 #if 1
 #define WOLFSSL_DH_CONST
 #define HAVE_FFDHE_2048
-    // #define HAVE_FFDHE_4096
-    // #define HAVE_FFDHE_6144
-    // #define HAVE_FFDHE_8192
+// #define HAVE_FFDHE_4096
+// #define HAVE_FFDHE_6144
+// #define HAVE_FFDHE_8192
 #endif
 #else
 #define NO_DH
@@ -152,15 +150,15 @@ extern time_t myTime(time_t *);
 #define HAVE_ECC
 
 /* Manually define enabled curves */
-//#define ECC_USER_CURVES
+// #define ECC_USER_CURVES
 
 #ifdef ECC_USER_CURVES
 /* Manual Curve Selection */
 // #define HAVE_ECC192
 // #define HAVE_ECC224
 #undef NO_ECC256
-    // #define HAVE_ECC384
-    // #define HAVE_ECC521
+// #define HAVE_ECC384
+// #define HAVE_ECC521
 #endif
 
 /* Fixed point cache (speeds repeated operations against same private key) */
@@ -191,8 +189,8 @@ extern time_t myTime(time_t *);
 /* use heap allocation for ECC points */
 #define ALT_ECC_SIZE
 
-    /* wolfSSL will compute the FP_MAX_BITS_ECC, but it can be overridden */
-    // #define FP_MAX_BITS_ECC (256 * 2)
+/* wolfSSL will compute the FP_MAX_BITS_ECC, but it can be overridden */
+// #define FP_MAX_BITS_ECC (256 * 2)
 #endif
 
 /* Speedups specific to curve */
@@ -209,16 +207,16 @@ extern time_t myTime(time_t *);
 
 /* GCM Method: GCM_TABLE_4BIT, GCM_SMALL, GCM_WORD32 or GCM_TABLE */
 #define HAVE_AESGCM
-#if 0 //TARGET_EMBEDDED
+#if 0 // TARGET_EMBEDDED
 #define GCM_SMALL
 #else
 #define GCM_TABLE_4BIT
 #endif
 
-    // #define WOLFSSL_AES_DIRECT
-    // #define HAVE_AES_ECB
-    // #define WOLFSSL_AES_COUNTER
-    // #define HAVE_AESCCM
+// #define WOLFSSL_AES_DIRECT
+// #define HAVE_AES_ECB
+// #define WOLFSSL_AES_COUNTER
+// #define HAVE_AESCCM
 #else
 #define NO_AES
 #endif
@@ -248,7 +246,7 @@ extern time_t myTime(time_t *);
 #define HAVE_CURVE25519
 #define HAVE_ED25519 /* ED25519 Requires SHA512 */
 
-    /* Optionally use small math (less flash usage, but much slower) */
+/* Optionally use small math (less flash usage, but much slower) */
 #if 0
 #define CURVED25519_SMALL
 #endif
@@ -273,8 +271,8 @@ extern time_t myTime(time_t *);
 /* Sha */
 #undef NO_SHA
 #if 1
-    /* 1k smaller, but 25% slower */
-    // #define USE_SLOW_SHA
+/* 1k smaller, but 25% slower */
+// #define USE_SLOW_SHA
 #else
 #define NO_SHA
 #endif
@@ -298,14 +296,14 @@ extern time_t myTime(time_t *);
 #if 1
 #define WOLFSSL_SHA512
 
-    /* Sha384 */
+/* Sha384 */
 #undef WOLFSSL_SHA384
 #if 1
 #define WOLFSSL_SHA384
 #endif
 
-    /* over twice as small, but 50% slower */
-    //#define USE_SLOW_SHA512
+/* over twice as small, but 50% slower */
+// #define USE_SLOW_SHA512
 #endif
 
 /* Sha3 */
@@ -348,9 +346,9 @@ extern time_t myTime(time_t *);
 #define USE_CERT_BUFFERS_2048
 #endif
 
-    /* ------------------------------------------------------------------------- */
-    /* Debugging */
-    /* ------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------- */
+/* Debugging */
+/* ------------------------------------------------------------------------- */
 
 #undef DEBUG_WOLFSSL
 #undef NO_ERROR_STRINGS
@@ -406,7 +404,7 @@ extern time_t myTime(time_t *);
 #else
 #ifndef WOLFSSL_STATIC_MEMORY
 #define NO_WOLFSSL_MEMORY
-    /* Otherwise we will use stdlib malloc, free and realloc */
+/* Otherwise we will use stdlib malloc, free and realloc */
 #endif
 #endif
 
@@ -448,14 +446,12 @@ unsigned long get_rand_32(void);
 #define WC_NO_HASHDRBG
 #endif
 
-
 #if 1
 /* Bypass P-RNG and use only HW RNG */
-//extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
+// extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #undef CUSTOM_RAND_GENERATE_BLOCK
 #define CUSTOM_RAND_GENERATE_BLOCK wc_pico_rng_gen_block
 #endif
-
 
 /* ------------------------------------------------------------------------- */
 /* Custom Standard Lib */
@@ -491,9 +487,9 @@ unsigned long get_rand_32(void);
 #define XSNPRINTF snprintf
 #endif
 
-    /* ------------------------------------------------------------------------- */
-    /* Enable Features */
-    /* ------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------- */
+/* Enable Features */
+/* ------------------------------------------------------------------------- */
 
 #define WOLFSSL_TLS13
 #define WOLFSSL_OLD_PRIME_CHECK /* Use faster DH prime checking */
@@ -501,7 +497,7 @@ unsigned long get_rand_32(void);
 #define HAVE_SUPPORTED_CURVES
 #define WOLFSSL_BASE64_ENCODE
 
-// #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
+#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
 // #define KEEP_PEER_CERT
 // #define HAVE_COMP_KEY
 
@@ -524,10 +520,10 @@ unsigned long get_rand_32(void);
 /* do not warm when file is included to be built and not required to be */
 #define WOLFSSL_IGNORE_FILE_WARN
 
-    /* In-lining of misc.c functions */
-    /* If defined, must include wolfcrypt/src/misc.c in build */
-    /* Slower, but about 1k smaller */
-    // #define NO_INLINE
+/* In-lining of misc.c functions */
+/* If defined, must include wolfcrypt/src/misc.c in build */
+/* Slower, but about 1k smaller */
+// #define NO_INLINE
 
 #ifdef TARGET_EMBEDDED
 #define NO_FILESYSTEM
@@ -543,14 +539,13 @@ unsigned long get_rand_32(void);
 #define NO_RC4
 #define NO_MD4
 #define NO_PWDBASED
-    // #define NO_CODING
-    // #define NO_ASN_TIME
-    // #define NO_CERTS
-    // #define NO_SIG_WRAPPER
+// #define NO_CODING
+// #define NO_ASN_TIME
+// #define NO_CERTS
+// #define NO_SIG_WRAPPER
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* WOLFSSL_USER_SETTINGS_H */
-

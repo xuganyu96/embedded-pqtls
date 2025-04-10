@@ -31,6 +31,9 @@ include_directories(${CMAKE_CURRENT_LIST_DIR}/config)
 include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 
 # WolfSSL source
+# user_settings:
+# - Need to set WOLFSSL_KEY_GEN to enable RSA key gen
+# - Need to enable USE_FAST_MATH or RSA will take too long
 include_directories(${WOLFSSL_ROOT})
 file(GLOB WOLFSSL_SRC
     "${WOLFSSL_ROOT}/src/*.c"
