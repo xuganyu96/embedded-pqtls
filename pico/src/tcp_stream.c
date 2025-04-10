@@ -1,8 +1,11 @@
 /**
  * Example TCP client
  *
- * To run this firmware you need a TCP server. One easy way on Linux is with
- * `netcat`: > while true; do echo "${HOSTNAME} says hello" | nc -lv 8000; done
+ * To run this firmware you need a TCP server. On Linux you can use netcat
+ * >>> while true; do echo "${HOSTNAME} says hello" | nc -lv 8000; done
+ *
+ * Make the server send longer messages (e.g. 1000 bytes of 0x00)
+ * >>> while true; do head -c 1000 < /dev/zero | tr '\0' '\x01' | nc -lv 8000; done
  *
  * NOTE: April 9, 2025
  * There is an interesting panic that I ran into. The server uses `nc -lv 8000`
@@ -25,6 +28,7 @@
 
 #define TCP_CONNECT_TIMEOUT_MS 10000
 #define TCP_READ_TIMEOUT_MS 10000
+#define TLS_MAX_BUFFER_LEN ((1 << 14) - 1))
 #define CLIENT_GREETING "Client says: Hi mom!\n"
 
 int main(void) {
@@ -69,8 +73,8 @@ int main(void) {
     tcp_err = PICO_PQTLS_tcp_stream_read(stream, app_buf, sizeof(app_buf),
                                          &outlen, TCP_READ_TIMEOUT_MS);
     if (tcp_err == TCP_RESULT_OK) {
-      app_buf[outlen] = 0; // Null-terminate the received string
-      INFO_printf("Received %d bytes: %s\n", outlen, app_buf);
+      INFO_printf("Received %d bytes\n", outlen);
+      dump_bytes(app_buf, outlen);
     } else {
       WARNING_printf("Read error: %d\n", tcp_err);
     }

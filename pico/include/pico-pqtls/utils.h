@@ -1,8 +1,8 @@
 #ifndef _UTILS_H
 #define _UTILS_H
 
-#include <pico/assert.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // ANSI color codes
 #ifdef USE_COLORED_LOGGING
@@ -29,6 +29,8 @@
 #define INFO_printf(fmt, ...) printf("INFO    : " fmt, ##__VA_ARGS__)
 #define DEBUG_printf(fmt, ...) printf("DEBUG   : " fmt, ##__VA_ARGS__)
 #endif
+
+void dump_bytes(const uint8_t *bytes, size_t len);
 
 /**
  * Perform a countdown

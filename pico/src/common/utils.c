@@ -8,8 +8,31 @@
 
 #define WIFI_CONNECT_TIMEOUT_MS 30000
 
+void dump_bytes(const uint8_t *bytes, size_t len) {
+  if (len <= 16) {
+    // Print the entire byte sequence as hex with 0x prefix
+    for (size_t i = 0; i < len; i++) {
+      printf("%02x ", bytes[i]);
+    }
+    printf("\n");
+  } else {
+    // Print the first 4 bytes with 0x prefix
+    for (size_t i = 0; i < 4; i++) {
+      printf("%02x ", bytes[i]);
+    }
+    // Print ellipsis
+    printf("... ");
+    // Print the last 4 bytes with 0x prefix
+    for (size_t i = len - 4; i < len; i++) {
+      printf("%02x ", bytes[i]);
+    }
+    printf("\n");
+  }
+}
+
 /**
- * Countdown from specified number of seconds. Useful for giving the human time to do setup
+ * Countdown from specified number of seconds. Useful for giving the human time
+ * to do setup
  */
 void countdown_s(int dur) {
   for (int i = dur; i > 0; i--) {
