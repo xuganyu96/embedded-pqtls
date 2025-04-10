@@ -2,10 +2,12 @@
  * Example TCP client
  *
  * To run this firmware you need a TCP server. On Linux you can use netcat
- * >>> while true; do echo "${HOSTNAME} says hello" | nc -lv 8000; done
+ *
+ * while true; do echo "${HOSTNAME} says hello" | nc -lv 8000; done
  *
  * Make the server send longer messages (e.g. 1000 bytes of 0x00)
- * >>> while true; do head -c 1000 < /dev/zero | tr '\0' '\x01' | nc -lv 8000; done
+ *
+ * while true; do head -c 1000 < /dev/zero | tr '\0' '\x01' | nc -lv 8000; done
  *
  * NOTE: April 9, 2025
  * There is an interesting panic that I ran into. The server uses `nc -lv 8000`
@@ -28,11 +30,11 @@
 
 #define TCP_CONNECT_TIMEOUT_MS 10000
 #define TCP_READ_TIMEOUT_MS 10000
-#define TLS_MAX_BUFFER_LEN ((1 << 14) - 1))
+#define TLS_MAX_BUFFER_LEN (16992)
 #define CLIENT_GREETING "Client says: Hi mom!\n"
 
 int main(void) {
-  uint8_t app_buf[2 * TCP_STREAM_BUF_SIZE];
+  uint8_t tls_rx_buf[TLS_MAX_BUFFER_LEN];
   stdio_init_all();
   countdown_s(10);
 
@@ -70,11 +72,15 @@ int main(void) {
       goto sleep;
     }
 
-    tcp_err = PICO_PQTLS_tcp_stream_read(stream, app_buf, sizeof(app_buf),
-                                         &outlen, TCP_READ_TIMEOUT_MS);
+    // tcp_err = PICO_PQTLS_tcp_stream_read(stream, tls_rx_buf,
+    // sizeof(tls_rx_buf),
+    //                                      &outlen, TCP_READ_TIMEOUT_MS);
+    outlen = 16000;
+    tcp_err = PICO_PQTLS_tcp_stream_read_exact(stream, tls_rx_buf, outlen,
+                                               TCP_READ_TIMEOUT_MS);
     if (tcp_err == TCP_RESULT_OK) {
       INFO_printf("Received %d bytes\n", outlen);
-      dump_bytes(app_buf, outlen);
+      dump_bytes(tls_rx_buf, outlen);
     } else {
       WARNING_printf("Read error: %d\n", tcp_err);
     }

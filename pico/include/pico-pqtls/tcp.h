@@ -7,7 +7,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define TCP_STREAM_BUF_SIZE (2048)
+// BUG: this large buffer size is not ideal (I want 2048 or 4096). However, if
+// the TCP server sends a message that is longer than the TCP buffer size,
+// tcp_stream_read_exact will fail. In the interest of moving the project along
+// I will leave the TCP buffer to be as large as the maximal possible TLS
+// message size, but in due time I will need to debug this
+#define TCP_STREAM_BUF_SIZE (16992)
 
 typedef enum PICO_PQTLS_tcp_err {
   TCP_RESULT_OK = 0,  // Success
