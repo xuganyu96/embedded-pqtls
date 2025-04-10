@@ -28,8 +28,6 @@
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
 
-#define TCP_CONNECT_TIMEOUT_MS 10000
-#define TCP_READ_TIMEOUT_MS 10000
 #define TLS_MAX_BUFFER_LEN (16992)
 #define CLIENT_GREETING "Client says: Hi mom!\n"
 

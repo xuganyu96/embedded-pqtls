@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 
 // ANSI color codes
 #ifdef USE_COLORED_LOGGING

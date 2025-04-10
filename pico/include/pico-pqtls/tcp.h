@@ -7,6 +7,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define TCP_CONNECT_TIMEOUT_MS 10000
+#define TCP_READ_TIMEOUT_MS 10000
+#define TCP_WRITE_TIMEOUT_MS 10000
+
 // BUG: this large buffer size is not ideal (I want 2048 or 4096). However, if
 // the TCP server sends a message that is longer than the TCP buffer size,
 // tcp_stream_read_exact will fail. In the interest of moving the project along
