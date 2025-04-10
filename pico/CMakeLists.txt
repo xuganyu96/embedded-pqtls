@@ -20,6 +20,7 @@ require_env_var(WIFI_SSID)
 require_env_var(WIFI_PASSWORD)
 require_env_var(TEST_TCP_SERVER_IP)
 require_env_var(TEST_TCP_SERVER_PORT)
+require_env_var(WOLFSSL_ROOT)
 
 include(pico_sdk_import.cmake)
 project(pico-pqtls C CXX ASM)
@@ -28,6 +29,44 @@ pico_sdk_init()
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 include_directories(${CMAKE_CURRENT_LIST_DIR}/config)
 include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
+
+# WolfSSL source
+include_directories(${WOLFSSL_ROOT})
+file(GLOB WOLFSSL_SRC
+    "${WOLFSSL_ROOT}/src/*.c"
+    "${WOLFSSL_ROOT}/wolfcrypt/src/*.c"
+    "${WOLFSSL_ROOT}/wolfcrypt/src/port/rpi_pico/*"
+)
+list(REMOVE_ITEM WOLFSSL_SRC EXCLUDE REGEX
+    "${WOLFSSL_ROOT}/src/bio.c"
+    "${WOLFSSL_ROOT}/src/conf.c"
+    "${WOLFSSL_ROOT}/src/pk.c"
+    "${WOLFSSL_ROOT}/src/ssl_asn1.c"
+    "${WOLFSSL_ROOT}/src/ssl_bn.c"
+    "${WOLFSSL_ROOT}/src/ssl_misc.c"
+    "${WOLFSSL_ROOT}/src/x509.c"
+    "${WOLFSSL_ROOT}/src/x509_str.c"
+    "${WOLFSSL_ROOT}/wolfcrypt/src/evp.c"
+    "${WOLFSSL_ROOT}/wolfcrypt/src/misc.c"
+)
+add_library(wolfssl STATIC
+    ${WOLFSSL_SRC}
+)
+target_compile_definitions(wolfssl PUBLIC
+    WOLFSSL_USER_SETTINGS
+)
+if (${PICO_PLATFORM} STREQUAL "rp2350")
+    add_compile_definitions(wolfssl WOLFSSL_SP_ARM_CORTEX_M_ASM)
+elseif (${PICO_PLATFORM} STREQUAL "rp2350-riscv")
+    add_compile_definitions(wolfSSL WOLFSSL_SP_RISCV32)
+else()
+    add_compile_definitions(wolfssl WOLFSSL_SP_ARM_THUMB_ASM)
+endif()
+target_link_libraries(wolfssl
+    pico_stdlib
+    pico_rand
+)
+
 
 # comment out to get plain logging, good for logging to file
 add_compile_definitions(USE_COLORED_LOGGING)
@@ -62,3 +101,18 @@ target_compile_definitions(tcp_stream PRIVATE
     TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
 )
 pico_add_extra_outputs(tcp_stream)
+
+add_executable(bench_wolfcrypt
+    src/bench_wolfcrypt.c
+    ${COMMON_SRC}
+    ${WOLFSSL_ROOT}/wolfcrypt/benchmark/benchmark.c
+)
+pico_enable_stdio_uart(bench_wolfcrypt 0)
+pico_enable_stdio_usb(bench_wolfcrypt 1)
+target_link_libraries(bench_wolfcrypt
+    wolfssl
+    pico_stdlib
+    pico_rand
+    pico_cyw43_arch_lwip_poll
+)
+pico_add_extra_outputs(bench_wolfcrypt)
