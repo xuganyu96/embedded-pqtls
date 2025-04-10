@@ -46,7 +46,7 @@ static void tcp_stream_flush_send_buffer(PICO_PQTLS_tcp_stream_t *stream) {
  * - Uses tcp_output() to push data down the stack.
  */
 static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
-  DEBUG_printf("tcp_stream_poll\n");
+  // DEBUG_printf("tcp_stream_poll\n");
   cyw43_arch_poll();
   PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
   tcp_stream_flush_send_buffer(stream);

@@ -31,6 +31,15 @@ include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 
 file(GLOB COMMON_SRC src/common/*.c)
 
+add_executable(colors src/colors.c ${COMMON_SRC})
+pico_enable_stdio_uart(colors 0)
+pico_enable_stdio_usb(colors 1)
+target_link_libraries(colors pico_stdlib pico_cyw43_arch_lwip_poll)
+# define macro `USE_COLORED_LOGGING` to make logging prints colorful
+target_compile_definitions(colors PRIVATE USE_COLORED_LOGGING)
+pico_add_extra_outputs(colors)
+
+
 add_executable(connect_wifi src/connect_wifi.c ${COMMON_SRC})
 pico_enable_stdio_uart(connect_wifi 0)
 pico_enable_stdio_usb(connect_wifi 1)
@@ -40,17 +49,6 @@ target_compile_definitions(connect_wifi  PRIVATE
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
 )
 pico_add_extra_outputs(connect_wifi)
-
-add_executable(tcp_client src/tcp_client.c ${COMMON_SRC})
-pico_enable_stdio_uart(tcp_client 0)
-pico_enable_stdio_usb(tcp_client 1)
-target_link_libraries(tcp_client pico_stdlib pico_cyw43_arch_lwip_poll)
-target_compile_definitions(tcp_client PRIVATE
-    WIFI_SSID=\"${WIFI_SSID}\"
-    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
-    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
-)
-pico_add_extra_outputs(tcp_client)
 
 add_executable(tcp_stream src/tcp_stream.c ${COMMON_SRC})
 pico_enable_stdio_uart(tcp_stream 0)
