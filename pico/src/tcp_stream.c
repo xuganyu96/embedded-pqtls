@@ -1,6 +1,9 @@
 /**
  * Example TCP client
  *
+ * To run this firmware you need a TCP server. One easy way on Linux is with
+ * `netcat`: > while true; do echo "${HOSTNAME} says hello" | nc -lv 8000; done
+ *
  * NOTE: April 9, 2025
  * There is an interesting panic that I ran into. The server uses `nc -lv 8000`
  * to listen for incoming TCP connection. First run the server, then start the
@@ -20,12 +23,12 @@
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
 
-#define TCP_CONNECT_TIMEOUT_MS 1000
+#define TCP_CONNECT_TIMEOUT_MS 10000
 #define TCP_READ_TIMEOUT_MS 10000
 #define CLIENT_GREETING "Client says: Hi mom!\n"
 
 int main(void) {
-  uint8_t app_buf[512];
+  uint8_t app_buf[2 * TCP_STREAM_BUF_SIZE];
   stdio_init_all();
   countdown_s(10);
 
@@ -46,7 +49,7 @@ int main(void) {
 
     PICO_PQTLS_tcp_stream_t *stream = PICO_PQTLS_tcp_stream_new();
     if (!stream) {
-      DEBUG_printf("FATAL: fail to instantiate TCP stream\n");
+      CRITICAL_printf("fail to instantiate TCP stream\n");
       return -1;
     }
 
@@ -54,11 +57,11 @@ int main(void) {
                                                    TEST_TCP_SERVER_PORT,
                                                    TCP_CONNECT_TIMEOUT_MS);
     if (err == ERR_OK) {
-      DEBUG_printf("Connected to %s:%d\n", TEST_TCP_SERVER_IP,
-                   TEST_TCP_SERVER_PORT);
+      INFO_printf("Connected to %s:%d\n", TEST_TCP_SERVER_IP,
+                  TEST_TCP_SERVER_PORT);
     } else {
-      DEBUG_printf("Failed to establish connection within %d ms (err=%d)\n",
-                   TCP_CONNECT_TIMEOUT_MS, err);
+      WARNING_printf("Failed to establish connection within %d ms (err=%d)\n",
+                     TCP_CONNECT_TIMEOUT_MS, err);
       PICO_PQTLS_tcp_stream_close(stream);
       goto sleep;
     }
@@ -67,27 +70,27 @@ int main(void) {
                                          &outlen, TCP_READ_TIMEOUT_MS);
     if (tcp_err == TCP_RESULT_OK) {
       app_buf[outlen] = 0; // Null-terminate the received string
-      printf("Received %d bytes: %s\n", outlen, app_buf);
+      INFO_printf("Received %d bytes: %s\n", outlen, app_buf);
     } else {
-      printf("Read error: %d\n", tcp_err);
+      WARNING_printf("Read error: %d\n", tcp_err);
     }
 
     tcp_err = PICO_PQTLS_tcp_stream_write(
         stream, (const uint8_t *)CLIENT_GREETING, strlen(CLIENT_GREETING) + 1,
         TCP_READ_TIMEOUT_MS);
     if (tcp_err == TCP_RESULT_OK) {
-      printf("Sent %d bytes\n", strlen(CLIENT_GREETING) + 1);
+      INFO_printf("Sent %d bytes\n", strlen(CLIENT_GREETING) + 1);
     } else {
-      printf("Write error: %d\n", tcp_err);
+      WARNING_printf("Write error: %d\n", tcp_err);
     }
 
     err = PICO_PQTLS_tcp_stream_close(stream);
     if (err == ERR_OK) {
       DEBUG_printf("Gracefully terminated connection\n");
     } else if (err == ERR_ABRT) {
-      DEBUG_printf("Aborted connection\n");
+      WARNING_printf("Aborted connection\n");
     } else {
-      DEBUG_printf("FATAL: UNREACHABLE!\n");
+      CRITICAL_printf("FATAL: UNREACHABLE!\n");
       return -1;
     }
 

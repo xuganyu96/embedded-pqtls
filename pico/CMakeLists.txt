@@ -29,14 +29,15 @@ include_directories(${CMAKE_CURRENT_LIST_DIR})
 include_directories(${CMAKE_CURRENT_LIST_DIR}/config)
 include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 
+# comment out to get plain logging, good for logging to file
+add_compile_definitions(USE_COLORED_LOGGING)
+
 file(GLOB COMMON_SRC src/common/*.c)
 
 add_executable(colors src/colors.c ${COMMON_SRC})
 pico_enable_stdio_uart(colors 0)
 pico_enable_stdio_usb(colors 1)
 target_link_libraries(colors pico_stdlib pico_cyw43_arch_lwip_poll)
-# define macro `USE_COLORED_LOGGING` to make logging prints colorful
-target_compile_definitions(colors PRIVATE USE_COLORED_LOGGING)
 pico_add_extra_outputs(colors)
 
 

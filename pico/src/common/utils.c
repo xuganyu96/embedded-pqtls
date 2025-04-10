@@ -3,12 +3,14 @@
 
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
-#include <stdio.h>
 
 #include "include/pico-pqtls/utils.h"
 
 #define WIFI_CONNECT_TIMEOUT_MS 30000
 
+/**
+ * Countdown from specified number of seconds. Useful for giving the human time to do setup
+ */
 void countdown_s(int dur) {
   for (int i = dur; i > 0; i--) {
     DEBUG_printf("Main loop begins in %d seconds\n", i);
@@ -29,14 +31,15 @@ static bool wifi_connected() {
 void ensure_wifi_connection_blocking(const char *ssid, const char *pw,
                                      uint32_t auth) {
   while (!wifi_connected()) {
-    DEBUG_printf("Wifi is down\n");
+    WARNING_printf("Wifi is down\n");
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
 
     DEBUG_printf("Attempting re-connect\n");
-    if (cyw43_arch_wifi_connect_timeout_ms(ssid, pw, auth, WIFI_CONNECT_TIMEOUT_MS) != 0) {
-      DEBUG_printf("Wi-Fi re-connect failed\n");
+    if (cyw43_arch_wifi_connect_timeout_ms(ssid, pw, auth,
+                                           WIFI_CONNECT_TIMEOUT_MS) != 0) {
+      WARNING_printf("Wi-Fi re-connect failed\n");
     } else {
-      DEBUG_printf("Connected!\n");
+      // INFO_printf("Connected!\n");
     }
   }
   // printf("WiFi is up\n");
