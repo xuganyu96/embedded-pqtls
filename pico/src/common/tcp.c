@@ -1,5 +1,6 @@
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
+#include <lwip/dns.h>
 #include <lwip/err.h>
 #include <lwip/pbuf.h>
 #include <lwip/tcp.h>
@@ -8,6 +9,47 @@
 #include <pico/time.h>
 #include <pico/types.h>
 #include <string.h>
+
+static void dns_handler(const char *name, const ip_addr_t *ipaddr, void *arg) {
+  dns_result_t *dns_res = (dns_result_t *)arg;
+  if (ipaddr) {
+    dns_res->addr = *ipaddr;
+    dns_res->resolved = true;
+  } else {
+    dns_res->resolved = false;
+  }
+  dns_res->complete = true;
+}
+
+void dns_result_init(dns_result_t *res) {
+  ip_addr_set_zero(&res->addr);
+  res->resolved = false;
+  res->complete = false;
+}
+
+/**
+ * Block until callback is called. Check dns_res->resolved for success or not
+ * TODO: there is currently a bug that if this is called twice, the second time
+ * will hang
+ */
+void dns_gethostbyname_blocking(const char *hostname, dns_result_t *dns_res) {
+  err_t err = dns_gethostbyname(hostname, &dns_res->addr, dns_handler, dns_res);
+  if (err == ERR_OK) {
+    // DNS record has been cached, no need to check callback
+    dns_res->complete = true;
+    dns_res->resolved = true;
+    return;
+  } else if (err == ERR_INPROGRESS) {
+    // Wait for callback
+    while (!dns_res->complete) {
+      cyw43_arch_poll();
+      sleep_ms(1);
+    }
+  } else {
+    CRITICAL_printf("Unhandled error (err %d)!\n", err);
+    exit(-1);
+  }
+}
 
 static void tcp_stream_flush_send_buffer(PICO_PQTLS_tcp_stream_t *stream) {
   if (!stream || !stream->connected || stream->tx_buflen == 0)

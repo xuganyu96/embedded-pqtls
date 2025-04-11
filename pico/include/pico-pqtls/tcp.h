@@ -37,6 +37,17 @@ typedef struct PICO_PQTLS_tcp_stream {
   bool connected;
 } PICO_PQTLS_tcp_stream_t;
 
+typedef struct dns_result {
+  ip_addr_t addr;
+  // remote hostname has been successfully found, addr can be used
+  bool resolved;
+  // DNS resolution is complete
+  bool complete;
+} dns_result_t;
+
+void dns_result_init(dns_result_t *res);
+void dns_gethostbyname_blocking(const char *hostname, dns_result_t *dns_res);
+
 PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void);
 void PICO_PQTLS_tcp_stream_free(PICO_PQTLS_tcp_stream_t *stream);
 err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,

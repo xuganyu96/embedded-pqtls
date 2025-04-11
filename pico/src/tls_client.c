@@ -1,6 +1,5 @@
 #include <wolfssl/wolfcrypt/settings.h>
 
-#include <lwip/dns.h>
 #include <lwip/ip4_addr.h>
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
@@ -14,7 +13,7 @@
 #include "wolfssl/wolfio.h"
 
 #define TLS_MAX_BUFFER_LEN (16992)
-#define SLEEP_MS (2 * 1000)
+#define SLEEP_MS (30 * 1000) // do not DoS the remote host
 
 #define REMOTE_HOSTNAME "api.github.com"
 #define HTTPS_PORT 443
@@ -25,55 +24,6 @@
   "Gecko/20100101 Firefox/136.0\r\n"                                           \
   "Accept: application/json\r\n"                                               \
   "Connection: close\r\n\r\n"
-
-typedef struct dns_result {
-  ip_addr_t addr;
-  // remote hostname has been successfully found, addr can be used
-  bool resolved;
-  // DNS resolution is complete
-  bool complete;
-} dns_result_t;
-
-void dns_result_init(dns_result_t *res) {
-  ip_addr_set_zero(&res->addr);
-  res->resolved = false;
-  res->complete = false;
-}
-
-static void dns_handler(const char *name, const ip_addr_t *ipaddr, void *arg) {
-  dns_result_t *dns_res = (dns_result_t *)arg;
-  if (ipaddr) {
-    dns_res->addr = *ipaddr;
-    dns_res->resolved = true;
-  } else {
-    dns_res->resolved = false;
-  }
-  dns_res->complete = true;
-}
-
-/**
- * Block until callback is called. Check dns_res->resolved for success or not
- * TODO: there is currently a bug that if this is called twice, the second time
- * will hang
- */
-void dns_gethostbyname_blocking(const char *hostname, dns_result_t *dns_res) {
-  err_t err = dns_gethostbyname(hostname, &dns_res->addr, dns_handler, dns_res);
-  if (err == ERR_OK) {
-    // DNS record has been cached, no need to check callback
-    dns_res->complete = true;
-    dns_res->resolved = true;
-    return;
-  } else if (err == ERR_INPROGRESS) {
-    // Wait for callback
-    while (!dns_res->complete) {
-      cyw43_arch_poll();
-      sleep_ms(1);
-    }
-  } else {
-    CRITICAL_printf("Unhandled error (err %d)!\n", err);
-    exit(-1);
-  }
-}
 
 /**
  * WolfSSL will call this when it wants to read stuff
