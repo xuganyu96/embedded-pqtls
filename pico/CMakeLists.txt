@@ -136,3 +136,18 @@ target_compile_definitions(tls_client PRIVATE
     TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
 )
 pico_add_extra_outputs(tls_client)
+
+add_executable(nettime src/nettime.c ${COMMON_SRC})
+pico_enable_stdio_uart(nettime 0)
+pico_enable_stdio_usb(nettime 1)
+target_link_libraries(nettime
+    wolfssl
+    pico_stdlib
+    pico_rand
+    pico_cyw43_arch_lwip_poll
+)
+target_compile_definitions(nettime PRIVATE
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+)
+pico_add_extra_outputs(nettime)
