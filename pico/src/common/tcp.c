@@ -29,8 +29,6 @@ void dns_result_init(dns_result_t *res) {
 
 /**
  * Block until callback is called. Check dns_res->resolved for success or not
- * TODO: there is currently a bug that if this is called twice, the second time
- * will hang
  */
 void dns_gethostbyname_blocking(const char *hostname, dns_result_t *dns_res) {
   err_t err = dns_gethostbyname(hostname, &dns_res->addr, dns_handler, dns_res);
@@ -122,14 +120,12 @@ static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
   }
   size_t to_copy = MIN(TCP_STREAM_BUF_SIZE - stream->rx_buflen, p->tot_len);
   if (to_copy > 0) {
-    // TODO: what if to_copy is less than p->tot_len? Since we will free p
-    // afterwards, will data be lost?
     pbuf_copy_partial(p, stream->rx_buf + stream->rx_buflen, to_copy, 0);
     stream->rx_buflen += to_copy;
     tcp_recved(tpcb, to_copy);
   }
-  // TODO: Copy only to_copy, but leave p unfreed and buffer the rest on next
-  // recv.
+  // TODO: if to_copy is less than p->tot_len, then freeing pbuf_free will cause
+  // uncopied data to be lost. Need to find a way to process these data.
   pbuf_free(p);
   return ERR_OK;
 }
