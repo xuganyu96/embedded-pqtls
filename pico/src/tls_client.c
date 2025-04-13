@@ -24,6 +24,24 @@
   "Gecko/20100101 Firefox/136.0\r\n"                                           \
   "Accept: application/json\r\n"                                               \
   "Connection: close\r\n\r\n"
+#define USERTRUST_ECC_CA_CERT                                                  \
+  "-----BEGIN CERTIFICATE-----                                                 \
+MIICjzCCAhWgAwIBAgIQXIuZxVqUxdJxVt7NiYDMJjAKBggqhkjOPQQDAzCBiDEL               \
+MAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNl               \
+eSBDaXR5MR4wHAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMT               \
+JVVTRVJUcnVzdCBFQ0MgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMTAwMjAx               \
+MDAwMDAwWhcNMzgwMTE4MjM1OTU5WjCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgT               \
+Ck5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNleSBDaXR5MR4wHAYDVQQKExVUaGUg               \
+VVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMTJVVTRVJUcnVzdCBFQ0MgQ2VydGlm               \
+aWNhdGlvbiBBdXRob3JpdHkwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQarFRaqflo               \
+I+d61SRvU8Za2EurxtW20eZzca7dnNYMYf3boIkDuAUU7FfO7l0/4iGzzvfUinng               \
+o4N+LZfQYcTxmdwlkWOrfzCjtHDix6EznPO/LlxTsV+zfTJ/ijTjeXmjQjBAMB0G               \
+A1UdDgQWBBQ64QmG1M8ZwpZ2dEl23OA1xmNjmjAOBgNVHQ8BAf8EBAMCAQYwDwYD               \
+VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAwNoADBlAjA2Z6EWCNzklwBBHU6+4WMB               \
+zzuqQhFkoJ2UOQIReVx7Hfpkue4WQrO/isIJxOzksU0CMQDpKmFHjFJKS04YcPbW               \
+RNZu9YO6bVi9JNlWSOrvxKJGgYhqOkbRqZtNyWHa0V1Xahg=                               \
+-----END CERTIFICATE-----                                                      \
+"
 
 /**
  * WolfSSL will call this when it wants to read stuff
@@ -130,8 +148,11 @@ int main(void) {
       CRITICAL_printf("Failed to create SSL CTX\n");
       exit(-1);
     }
-    // TODO: at least verify peer!
     wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_NONE, NULL);
+    // wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_PEER, NULL);
+    wolfSSL_CTX_load_verify_buffer(
+        ssl_ctx, (unsigned char *)USERTRUST_ECC_CA_CERT,
+        sizeof(USERTRUST_ECC_CA_CERT), SSL_FILETYPE_PEM);
     wolfSSL_SetIORecv(ssl_ctx, wolfssl_recv_cb);
     wolfSSL_SetIOSend(ssl_ctx, wolfssl_send_cb);
     if ((ssl = wolfSSL_new(ssl_ctx)) == NULL) {
@@ -146,6 +167,7 @@ int main(void) {
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
       WARNING_printf("TLS handshake failed (%d)\n",
                      wolfSSL_get_error(ssl, ssl_err));
+      goto shutdown;
     } else {
       INFO_printf("TLS handshake success\n");
     }
@@ -169,6 +191,7 @@ int main(void) {
     http_buflen = 0;
 
     // Finished, close TCP connection and cleanup
+  shutdown:
     wolfSSL_shutdown(ssl);
     lwip_err = PICO_PQTLS_tcp_stream_close(stream);
     if (lwip_err == ERR_OK) {
