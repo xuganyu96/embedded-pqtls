@@ -13,7 +13,7 @@
 #include "wolfssl/wolfio.h"
 
 #define TLS_MAX_BUFFER_LEN (16992)
-#define SLEEP_MS (30 * 1000) // do not DoS the remote host
+#define SLEEP_MS (5 * 60 * 1000) // do not DoS the remote host
 
 #define REMOTE_HOSTNAME "api.github.com"
 #define HTTPS_PORT 443
@@ -25,23 +25,22 @@
   "Accept: application/json\r\n"                                               \
   "Connection: close\r\n\r\n"
 #define USERTRUST_ECC_CA_CERT                                                  \
-  "-----BEGIN CERTIFICATE-----                                                 \
-MIICjzCCAhWgAwIBAgIQXIuZxVqUxdJxVt7NiYDMJjAKBggqhkjOPQQDAzCBiDEL               \
-MAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNl               \
-eSBDaXR5MR4wHAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMT               \
-JVVTRVJUcnVzdCBFQ0MgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMTAwMjAx               \
-MDAwMDAwWhcNMzgwMTE4MjM1OTU5WjCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgT               \
-Ck5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNleSBDaXR5MR4wHAYDVQQKExVUaGUg               \
-VVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMTJVVTRVJUcnVzdCBFQ0MgQ2VydGlm               \
-aWNhdGlvbiBBdXRob3JpdHkwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQarFRaqflo               \
-I+d61SRvU8Za2EurxtW20eZzca7dnNYMYf3boIkDuAUU7FfO7l0/4iGzzvfUinng               \
-o4N+LZfQYcTxmdwlkWOrfzCjtHDix6EznPO/LlxTsV+zfTJ/ijTjeXmjQjBAMB0G               \
-A1UdDgQWBBQ64QmG1M8ZwpZ2dEl23OA1xmNjmjAOBgNVHQ8BAf8EBAMCAQYwDwYD               \
-VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAwNoADBlAjA2Z6EWCNzklwBBHU6+4WMB               \
-zzuqQhFkoJ2UOQIReVx7Hfpkue4WQrO/isIJxOzksU0CMQDpKmFHjFJKS04YcPbW               \
-RNZu9YO6bVi9JNlWSOrvxKJGgYhqOkbRqZtNyWHa0V1Xahg=                               \
------END CERTIFICATE-----                                                      \
-"
+  "-----BEGIN CERTIFICATE-----\n"                                              \
+  "MIICjzCCAhWgAwIBAgIQXIuZxVqUxdJxVt7NiYDMJjAKBggqhkjOPQQDAzCBiDEL\n"         \
+  "MAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNl\n"         \
+  "eSBDaXR5MR4wHAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMT\n"         \
+  "JVVTRVJUcnVzdCBFQ0MgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMTAwMjAx\n"         \
+  "MDAwMDAwWhcNMzgwMTE4MjM1OTU5WjCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgT\n"         \
+  "Ck5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNleSBDaXR5MR4wHAYDVQQKExVUaGUg\n"         \
+  "VVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMTJVVTRVJUcnVzdCBFQ0MgQ2VydGlm\n"         \
+  "aWNhdGlvbiBBdXRob3JpdHkwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQarFRaqflo\n"         \
+  "I+d61SRvU8Za2EurxtW20eZzca7dnNYMYf3boIkDuAUU7FfO7l0/4iGzzvfUinng\n"         \
+  "o4N+LZfQYcTxmdwlkWOrfzCjtHDix6EznPO/LlxTsV+zfTJ/ijTjeXmjQjBAMB0G\n"         \
+  "A1UdDgQWBBQ64QmG1M8ZwpZ2dEl23OA1xmNjmjAOBgNVHQ8BAf8EBAMCAQYwDwYD\n"         \
+  "VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAwNoADBlAjA2Z6EWCNzklwBBHU6+4WMB\n"         \
+  "zzuqQhFkoJ2UOQIReVx7Hfpkue4WQrO/isIJxOzksU0CMQDpKmFHjFJKS04YcPbW\n"         \
+  "RNZu9YO6bVi9JNlWSOrvxKJGgYhqOkbRqZtNyWHa0V1Xahg=\n"                         \
+  "-----END CERTIFICATE-----\n"
 
 /**
  * WolfSSL will call this when it wants to read stuff
@@ -148,11 +147,15 @@ int main(void) {
       CRITICAL_printf("Failed to create SSL CTX\n");
       exit(-1);
     }
+    uint8_t ca_cert[] = USERTRUST_ECC_CA_CERT;
+    size_t ca_cert_size = sizeof(ca_cert);
     // wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_NONE, NULL);
     wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_PEER, NULL);
-    wolfSSL_CTX_load_verify_buffer(
-        ssl_ctx, (unsigned char *)USERTRUST_ECC_CA_CERT,
-        sizeof(USERTRUST_ECC_CA_CERT), SSL_FILETYPE_PEM);
+    if (wolfSSL_CTX_load_verify_buffer(ssl_ctx, ca_cert, ca_cert_size,
+                                       SSL_FILETYPE_PEM) != SSL_SUCCESS) {
+      CRITICAL_printf("Failed to load CA certificate\n");
+      exit(-1);
+    }
     wolfSSL_SetIORecv(ssl_ctx, wolfssl_recv_cb);
     wolfSSL_SetIOSend(ssl_ctx, wolfssl_send_cb);
     if ((ssl = wolfSSL_new(ssl_ctx)) == NULL) {
@@ -209,6 +212,7 @@ int main(void) {
     ssl = NULL;
     wolfSSL_CTX_free(ssl_ctx);
     ssl_ctx = NULL;
+    cyw43_arch_poll();
 
   sleep:
     DEBUG_printf("Taking a nap for %d ms\n", SLEEP_MS);
@@ -218,10 +222,10 @@ int main(void) {
 
 /**
  * WolfSSL needs a UNIX timestamp
- * TODO: this is a dummy time, need to implement a real clock with Pi
  */
 #include <time.h>
 time_t myTime(time_t *t) {
-  *t = (((2023 - 1970) * 365 + (8 * 30)) * 24 * 60 * 60);
+  // date +%s
+  *t = 1744639028;
   return *t;
 }
