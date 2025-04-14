@@ -1,202 +1,187 @@
-/**
- * Copyright (c) 2022 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- *
- * On a UNIX machine you can check if the output if correct using `date -u`:
- * >>> while true; do date -u; sleep 1; clear; done
- */
+#include <lwip/err.h>
+#include <lwip/ip_addr.h>
+#include <lwip/udp.h>
+#include <pico/cyw43_arch.h>
+#include <pico/stdio.h>
+#include <pico/time.h>
 
-#include <cyw43_ll.h>
-#include <string.h>
-#include <time.h>
-
+#include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
-#include "pico/cyw43_arch.h"
-#include "pico/stdlib.h"
 
-#include "lwip/dns.h"
-#include "lwip/pbuf.h"
-#include "lwip/udp.h"
-
-typedef struct NTP_T_ {
-  ip_addr_t ntp_server_address;
-  bool dns_request_sent;
-  struct udp_pcb *ntp_pcb;
-  absolute_time_t ntp_test_time;
-  alarm_id_t ntp_resend_alarm;
-} NTP_T;
-
-#define NTP_SERVER "pool.ntp.org"
-#define NTP_MSG_LEN 48
+#define NTP_TIMEOUT_MS (10 * 1000)
+#define NTP_DELTA_SECONDS 2208988800 // seconds between 1900 and 1970
+#define NTP_HOSTNAME "pool.ntp.org"
 #define NTP_PORT 123
-#define NTP_DELTA 2208988800 // seconds between 1 Jan 1900 and 1 Jan 1970
-#define NTP_TEST_TIME (30 * 1000)
-#define NTP_RESEND_TIME (10 * 1000)
+#define NTP_MSG_LEN 48
+#define NTP_STRATUM_INVALID 0
+#define NTP_MODE_SERVER 4
+#define NTP_MODE_CLIENT 0b00000011
+#define NTP_MODE_MASK 0x7
+#define NTP_LI_NO_WARNING 0
+#define NTP_VN_VERSION_3 0b00011000
 
-// Called with results of operation
-static void ntp_result(NTP_T *state, int status, time_t *result) {
-  if (status == 0 && result) {
-    struct tm *utc = gmtime(result);
-    printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d\n", utc->tm_mday,
-           utc->tm_mon + 1, utc->tm_year + 1900, utc->tm_hour, utc->tm_min,
-           utc->tm_sec);
-  }
+struct ntp_client {
+  ip_addr_t ntp_ipaddr;
+  uint16_t ntp_port;
+  struct udp_pcb *pcb;
+  // whether NTP response has been processed
+  bool processed;
+  // indicate the status of the NTP sync
+  err_t ntp_err;
+  // The UNIX timestamp (seconds since 1970) received from NTP
+  time_t epoch;
+  // The output of get_absolute_time the moment when NTP response is processed
+  absolute_time_t abs_time_at_ntp_resp;
+};
 
-  if (state->ntp_resend_alarm > 0) {
-    cancel_alarm(state->ntp_resend_alarm);
-    state->ntp_resend_alarm = 0;
+static void ntp_resp_handler(void *arg, struct udp_pcb *pcb, struct pbuf *p,
+                             const ip_addr_t *peer_addr, u16_t peer_port) {
+  struct ntp_client *client = (struct ntp_client *)arg;
+  client->processed = true;
+  client->abs_time_at_ntp_resp = get_absolute_time();
+  if (p->tot_len != NTP_MSG_LEN) {
+    WARNING_printf("UDP response length %d, expected %d\n", p->tot_len,
+                   NTP_MSG_LEN);
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
   }
-  state->ntp_test_time = make_timeout_time_ms(NTP_TEST_TIME);
-  state->dns_request_sent = false;
+  uint8_t resp_mode = pbuf_get_at(p, 0) & NTP_MODE_MASK;
+  uint8_t resp_stratum = pbuf_get_at(p, 1);
+
+  if (!ip_addr_cmp(&client->ntp_ipaddr, peer_addr)) {
+    WARNING_printf("Mismatched IP addr: expect %s found %s\n",
+                   ip4addr_ntoa(&client->ntp_ipaddr), ip4addr_ntoa(peer_addr));
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  if (peer_port != client->ntp_port) {
+    WARNING_printf("Mismatched Port: expect %d found %d\n", client->ntp_port,
+                   peer_port);
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  if (resp_mode != NTP_MODE_SERVER) {
+    WARNING_printf("Unexpected NTP mode: expect %d found %d\n", NTP_MODE_SERVER,
+                   resp_mode);
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  if (resp_stratum == NTP_STRATUM_INVALID) {
+    WARNING_printf("Invalid NTP stratum\n");
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  client->ntp_err = ERR_OK;
+  uint8_t seconds_buf[4] = {0};
+  pbuf_copy_partial(p, seconds_buf, sizeof(seconds_buf), 40);
+  uint32_t seconds_since_1900 = seconds_buf[0] << 24 | seconds_buf[1] << 16 |
+                                seconds_buf[2] << 8 | seconds_buf[3];
+  uint32_t seconds_since_1970 = seconds_since_1900 - NTP_DELTA_SECONDS;
+  client->epoch = seconds_since_1970;
+  INFO_printf("got ntp response: %llu\n", client->epoch);
+
+cleanup:
+  pbuf_free(p);
 }
 
-static int64_t ntp_failed_handler(alarm_id_t id, void *user_data);
+err_t ntp_client_init(struct ntp_client *client, ip_addr_t ntp_ipaddr,
+                      uint16_t ntp_port) {
+  client->ntp_ipaddr = ntp_ipaddr;
+  client->ntp_port = ntp_port;
+  client->processed = false;
+  // TODO: do I need to free this?
+  client->pcb = udp_new_ip_type(IPADDR_TYPE_V4);
+  if (!client->pcb) {
+    CRITICAL_printf("Failed to allocate for NTP's UDP control block\n");
+    return ERR_MEM;
+  }
+  udp_recv(client->pcb, ntp_resp_handler, client);
+  return ERR_OK;
+}
 
-// Make an NTP request
-static void ntp_request(NTP_T *state) {
-  // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure
-  // correct locking. You can omit them if you are in a callback from lwIP. Note
-  // that when using pico_cyw_arch_poll these calls are a no-op and can be
-  // omitted, but it is a good practice to use them in case you switch the
-  // cyw43_arch type later.
+void ntp_client_close(struct ntp_client *client) {
+  if (client->pcb) {
+    udp_remove(client->pcb);
+  }
+}
+
+/**
+ * This method will handle the UDP PCB
+ */
+err_t ntp_client_sync_timeout_ms(struct ntp_client *client,
+                                 uint32_t timeout_ms) {
   cyw43_arch_lwip_begin();
-  struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
-  uint8_t *req = (uint8_t *)p->payload;
-  memset(req, 0, NTP_MSG_LEN);
-  req[0] = 0x1b;
-  udp_sendto(state->ntp_pcb, p, &state->ntp_server_address, NTP_PORT);
-  pbuf_free(p);
+  struct pbuf *ntp_req = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
+  uint8_t *payload = (uint8_t *)ntp_req->payload;
+  memset(payload, 0, NTP_MSG_LEN);
+  payload[0] = NTP_LI_NO_WARNING | NTP_VN_VERSION_3 | NTP_MODE_CLIENT;
+  udp_sendto(client->pcb, ntp_req, &client->ntp_ipaddr, client->ntp_port);
+  pbuf_free(ntp_req);
   cyw43_arch_lwip_end();
-}
 
-static int64_t ntp_failed_handler(alarm_id_t id, void *user_data) {
-  NTP_T *state = (NTP_T *)user_data;
-  printf("ntp request failed\n");
-  ntp_result(state, -1, NULL);
-  return 0;
-}
-
-// Call back with a DNS result
-static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr,
-                          void *arg) {
-  NTP_T *state = (NTP_T *)arg;
-  if (ipaddr) {
-    state->ntp_server_address = *ipaddr;
-    printf("ntp address %s\n", ipaddr_ntoa(ipaddr));
-    ntp_request(state);
-  } else {
-    printf("ntp dns request failed\n");
-    ntp_result(state, -1, NULL);
-  }
-}
-
-// NTP data received
-static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p,
-                     const ip_addr_t *addr, u16_t port) {
-  NTP_T *state = (NTP_T *)arg;
-  uint8_t mode = pbuf_get_at(p, 0) & 0x7;
-  uint8_t stratum = pbuf_get_at(p, 1);
-
-  // Check the result
-  if (ip_addr_cmp(addr, &state->ntp_server_address) && port == NTP_PORT &&
-      p->tot_len == NTP_MSG_LEN && mode == 0x4 && stratum != 0) {
-    uint8_t seconds_buf[4] = {0};
-    pbuf_copy_partial(p, seconds_buf, sizeof(seconds_buf), 40);
-    uint32_t seconds_since_1900 = seconds_buf[0] << 24 | seconds_buf[1] << 16 |
-                                  seconds_buf[2] << 8 | seconds_buf[3];
-    uint32_t seconds_since_1970 = seconds_since_1900 - NTP_DELTA;
-    time_t epoch = seconds_since_1970;
-    ntp_result(state, 0, &epoch);
-  } else {
-    printf("invalid ntp response\n");
-    ntp_result(state, -1, NULL);
-  }
-  pbuf_free(p);
-}
-
-// Perform initialisation
-static NTP_T *ntp_init(void) {
-  NTP_T *state = (NTP_T *)calloc(1, sizeof(NTP_T));
-  if (!state) {
-    printf("failed to allocate state\n");
-    return NULL;
-  }
-  state->ntp_pcb = udp_new_ip_type(IPADDR_TYPE_ANY);
-  if (!state->ntp_pcb) {
-    printf("failed to create pcb\n");
-    free(state);
-    return NULL;
-  }
-  udp_recv(state->ntp_pcb, ntp_recv, state);
-  return state;
-}
-
-// Runs ntp test forever
-void run_ntp_test(void) {
-  NTP_T *state = ntp_init();
-  if (!state)
-    return;
-  while (true) {
-    if (absolute_time_diff_us(get_absolute_time(), state->ntp_test_time) < 0 &&
-        !state->dns_request_sent) {
-      // Set alarm in case udp requests are lost
-      state->ntp_resend_alarm =
-          add_alarm_in_ms(NTP_RESEND_TIME, ntp_failed_handler, state, true);
-
-      // cyw43_arch_lwip_begin/end should be used around calls into lwIP to
-      // ensure correct locking. You can omit them if you are in a callback from
-      // lwIP. Note that when using pico_cyw_arch_poll these calls are a no-op
-      // and can be omitted, but it is a good practice to use them in case you
-      // switch the cyw43_arch type later.
-      cyw43_arch_lwip_begin();
-      int err = dns_gethostbyname(NTP_SERVER, &state->ntp_server_address,
-                                  ntp_dns_found, state);
-      cyw43_arch_lwip_end();
-
-      state->dns_request_sent = true;
-      if (err == ERR_OK) {
-        ntp_request(state); // Cached result
-      } else if (err !=
-                 ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
-        printf("dns request failed\n");
-        ntp_result(state, -1, NULL);
-      }
-    }
-#if PICO_CYW43_ARCH_POLL
-    // if you are using pico_cyw43_arch_poll, then you must poll periodically
-    // from your main loop (not from a timer interrupt) to check for Wi-Fi
-    // driver or lwIP work that needs to be done.
+  uint32_t timeout_begin = to_ms_since_boot(get_absolute_time());
+  while ((to_ms_since_boot(get_absolute_time()) - timeout_begin) < timeout_ms &&
+         !client->processed) {
     cyw43_arch_poll();
-    // you can poll as often as you like, however if you have nothing else to do
-    // you can choose to sleep until either a specified time, or
-    // cyw43_arch_poll() has work to do:
-    cyw43_arch_wait_for_work_until(
-        state->dns_request_sent ? at_the_end_of_time : state->ntp_test_time);
-#else
-    // if you are not using pico_cyw43_arch_poll, then WiFI driver and lwIP work
-    // is done via interrupt in the background. This sleep is just an example of
-    // some (blocking) work you might be doing.
-    sleep_ms(1000);
-#endif
+    sleep_ms(1);
   }
-  free(state);
+
+  if (!client->processed) {
+    return ERR_TIMEOUT;
+  }
+  return client->ntp_err;
 }
 
-int main() {
+/**
+ * Return the current time
+ */
+time_t get_current_epoch(struct ntp_client *client) {
+  uint64_t diff_us =
+      absolute_time_diff_us(client->abs_time_at_ntp_resp, get_absolute_time());
+  return client->epoch + (us_to_ms(diff_us) / 1000u);
+}
+
+int main(void) {
   stdio_init_all();
 
-  if (cyw43_arch_init()) {
-    printf("failed to initialise\n");
+  if (cyw43_arch_init() != 0) {
+    CRITICAL_printf("cyw43 failed to initialize\n");
     exit(-1);
   }
   cyw43_arch_enable_sta_mode();
+  ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
+                                  CYW43_AUTH_WPA2_AES_PSK);
+  struct ntp_client client;
+  err_t ntp_err;
+  dns_result_t ntp_dns;
 
   while (1) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                     CYW43_AUTH_WPA2_AES_PSK);
-    run_ntp_test();
-    sleep_ms(1000);
+    // First resolve the IP address of the NTP server
+    dns_result_init(&ntp_dns);
+    dns_gethostbyname_blocking(NTP_HOSTNAME, &ntp_dns);
+    if (!ntp_dns.resolved) {
+      CRITICAL_printf("Failed to resolve %s\n", NTP_HOSTNAME);
+      exit(-1);
+    } else {
+      INFO_printf("%s resolved to %s\n", NTP_HOSTNAME,
+                  ipaddr_ntoa(&ntp_dns.addr));
+    }
+
+    ntp_client_init(&client, ntp_dns.addr, NTP_PORT);
+    ntp_err = ntp_client_sync_timeout_ms(&client, NTP_TIMEOUT_MS);
+    if (ntp_err == ERR_TIMEOUT) {
+      WARNING_printf("NTP server timed out\n");
+      goto cleanup;
+    }
+    // check the clock for a few seconds
+    for (int i = 0; i < 60; i++) {
+      INFO_printf("Current epoch %llu\n", get_current_epoch(&client));
+      sleep_ms(1000);
+    }
+
+  cleanup:
+    ntp_client_close(&client);
   }
-  return 0;
 }
