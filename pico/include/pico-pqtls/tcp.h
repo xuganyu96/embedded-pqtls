@@ -65,4 +65,37 @@ PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
                             const uint8_t *data, size_t len,
                             uint32_t timeout_ms);
 err_t PICO_PQTLS_tcp_stream_close(PICO_PQTLS_tcp_stream_t *stream);
+
+
+#define NTP_TIMEOUT_MS (10 * 1000)
+#define NTP_DELTA_SECONDS 2208988800 // seconds between 1900 and 1970
+#define NTP_HOSTNAME "pool.ntp.org"
+#define NTP_PORT 123
+#define NTP_MSG_LEN 48
+#define NTP_STRATUM_INVALID 0
+#define NTP_MODE_SERVER 4
+#define NTP_MODE_CLIENT 0b00000011
+#define NTP_MODE_MASK 0x7
+#define NTP_LI_NO_WARNING 0
+#define NTP_VN_VERSION_3 0b00011000
+
+typedef struct ntp_client {
+  ip_addr_t ntp_ipaddr;
+  uint16_t ntp_port;
+  struct udp_pcb *pcb;
+  // whether NTP response has been processed
+  bool processed;
+  // indicate the status of the NTP sync
+  err_t ntp_err;
+  // The UNIX timestamp (seconds since 1970) received from NTP
+  time_t epoch;
+  // The output of get_absolute_time the moment when NTP response is processed
+  absolute_time_t abs_time_at_ntp_resp;
+} ntp_client_t;
+
+err_t ntp_client_init(ntp_client_t *client, ip_addr_t ntp_ipaddr,
+                      uint16_t ntp_port);
+void ntp_client_close(ntp_client_t *client);
+err_t ntp_client_sync_timeout_ms(ntp_client_t *client, uint32_t timeout_ms);
+time_t get_current_epoch(ntp_client_t *client);
 #endif

@@ -364,3 +364,114 @@ err_t PICO_PQTLS_tcp_stream_close(PICO_PQTLS_tcp_stream_t *stream) {
   PICO_PQTLS_tcp_stream_free(stream);
   return err;
 }
+
+static void ntp_resp_handler(void *arg, struct udp_pcb *pcb, struct pbuf *p,
+                             const ip_addr_t *peer_addr, u16_t peer_port) {
+  ntp_client_t *client = (ntp_client_t *)arg;
+  client->processed = true;
+  client->abs_time_at_ntp_resp = get_absolute_time();
+  if (p->tot_len != NTP_MSG_LEN) {
+    WARNING_printf("UDP response length %d, expected %d\n", p->tot_len,
+                   NTP_MSG_LEN);
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  uint8_t *payload = (uint8_t *)(p->payload);
+  uint8_t resp_mode = payload[0] & NTP_MODE_MASK;
+  uint8_t resp_stratum = payload[1];
+
+  if (!ip_addr_cmp(&client->ntp_ipaddr, peer_addr)) {
+    WARNING_printf("Mismatched IP addr: expect %s found %s\n",
+                   ip4addr_ntoa(&client->ntp_ipaddr), ip4addr_ntoa(peer_addr));
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  if (peer_port != client->ntp_port) {
+    WARNING_printf("Mismatched Port: expect %d found %d\n", client->ntp_port,
+                   peer_port);
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  if (resp_mode != NTP_MODE_SERVER) {
+    WARNING_printf("Unexpected NTP mode: expect %d found %d\n", NTP_MODE_SERVER,
+                   resp_mode);
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  if (resp_stratum == NTP_STRATUM_INVALID) {
+    WARNING_printf("Invalid NTP stratum\n");
+    client->ntp_err = ERR_VAL;
+    goto cleanup;
+  }
+  client->ntp_err = ERR_OK;
+  uint8_t seconds_buf[4] = {0};
+  pbuf_copy_partial(p, seconds_buf, sizeof(seconds_buf), 40);
+  uint32_t seconds_since_1900 = seconds_buf[0] << 24 | seconds_buf[1] << 16 |
+                                seconds_buf[2] << 8 | seconds_buf[3];
+  uint32_t seconds_since_1970 = seconds_since_1900 - NTP_DELTA_SECONDS;
+  client->epoch = seconds_since_1970;
+  INFO_printf("got ntp response: %llu\n", client->epoch);
+
+cleanup:
+  pbuf_free(p);
+}
+
+err_t ntp_client_init(ntp_client_t *client, ip_addr_t ntp_ipaddr,
+                      uint16_t ntp_port) {
+  client->ntp_ipaddr = ntp_ipaddr;
+  client->ntp_port = ntp_port;
+  client->processed = false;
+  client->pcb = udp_new_ip_type(IPADDR_TYPE_V4);
+  if (!client->pcb) {
+    CRITICAL_printf("Failed to allocate for NTP's UDP control block\n");
+    return ERR_MEM;
+  }
+  udp_recv(client->pcb, ntp_resp_handler, client);
+  return ERR_OK;
+}
+
+void ntp_client_close(ntp_client_t *client) {
+  if (client->pcb) {
+    udp_remove(client->pcb);
+    client->pcb = NULL;
+  }
+}
+
+/**
+ * This method will handle the UDP PCB
+ */
+err_t ntp_client_sync_timeout_ms(ntp_client_t *client, uint32_t timeout_ms) {
+  cyw43_arch_lwip_begin();
+  struct pbuf *ntp_req = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
+  if (!ntp_req) {
+    WARNING_printf("Failed to allocate %d pbuf\n", NTP_MSG_LEN);
+    return ERR_MEM;
+  }
+  uint8_t *payload = (uint8_t *)ntp_req->payload;
+  memset(payload, 0, NTP_MSG_LEN);
+  payload[0] = NTP_LI_NO_WARNING | NTP_VN_VERSION_3 | NTP_MODE_CLIENT;
+  udp_sendto(client->pcb, ntp_req, &client->ntp_ipaddr, client->ntp_port);
+  pbuf_free(ntp_req);
+  cyw43_arch_lwip_end();
+
+  uint32_t timeout_begin = to_ms_since_boot(get_absolute_time());
+  while ((to_ms_since_boot(get_absolute_time()) - timeout_begin) < timeout_ms &&
+         !client->processed) {
+    cyw43_arch_poll();
+    sleep_ms(1);
+  }
+
+  if (!client->processed) {
+    return ERR_TIMEOUT;
+  }
+  return client->ntp_err;
+}
+
+/**
+ * Return the current time
+ */
+time_t get_current_epoch(ntp_client_t *client) {
+  uint64_t diff_us =
+      absolute_time_diff_us(client->abs_time_at_ntp_resp, get_absolute_time());
+  return client->epoch + (us_to_ms(diff_us) / 1000u);
+}
