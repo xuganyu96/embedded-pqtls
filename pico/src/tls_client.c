@@ -43,6 +43,9 @@
   "RNZu9YO6bVi9JNlWSOrvxKJGgYhqOkbRqZtNyWHa0V1Xahg=\n"                         \
   "-----END CERTIFICATE-----\n"
 
+// the clock
+static ntp_client_t ntp_client;
+
 /**
  * WolfSSL will call this when it wants to read stuff
  */
@@ -102,8 +105,8 @@ int main(void) {
   wolfSSL_Init();
   wolfSSL_Debugging_ON();
 
-  dns_result_t dns_res;
-  err_t lwip_err;
+  dns_result_t peer_dns, ntp_dns;
+  err_t lwip_err, ntp_err;
 
   uint8_t http_buf[8192];
   size_t http_buflen = 0;
@@ -113,13 +116,31 @@ int main(void) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                     CYW43_AUTH_WPA2_AES_PSK);
 
+    // Synchronize the clock
+    dns_result_init(&ntp_dns);
+    dns_gethostbyname_blocking(NTP_HOSTNAME, &ntp_dns);
+    if (!ntp_dns.resolved) {
+      CRITICAL_printf("Failed to resolve %s\n", NTP_HOSTNAME);
+      exit(-1);
+    } else {
+      INFO_printf("%s resolved to %s\n", NTP_HOSTNAME,
+                  ipaddr_ntoa(&ntp_dns.addr));
+    }
+
+    ntp_client_init(&ntp_client, ntp_dns.addr, NTP_PORT);
+    ntp_err = ntp_client_sync_timeout_ms(&ntp_client, NTP_TIMEOUT_MS);
+    if (ntp_err == ERR_TIMEOUT) {
+      WARNING_printf("NTP server timed out\n");
+      goto shutdown;
+    }
+
     // Look up IP address of peer
-    dns_result_init(&dns_res);
+    dns_result_init(&peer_dns);
     DEBUG_printf("resolving %s\n", REMOTE_HOSTNAME);
-    dns_gethostbyname_blocking(REMOTE_HOSTNAME, &dns_res);
-    if (dns_res.resolved) {
+    dns_gethostbyname_blocking(REMOTE_HOSTNAME, &peer_dns);
+    if (peer_dns.resolved) {
       INFO_printf("%s resolved to %s\n", REMOTE_HOSTNAME,
-                  ipaddr_ntoa(&dns_res.addr));
+                  ipaddr_ntoa(&peer_dns.addr));
     } else {
       WARNING_printf("%s failed to resolve\n", REMOTE_HOSTNAME);
       goto sleep;
@@ -133,7 +154,8 @@ int main(void) {
     }
 
     lwip_err = PICO_PQTLS_tcp_stream_connect_timeout_ms(
-        stream, ipaddr_ntoa(&dns_res.addr), HTTPS_PORT, TCP_CONNECT_TIMEOUT_MS);
+        stream, ipaddr_ntoa(&peer_dns.addr), HTTPS_PORT,
+        TCP_CONNECT_TIMEOUT_MS);
     if (lwip_err == ERR_OK) {
       INFO_printf("Connected to %s:%d\n", REMOTE_HOSTNAME, HTTPS_PORT);
     } else {
@@ -204,6 +226,7 @@ int main(void) {
 
     // Finished, close TCP connection and cleanup
   shutdown:
+    ntp_client_close(&ntp_client);
     wolfSSL_shutdown(ssl);
     lwip_err = PICO_PQTLS_tcp_stream_close(stream);
     if (lwip_err == ERR_OK) {
@@ -231,7 +254,6 @@ int main(void) {
  */
 #include <time.h>
 time_t myTime(time_t *t) {
-  // date +%s
-  *t = 1744639028;
+  *t = get_current_epoch(&ntp_client);
   return *t;
 }
