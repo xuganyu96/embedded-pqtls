@@ -25,6 +25,24 @@
   "Gecko/20100101 Firefox/136.0\r\n"                                           \
   "Accept: application/json\r\n"                                               \
   "Connection: close\r\n\r\n"
+#define USERTRUST_ECC_CA_CERT                                                  \
+  "-----BEGIN CERTIFICATE-----\n"                                              \
+  "MIICjzCCAhWgAwIBAgIQXIuZxVqUxdJxVt7NiYDMJjAKBggqhkjOPQQDAzCBiDEL\n"         \
+  "MAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNl\n"         \
+  "eSBDaXR5MR4wHAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMT\n"         \
+  "JVVTRVJUcnVzdCBFQ0MgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMTAwMjAx\n"         \
+  "MDAwMDAwWhcNMzgwMTE4MjM1OTU5WjCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgT\n"         \
+  "Ck5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNleSBDaXR5MR4wHAYDVQQKExVUaGUg\n"         \
+  "VVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMTJVVTRVJUcnVzdCBFQ0MgQ2VydGlm\n"         \
+  "aWNhdGlvbiBBdXRob3JpdHkwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQarFRaqflo\n"         \
+  "I+d61SRvU8Za2EurxtW20eZzca7dnNYMYf3boIkDuAUU7FfO7l0/4iGzzvfUinng\n"         \
+  "o4N+LZfQYcTxmdwlkWOrfzCjtHDix6EznPO/LlxTsV+zfTJ/ijTjeXmjQjBAMB0G\n"         \
+  "A1UdDgQWBBQ64QmG1M8ZwpZ2dEl23OA1xmNjmjAOBgNVHQ8BAf8EBAMCAQYwDwYD\n"         \
+  "VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAwNoADBlAjA2Z6EWCNzklwBBHU6+4WMB\n"         \
+  "zzuqQhFkoJ2UOQIReVx7Hfpkue4WQrO/isIJxOzksU0CMQDpKmFHjFJKS04YcPbW\n"         \
+  "RNZu9YO6bVi9JNlWSOrvxKJGgYhqOkbRqZtNyWHa0V1Xahg=\n"                         \
+  "-----END CERTIFICATE-----\n"
+
 /**
  * WolfSSL will call this when it wants to read stuff
  */
@@ -130,6 +148,11 @@ int main(void) {
       CRITICAL_printf("Failed to create SSL CTX\n");
       exit(-1);
     }
+    // TODO: when using USERTRUST_ECC_CA_CERT WolfSSL will error out (188)
+    //   it is probably because WolfSSL advertised a different set of supported
+    //   signature algorithms than my browser (Firefox), which causes
+    //   api.github.com to return a different Certificate chain that then traces
+    //   to a different root
     uint8_t ca_certs[] = MOZILLA_CA_CERTS;
     size_t ca_certs_size = sizeof(ca_certs);
     // wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_NONE, NULL);
