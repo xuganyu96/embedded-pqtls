@@ -82,17 +82,18 @@ int main(int argc, char **argv) {
 
   // Root certificates downloaded from
   // https://ccadb.my.salesforce-sites.com/mozilla/IncludedRootsPEMTxt?TrustBitsInclude=Websites
-  // if (wolfSSL_CTX_load_verify_locations(
-  //         ctx, "./examples/mozilla-trusted-ca.pem", NULL) != SSL_SUCCESS) {
-  //   fprintf(stderr, "Error loading root certificates please check the
-  //   file.\n"); exit(EXIT_FAILURE);
-  // }
-  uint8_t ca_cert[] = USERTRUST_ECC_CA_CERT;
-  if (wolfSSL_CTX_load_verify_buffer(ctx, ca_cert, sizeof(ca_cert),
-                                     WOLFSSL_FILETYPE_PEM) != SSL_SUCCESS) {
-    fprintf(stderr, "Error loading root certificates\n");
+  // const char *ca_file = "./examples/mozilla-trusted-ca.pem";
+  const char *ca_file = "/Users/ganyuxu/Downloads/github-com.pem";
+  if (wolfSSL_CTX_load_verify_locations(ctx, ca_file, NULL) != SSL_SUCCESS) {
+    fprintf(stderr, "Error loading root certificates please check the file.\n");
     exit(EXIT_FAILURE);
   }
+  // uint8_t ca_cert[] = USERTRUST_ECC_CA_CERT;
+  // if (wolfSSL_CTX_load_verify_buffer(ctx, ca_cert, sizeof(ca_cert),
+  //                                    WOLFSSL_FILETYPE_PEM) != SSL_SUCCESS) {
+  //   fprintf(stderr, "Error loading root certificates\n");
+  //   exit(EXIT_FAILURE);
+  // }
 
   ssl = wolfSSL_new(ctx);
   if (!ssl) {
