@@ -45,8 +45,9 @@ static void ntp_resp_handler(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     client->ntp_err = ERR_VAL;
     goto cleanup;
   }
-  uint8_t resp_mode = pbuf_get_at(p, 0) & NTP_MODE_MASK;
-  uint8_t resp_stratum = pbuf_get_at(p, 1);
+  uint8_t *payload = (uint8_t *)(p->payload);
+  uint8_t resp_mode = payload[0] & NTP_MODE_MASK;
+  uint8_t resp_stratum = payload[1];
 
   if (!ip_addr_cmp(&client->ntp_ipaddr, peer_addr)) {
     WARNING_printf("Mismatched IP addr: expect %s found %s\n",
@@ -89,7 +90,6 @@ err_t ntp_client_init(struct ntp_client *client, ip_addr_t ntp_ipaddr,
   client->ntp_ipaddr = ntp_ipaddr;
   client->ntp_port = ntp_port;
   client->processed = false;
-  // TODO: do I need to free this?
   client->pcb = udp_new_ip_type(IPADDR_TYPE_V4);
   if (!client->pcb) {
     CRITICAL_printf("Failed to allocate for NTP's UDP control block\n");
@@ -102,6 +102,7 @@ err_t ntp_client_init(struct ntp_client *client, ip_addr_t ntp_ipaddr,
 void ntp_client_close(struct ntp_client *client) {
   if (client->pcb) {
     udp_remove(client->pcb);
+    client->pcb = NULL;
   }
 }
 
@@ -112,6 +113,10 @@ err_t ntp_client_sync_timeout_ms(struct ntp_client *client,
                                  uint32_t timeout_ms) {
   cyw43_arch_lwip_begin();
   struct pbuf *ntp_req = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
+  if (!ntp_req) {
+    WARNING_printf("Failed to allocate %d pbuf\n", NTP_MSG_LEN);
+    return ERR_MEM;
+  }
   uint8_t *payload = (uint8_t *)ntp_req->payload;
   memset(payload, 0, NTP_MSG_LEN);
   payload[0] = NTP_LI_NO_WARNING | NTP_VN_VERSION_3 | NTP_MODE_CLIENT;
