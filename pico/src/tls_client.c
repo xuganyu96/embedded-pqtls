@@ -148,8 +148,8 @@ int main(void) {
       CRITICAL_printf("Failed to create SSL CTX\n");
       exit(-1);
     }
-    wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_NONE, NULL);
-    // wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_PEER, NULL);
+    // wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_NONE, NULL);
+    wolfSSL_CTX_set_verify(ssl_ctx, WOLFSSL_VERIFY_PEER, NULL);
     wolfSSL_CTX_load_verify_buffer(
         ssl_ctx, (unsigned char *)USERTRUST_ECC_CA_CERT,
         sizeof(USERTRUST_ECC_CA_CERT), SSL_FILETYPE_PEM);
@@ -167,6 +167,9 @@ int main(void) {
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
       WARNING_printf("TLS handshake failed (%d)\n",
                      wolfSSL_get_error(ssl, ssl_err));
+      char errmsg[80];
+      wolfSSL_ERR_error_string(ssl_err, errmsg);
+      printf("Error string: %s\n", errmsg);
       goto shutdown;
     } else {
       INFO_printf("TLS handshake success\n");
