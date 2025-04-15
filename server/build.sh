@@ -51,14 +51,16 @@ setup_experiment() {
     rm -rf $builddir
 }
 
+export setup_experiment
+
 # example: 
 #     setup_experiment "Kyber512" "Dilithium2" "Dilithium2" "Dilithium2" "Dilithium2" "Dilithium2" "Y"
 
 # TODO: include SPHINCS+
 # TODO: include one-time KEMs
 # >>>>> PQ-TLS setups, including server and mutual authentication
-setup_experiment "Kyber512" "Dilithium2" "Dilithium2" "Dilithium2"
-setup_experiment "Kyber512" "Dilithium2" "Dilithium2" "Dilithium2" "Dilithium2" "Dilithium2"
+# setup_experiment "Kyber512" "Dilithium2" "Dilithium2" "Dilithium2"
+# setup_experiment "Kyber512" "Dilithium2" "Dilithium2" "Dilithium2" "Dilithium2" "Dilithium2"
 # setup_experiment "Kyber512" "Falcon512" "Falcon512" "Falcon512"
 # setup_experiment "Kyber512" "Falcon512" "Falcon512" "Falcon512" "Falcon512" "Falcon512"
 # setup_experiment "Hqc128" "Dilithium2" "Dilithium2" "Dilithium2"
@@ -67,8 +69,8 @@ setup_experiment "Kyber512" "Dilithium2" "Dilithium2" "Dilithium2" "Dilithium2" 
 # setup_experiment "Hqc128" "Falcon512" "Falcon512" "Falcon512" "Falcon512" "Falcon512"
 
 # >>>>> KEMTLS setups, including server and mutual authentication
-setup_experiment "Kyber512" "Kyber512" "Dilithium2" "Dilithium2"
-setup_experiment "Kyber512" "Kyber512" "Dilithium2" "Dilithium2" "Kyber512" "Dilithium2"
+# setup_experiment "Kyber512" "Kyber512" "Dilithium2" "Dilithium2"
+# setup_experiment "Kyber512" "Kyber512" "Dilithium2" "Dilithium2" "Kyber512" "Dilithium2"
 # setup_experiment "Kyber512" "Kyber512" "Falcon512" "Falcon512"
 # setup_experiment "Kyber512" "Kyber512" "Falcon512" "Falcon512" "Kyber512" "Falcon512"
 # setup_experiment "Hqc128" "Hqc128" "Dilithium2" "Dilithium2"
@@ -77,6 +79,6 @@ setup_experiment "Kyber512" "Kyber512" "Dilithium2" "Dilithium2" "Kyber512" "Dil
 # setup_experiment "Hqc128" "Hqc128" "Falcon512" "Falcon512" "Hqc128" "Falcon512"
 
 # >>>>> KEMTLS-PDK setups
-setup_experiment "Kyber512" "Kyber512" "" "" "" "" "true"
-setup_experiment "Kyber512" "Kyber512" "" "" "Kyber512" "Dilithium2" "true"
+# setup_experiment "Kyber512" "Kyber512" "" "" "" "" "true"
+# setup_experiment "Kyber512" "Kyber512" "" "" "Kyber512" "Dilithium2" "true"
 # setup_experiment "Kyber512" "ClassicMceliece348864" "" "" "" "" "true"

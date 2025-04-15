@@ -6,11 +6,15 @@
     - [ ] SPHINCS+ (SLH-DSA)
     - [ ] one-time ML-KEM (not yet implemented)
     - [ ] one-time HQC (not yet implemented)
-- [ ] Get Wifi working on Pico 2 W
-- [ ] Get WolfSSL working on Pico 2 W
+- [x] Get Wifi working on Pico 2 W
+- [x] Get WolfSSL working on Pico 2 W
 - [ ] Start modifying WolfSSL for PQ-TLS and KEM-TLS
 
 # KEMTLS and PQ-TLS on Raspberry Pi Pico
+Content of this repository:
+- **pico**: C project for running TLS client on Raspberry Pi Pico 2 W
+- **desktop**: C project for running on a desktop environment (Apple Silicon + MacOS)
+- **server**: scripts and stuff for setting up TLS server (x86_64 Ubuntu?)
 
 ## References
 
