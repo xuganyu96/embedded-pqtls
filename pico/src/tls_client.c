@@ -25,6 +25,14 @@
   "Gecko/20100101 Firefox/136.0\r\n"                                           \
   "Accept: application/json\r\n"                                               \
   "Connection: close\r\n\r\n"
+// TODO: according to Firefox, GitHub's certificate chain that traces back to
+// this root certificate uses SHA256-ECDSA and SHA384-ECDSA. I've tried using
+// wolfSSL_CTX_UseSupportedCurve with secp256r1 and secp384r1, but server
+// authentication still fails with error code 188, indicating that root 
+// certificate was not found. Later in the project I will be using self-signed
+// root certificates, so for now it is not worth it to try to pinpoint which of
+// the Mozilla's trusted CA certificates was used, or how to configure wolfSSL
+// to support these signature algorithms.
 #define USERTRUST_ECC_CA_CERT                                                  \
   "-----BEGIN CERTIFICATE-----\n"                                              \
   "MIICjzCCAhWgAwIBAgIQXIuZxVqUxdJxVt7NiYDMJjAKBggqhkjOPQQDAzCBiDEL\n"         \
