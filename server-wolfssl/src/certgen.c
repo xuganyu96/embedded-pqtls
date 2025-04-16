@@ -1,5 +1,9 @@
 /**
  * Generate certificate chain
+ *
+ * Load certificate and key to some server (e.g. rustls/examples/tlsserver-mio)
+ * then load CA certificate into curl:
+ * >>> curl --cacert ca-cert.pem https://example-server:8000
  */
 #include <stdio.h>
 #include <string.h>
