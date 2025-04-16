@@ -44,5 +44,5 @@ target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations)
 
 add_compile_options(-O3 -Wall -Wextra)
 
-add_executable(hello src/hello.c)
-target_link_libraries(hello wolfssl)
+add_executable(certgen src/certgen.c)
+target_link_libraries(certgen wolfssl)
