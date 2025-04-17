@@ -18,6 +18,7 @@
 #define SERVER_ROOT_COMMON_NAME "server-root.eng.uwaterloo.ca"
 #define SERVER_INT_COMMON_NAME "server-int.eng.uwaterloo.ca"
 #define SERVER_LEAF_COMMON_NAME "*.eng.uwaterloo.ca"
+#define CLIENT_LEAF_COMMON_NAME "*.eng.uwaterloo.ca"
 #define SUBJ_EMAIL "no-reply@eng.uwaterloo.ca"
 // Can be made larger: certgen will definitely run on a browser
 #define DER_CERT_MAX_SIZE 4096
@@ -49,7 +50,7 @@ int main(int argc, char *argv[0]) {
     exit(EXIT_FAILURE);
   }
 
-  // server root certificate
+  // root certificate will sign both server-int and client-leaf
   Cert root_cert;
   RsaKey root_key;
   RNG rng;
@@ -123,8 +124,7 @@ int main(int argc, char *argv[0]) {
   char root_cert_filepath[PATH_MAX_SIZE], root_key_filepath[PATH_MAX_SIZE];
   int written;
   FILE *file;
-  snprintf(root_cert_filepath, sizeof(root_cert_filepath), "%s/server-root.crt",
-           dir);
+  snprintf(root_cert_filepath, sizeof(root_cert_filepath), "%s/root.crt", dir);
   file = fopen(root_cert_filepath, "w");
   if (!file) {
     perror("Error opening file for writing");
@@ -137,8 +137,7 @@ int main(int argc, char *argv[0]) {
     exit(EXIT_FAILURE);
   }
   fclose(file);
-  snprintf(root_key_filepath, sizeof(root_key_filepath), "%s/server-root.key",
-           dir);
+  snprintf(root_key_filepath, sizeof(root_key_filepath), "%s/root.key", dir);
   file = fopen(root_key_filepath, "w");
   if (!file) {
     perror("Error opening file for writing");
@@ -272,7 +271,7 @@ int main(int argc, char *argv[0]) {
   memcpy(leaf_cert.afterDate + 2, NOT_AFTER_DATE, strlen(NOT_AFTER_DATE));
   leaf_cert.afterDateSz = 15;
   if (wc_SetIssuerBuffer(&leaf_cert, int_cert_der, int_cert_der_size) != 0) {
-    fprintf(stderr, "Failed to set intermiediate as leaf's issuer\n");
+    fprintf(stderr, "Failed to set intermediate as leaf's issuer\n");
     exit(EXIT_FAILURE);
   }
   ecc_key leaf_key;
@@ -353,6 +352,7 @@ int main(int argc, char *argv[0]) {
   }
   fclose(file);
 
+  // server certificate chain
   char chain_cert_filepath[PATH_MAX_SIZE];
   snprintf(chain_cert_filepath, sizeof(chain_cert_filepath),
            "%s/server-chain.crt", dir);
@@ -370,6 +370,128 @@ int main(int argc, char *argv[0]) {
   written = fwrite(int_cert_pem, sizeof(uint8_t), int_cert_pem_size, file);
   if (written < int_cert_pem_size) {
     fprintf(stderr, "Wrote %d out of %d bytes\n", written, int_cert_pem_size);
+    fclose(file);
+    exit(EXIT_FAILURE);
+  }
+  written = fwrite(root_cert_pem, sizeof(uint8_t), root_cert_pem_size, file);
+  if (written < root_cert_pem_size) {
+    fprintf(stderr, "Wrote %d out of %d bytes\n", written, root_cert_pem_size);
+    fclose(file);
+    exit(EXIT_FAILURE);
+  }
+  fclose(file);
+
+  // client leaf certificate
+  Cert client_leaf_cert;
+  wc_InitCert(&client_leaf_cert);
+  client_leaf_cert.sigType = CTC_SHA256wRSA; // signed by root
+  strncpy(client_leaf_cert.subject.country, SUBJ_COUNTRY, CTC_NAME_SIZE);
+  strncpy(client_leaf_cert.subject.state, SUBJ_STATE, CTC_NAME_SIZE);
+  strncpy(client_leaf_cert.subject.locality, SUBJ_LOCALITY, CTC_NAME_SIZE);
+  strncpy(client_leaf_cert.subject.org, SUBJ_ORGANIZATION, CTC_NAME_SIZE);
+  strncpy(client_leaf_cert.subject.commonName, CLIENT_LEAF_COMMON_NAME, CTC_NAME_SIZE);
+  strncpy(client_leaf_cert.subject.email, SUBJ_EMAIL, CTC_NAME_SIZE);
+  client_leaf_cert.beforeDate[0] = ASN_UTC_TIME;
+  client_leaf_cert.beforeDate[1] = ASN_UTC_TIME_SIZE - 1;
+  memcpy(client_leaf_cert.beforeDate + 2, NOT_BEFORE_DATE, strlen(NOT_BEFORE_DATE));
+  client_leaf_cert.beforeDateSz = 15;
+  client_leaf_cert.afterDate[0] = ASN_UTC_TIME;
+  client_leaf_cert.afterDate[1] = ASN_UTC_TIME_SIZE - 1;
+  memcpy(client_leaf_cert.afterDate + 2, NOT_AFTER_DATE, strlen(NOT_AFTER_DATE));
+  client_leaf_cert.afterDateSz = 15;
+  if (wc_SetIssuerBuffer(&client_leaf_cert, root_cert_der, root_cert_der_size) != 0) {
+    fprintf(stderr, "Failed to set root as client leaf's issuer\n");
+    exit(EXIT_FAILURE);
+  }
+  ecc_key client_leaf_key;
+  wc_ecc_init(&client_leaf_key);
+  if (wc_ecc_make_key(&rng, ECC_KEY_SIZE, &client_leaf_key) != 0) {
+    fprintf(stderr, "Failed to make %d byte ECC key\n", ECC_KEY_SIZE);
+    exit(EXIT_FAILURE);
+  }
+  uint8_t client_leaf_cert_der[DER_CERT_MAX_SIZE], client_leaf_cert_pem[PEM_CERT_MAX_SIZE];
+  int client_leaf_cert_der_size, client_leaf_cert_pem_size;
+  if ((client_leaf_cert_der_size =
+           wc_MakeCert(&client_leaf_cert, client_leaf_cert_der, sizeof(client_leaf_cert_der), NULL,
+                       &client_leaf_key, &rng)) < 0) {
+    fprintf(stderr, "Failed to make unsigned client leaf certificate body (err %d)\n",
+            client_leaf_cert_der_size);
+    exit(EXIT_FAILURE);
+  }
+  client_leaf_cert_der_size =
+      wc_SignCert(client_leaf_cert.bodySz, client_leaf_cert.sigType, client_leaf_cert_der,
+                  sizeof(client_leaf_cert_der), &root_key, NULL, &rng);
+  if (client_leaf_cert_der_size < 0) {
+    fprintf(stderr, "Failed to sign leaf certificate (err %d)\n",
+            client_leaf_cert_der_size);
+    exit(EXIT_FAILURE);
+  }
+  client_leaf_cert_pem_size =
+      wc_DerToPem(client_leaf_cert_der, client_leaf_cert_der_size, client_leaf_cert_pem,
+                  sizeof(client_leaf_cert_pem), CERT_TYPE);
+  if (client_leaf_cert_pem_size < 0) {
+    fprintf(stderr, "Failed to convert leaf certificate to PEM (err %d)\n",
+            client_leaf_cert_pem_size);
+    exit(EXIT_FAILURE);
+  }
+  uint8_t client_leaf_key_der[DER_KEY_MAX_SIZE], client_leaf_key_pem[PEM_KEY_MAX_SIZE];
+  int client_leaf_key_der_size, client_leaf_key_pem_size;
+  client_leaf_key_der_size =
+      wc_EccKeyToDer(&client_leaf_key, client_leaf_key_der, sizeof(client_leaf_key_der));
+  if (client_leaf_key_der_size < 0) {
+    fprintf(stderr, "Failed to convert leaf key to DER (err %d)\n",
+            client_leaf_key_der_size);
+    exit(EXIT_FAILURE);
+  }
+  client_leaf_key_pem_size = wc_DerToPem(client_leaf_key_der, client_leaf_key_der_size, client_leaf_key_pem,
+                                  sizeof(client_leaf_key_pem), ECC_TYPE);
+  if (client_leaf_key_pem_size < 0) {
+    fprintf(stderr, "Failed to convert leaf key to PEM (err %d)\n",
+            client_leaf_key_pem_size);
+    exit(EXIT_FAILURE);
+  }
+
+  char client_leaf_cert_filepath[PATH_MAX_SIZE], client_leaf_key_filepath[PATH_MAX_SIZE];
+  snprintf(client_leaf_cert_filepath, sizeof(client_leaf_cert_filepath), "%s/client-leaf.crt",
+           dir);
+  file = fopen(client_leaf_cert_filepath, "w");
+  if (!file) {
+    fprintf(stderr, "Failed to open %s to write\n", client_leaf_cert_filepath);
+    exit(EXIT_FAILURE);
+  }
+  written = fwrite(client_leaf_cert_pem, sizeof(uint8_t), client_leaf_cert_pem_size, file);
+  if (written < client_leaf_cert_pem_size) {
+    fprintf(stderr, "Wrote %d out of %d bytes\n", written, client_leaf_cert_pem_size);
+    fclose(file);
+    exit(EXIT_FAILURE);
+  }
+  fclose(file);
+  snprintf(client_leaf_key_filepath, sizeof(client_leaf_key_filepath), "%s/client-leaf.key",
+           dir);
+  file = fopen(client_leaf_key_filepath, "w");
+  if (!file) {
+    fprintf(stderr, "Failed to open %s to write\n", client_leaf_key_filepath);
+    exit(EXIT_FAILURE);
+  }
+  written = fwrite(client_leaf_key_pem, sizeof(uint8_t), client_leaf_key_pem_size, file);
+  if (written < client_leaf_key_pem_size) {
+    fprintf(stderr, "Wrote %d out of %d bytes\n", written, client_leaf_key_pem_size);
+    fclose(file);
+    exit(EXIT_FAILURE);
+  }
+  fclose(file);
+
+  // client certificate chain
+  snprintf(chain_cert_filepath, sizeof(chain_cert_filepath),
+           "%s/client-chain.crt", dir);
+  file = fopen(chain_cert_filepath, "w");
+  if (!file) {
+    fprintf(stderr, "Failed to open %s to write\n", chain_cert_filepath);
+    exit(EXIT_FAILURE);
+  }
+  written = fwrite(client_leaf_cert_pem, sizeof(uint8_t), client_leaf_cert_pem_size, file);
+  if (written < client_leaf_cert_pem_size) {
+    fprintf(stderr, "Wrote %d out of %d bytes\n", written, client_leaf_cert_pem_size);
     fclose(file);
     exit(EXIT_FAILURE);
   }
