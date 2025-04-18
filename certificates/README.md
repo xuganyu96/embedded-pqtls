@@ -3,6 +3,11 @@
 - For now it's okay to assume that the server will run on x86_64 Linux desktop, but keep in mind that for future work I might want to do a TLS server on a Pico 2 W as well
 - Use CMake to directly compile WolfSSL source code as static library. Need to figure out `user_settings.h`.
 
+## X.509 certificates for ML-KEM and ML-DSA
+There are two relevant IETF drafts:
+- [ML-KEM certificates](https://datatracker.ietf.org/doc/draft-ietf-lamps-kyber-certificates/)
+- [ML-DSA certificates](https://datatracker.ietf.org/doc/draft-ietf-lamps-dilithium-certificates/)
+
 ## Generate server certificate chain
 `src/certgen.c` will generate a chain of 3 certificates (leaf-intermediate-root) and their corresponding private keys in the specified directory. The validity of the certificates can be verified in two ways:
 
