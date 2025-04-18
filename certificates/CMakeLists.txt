@@ -21,16 +21,17 @@ file(GLOB WOLFSSL_SRC
     "${WOLFSSL_ROOT}/wolfcrypt/src/*.c"
 )
 list(REMOVE_ITEM WOLFSSL_SRC EXCLUDE REGEX
-    "${WOLFSSL_ROOT}/src/bio.c"
-    "${WOLFSSL_ROOT}/src/conf.c"
-    "${WOLFSSL_ROOT}/src/pk.c"
-    "${WOLFSSL_ROOT}/src/ssl_asn1.c"
-    "${WOLFSSL_ROOT}/src/ssl_bn.c"
-    "${WOLFSSL_ROOT}/src/ssl_misc.c"
-    "${WOLFSSL_ROOT}/src/x509.c"
-    "${WOLFSSL_ROOT}/src/x509_str.c"
-    "${WOLFSSL_ROOT}/wolfcrypt/src/evp.c"
-    "${WOLFSSL_ROOT}/wolfcrypt/src/misc.c"
+    # TODO: enable everything on desktop
+    # "${WOLFSSL_ROOT}/src/bio.c"
+    # "${WOLFSSL_ROOT}/src/conf.c"
+    # "${WOLFSSL_ROOT}/src/pk.c"
+    # "${WOLFSSL_ROOT}/src/ssl_asn1.c"
+    # "${WOLFSSL_ROOT}/src/ssl_bn.c"
+    # "${WOLFSSL_ROOT}/src/ssl_misc.c"
+    # "${WOLFSSL_ROOT}/src/x509.c"
+    # "${WOLFSSL_ROOT}/src/x509_str.c"
+    # "${WOLFSSL_ROOT}/wolfcrypt/src/evp.c"
+    # "${WOLFSSL_ROOT}/wolfcrypt/src/misc.c"
 )
 add_library(wolfssl STATIC
     ${WOLFSSL_SRC}
@@ -46,3 +47,6 @@ add_compile_options(-O3 -Wall -Wextra)
 
 add_executable(certgen src/certgen.c)
 target_link_libraries(certgen wolfssl)
+
+add_executable(asn1 src/asn1.c)
+target_link_libraries(asn1 wolfssl)

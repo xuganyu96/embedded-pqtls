@@ -58,6 +58,7 @@ extern "C" {
 #define HAVE_OID_ENCODING
 #define WOLFSSL_ASN_TEMPLATE
 #define WOLFSSL_ALT_NAMES /* Support subject alternative names extension */
+#define WOLFSSL_ASN_PRINT
 
 /* ------------------------------------------------------------------------- */
 /* Platform */
