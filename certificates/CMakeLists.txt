@@ -50,3 +50,6 @@ target_link_libraries(certgen wolfssl)
 
 add_executable(asn1 src/asn1.c)
 target_link_libraries(asn1 wolfssl)
+
+add_executable(pq-certgen src/pq-certgen.c)
+target_link_libraries(pq-certgen wolfssl)

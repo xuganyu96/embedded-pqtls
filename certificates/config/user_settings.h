@@ -60,6 +60,11 @@ extern "C" {
 #define WOLFSSL_ALT_NAMES /* Support subject alternative names extension */
 #define WOLFSSL_ASN_PRINT
 
+// post-quantum cryptograqphy
+#define HAVE_DILITHIUM
+#define HAVE_FALCON
+#define HAVE_SPHINCS
+
 /* ------------------------------------------------------------------------- */
 /* Platform */
 /* ------------------------------------------------------------------------- */
