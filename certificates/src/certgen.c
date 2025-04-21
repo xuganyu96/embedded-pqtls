@@ -4,6 +4,7 @@
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/dilithium.h"
 #include "wolfssl/wolfcrypt/error-crypt.h"
+#include "wolfssl/wolfcrypt/types.h"
 
 #ifndef QUIET
 #define DEBUG_printf(...) fprintf(stderr, __VA_ARGS__)
@@ -66,7 +67,7 @@ int generate_dilithium_self_cert_pair(uint8_t *cert, size_t cert_cap,
 
   // Entity of the certificate
   wc_InitCert(&root_cert);
-  root_cert.sigType = CTC_DILITHIUM_LEVEL5;
+  root_cert.sigType = CTC_ML_DSA_LEVEL5;
   root_cert.isCA = 1;
   strncpy(root_cert.subject.country, LEAF_COUNTRY, CTC_NAME_SIZE);
   strncpy(root_cert.subject.state, LEAF_STATE, CTC_NAME_SIZE);
@@ -77,15 +78,15 @@ int generate_dilithium_self_cert_pair(uint8_t *cert, size_t cert_cap,
   set_after_date_utctime(&root_cert, NOT_AFTER_DATE);
 
   // TODO: Dilithium and ML-DSA are distinct!
-  dilithium_key root_key;
+  MlDsaKey root_key;
   uint8_t root_key_der[KEY_DER_MAX_SIZE], root_key_pem[KEY_PEM_MAX_SIZE];
   int root_key_der_size, root_key_pem_size;
-  wc_dilithium_init(&root_key);
-  wc_dilithium_set_level(&root_key, 5);
-  wc_dilithium_make_key(&root_key, rng);
+  wc_MlDsaKey_Init(&root_key, NULL, INVALID_DEVID);
+  wc_MlDsaKey_SetParams(&root_key, 5);
+  wc_MlDsaKey_MakeKey(&root_key, rng);
   root_cert_der_size =
       wc_MakeCert_ex(&root_cert, root_cert_der, sizeof(root_cert_der),
-                     DILITHIUM_LEVEL5_TYPE, &root_key, rng);
+                     ML_DSA_LEVEL5_TYPE, &root_key, rng);
   if (root_cert_der_size < 0) {
     fprintf(stderr, "Failed to create root cert body (err %d)\n",
             root_cert_der_size);
@@ -93,9 +94,9 @@ int generate_dilithium_self_cert_pair(uint8_t *cert, size_t cert_cap,
   } else {
     DEBUG_printf("root cert (unsigned) DER size %d\n", root_cert_der_size);
   }
-  root_cert_der_size = wc_SignCert_ex(root_cert.bodySz, root_cert.sigType,
-                                      root_cert_der, sizeof(root_cert_der),
-                                      DILITHIUM_LEVEL5_TYPE, &root_key, rng);
+  root_cert_der_size =
+      wc_SignCert_ex(root_cert.bodySz, root_cert.sigType, root_cert_der,
+                     sizeof(root_cert_der), ML_DSA_LEVEL5_TYPE, &root_key, rng);
   if (root_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign root cert body (err %d)\n",
             root_cert_der_size);
@@ -115,6 +116,7 @@ int generate_dilithium_self_cert_pair(uint8_t *cert, size_t cert_cap,
   }
 
   // convert DER to PEM
+  // TODO: using Dilithium method on ML-DSA?
   if ((root_key_der_size = wc_Dilithium_KeyToDer(&root_key, root_key_der,
                                                  sizeof(root_key_der))) < 0) {
     fprintf(stderr, "Failed to convert dilithium key to der (err %d)\n",
@@ -124,7 +126,7 @@ int generate_dilithium_self_cert_pair(uint8_t *cert, size_t cert_cap,
     DEBUG_printf("root key DER size %d\n", root_key_der_size);
   }
   root_key_pem_size = wc_DerToPem(root_key_der, root_key_der_size, root_key_pem,
-                                  sizeof(root_key_pem), DILITHIUM_LEVEL5_TYPE);
+                                  sizeof(root_key_pem), ML_DSA_LEVEL5_TYPE);
   if (root_key_pem_size < 0) {
     fprintf(stderr, "Failed to convert dilithium key to PEM (err %d)\n",
             root_key_pem_size);
