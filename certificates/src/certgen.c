@@ -14,6 +14,7 @@
 #define DEBUG_printf(...) ((void)0)
 #endif
 
+// TODO: try wc_Dilithium_PrivateKeyToDer
 #define wc_MlDsa_KeyToDer wc_Dilithium_KeyToDer
 #define CERTS_DIR "certs"
 #define LEAF_COUNTRY "CA"

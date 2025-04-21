@@ -147,11 +147,11 @@ extern "C" {
 
 #ifdef ECC_USER_CURVES
 /* Manual Curve Selection */
-// #define HAVE_ECC192
-// #define HAVE_ECC224
+#define HAVE_ECC192
+#define HAVE_ECC224
 #undef NO_ECC256
-// #define HAVE_ECC384
-// #define HAVE_ECC521
+#define HAVE_ECC384
+#define HAVE_ECC521
 #endif
 
 /* Fixed point cache (speeds repeated operations against same private key) */
@@ -264,7 +264,7 @@ extern "C" {
 // #define USE_SLOW_SHA256
 
 /* Sha224 */
-#if 0
+#if 1
 #define WOLFSSL_SHA224
 #endif
 #else
@@ -273,12 +273,12 @@ extern "C" {
 
 /* Sha512 */
 #undef WOLFSSL_SHA512
-#if 0
+#if 1
 #define WOLFSSL_SHA512
 
     /* Sha384 */
 #undef WOLFSSL_SHA384
-#if 0
+#if 1
 #define WOLFSSL_SHA384
 #endif
 
