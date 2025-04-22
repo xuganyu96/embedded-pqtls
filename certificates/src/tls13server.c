@@ -129,6 +129,9 @@ int main(int argc, char *argv[]) {
     exit(err);
   }
 
+  WOLFSSL_CTX *ctx = NULL;
+  WOLFSSL *ssl = NULL;
+
   int listener, stream = 0;
   struct sockaddr_in addr;
   size_t addr_size = sizeof(addr);
@@ -157,15 +160,72 @@ int main(int argc, char *argv[]) {
     printf("Listening on port %d\n", args.port);
   }
 
+  err = wolfSSL_Init();
+  if (err != WOLFSSL_SUCCESS) {
+    fprintf(stderr, "Failed to initialize WolfSSL\n");
+    ret = -1;
+    goto shutdown;
+  }
+  if ((ctx = wolfSSL_CTX_new(wolfTLSv1_3_server_method())) == NULL) {
+    fprintf(stderr, "Failed to create TLSv1.3 context\n");
+    ret = -1;
+    goto shutdown;
+  }
+  err = wolfSSL_CTX_use_certificate_chain_file_format(ctx, args.certs,
+                                                      SSL_FILETYPE_PEM);
+  if (err != WOLFSSL_SUCCESS) {
+    fprintf(stderr, "Failed to load certificate chain\n");
+    ret = -1;
+    goto shutdown;
+  }
+  err = wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
+  if (err != WOLFSSL_SUCCESS) {
+    fprintf(stderr, "Failed to load private key\n");
+    ret = -1;
+    goto shutdown;
+  }
+  if (strlen(args.cafile) > 0) {
+    err = wolfSSL_CTX_load_verify_locations(ctx, args.cafile, NULL);
+    if (err != WOLFSSL_SUCCESS) {
+      fprintf(stderr, "Failed to load client CA\n");
+      ret = -1;
+      goto shutdown;
+    }
+    wolfSSL_CTX_set_verify(
+        ctx, WOLFSSL_VERIFY_PEER | WOLFSSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
+  } else {
+    wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
+  }
+
   while (true) {
     stream =
         accept(listener, (struct sockaddr *)&addr, (socklen_t *)&addr_size);
     if (stream < 0) {
       fprintf(stderr, "Failed to accept incoming connection\n");
       goto shutdown;
-    } else {
-      debug_network_peer(stream);
     }
+    debug_network_peer(stream);
+
+    ssl = wolfSSL_new(ctx);
+    if (!ssl) {
+      fprintf(stderr, "Failed to create new SSL\n");
+      ret = -1;
+      goto shutdown;
+    }
+    wolfSSL_set_fd(ssl, stream);
+    err = wolfSSL_accept(ssl);
+    if (err != WOLFSSL_SUCCESS) {
+      char errmsg[80];
+      fprintf(stderr, "TLS handshake failed: %d\n", err);
+      wolfSSL_ERR_error_string(wolfSSL_get_error(ssl, err), errmsg);
+      fprintf(stderr, "Error string: %s\n", errmsg);
+      ret = -1;
+      goto shutdown;
+    }
+    printf("Successful handshake\n");
+
+    close(stream);
+    wolfSSL_free(ssl);
   }
 
 shutdown:
@@ -174,6 +234,12 @@ shutdown:
   }
   if (stream) {
     close(stream);
+  }
+  if (ctx) {
+    wolfSSL_CTX_free(ctx);
+  }
+  if (ssl) {
+    wolfSSL_free(ssl);
   }
   return ret;
 }
