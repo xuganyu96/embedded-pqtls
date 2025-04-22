@@ -178,6 +178,8 @@ int main(int argc, char *argv[]) {
     ret = -1;
     goto shutdown;
   }
+  // BUG: this private key is not well formed
+  //   sendtls13certificateverify calls decodePrivateKey, which returns -133
   err = wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
   if (err != WOLFSSL_SUCCESS) {
     fprintf(stderr, "Failed to load private key\n");
