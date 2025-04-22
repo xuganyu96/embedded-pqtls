@@ -38,7 +38,10 @@ typedef struct cli_args {
   int port;
 } cli_args_t;
 
-static void cli_args_init(cli_args_t *args) {
+/**
+ * Set all strings components to the empty string
+ */
+void cli_args_init(cli_args_t *args) {
   if (args) {
     memset(args, 0, sizeof(cli_args_t));
   }
@@ -147,7 +150,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  int sockfd;
+  int sockfd, ssl_err;
   WOLFSSL *ssl;
   WOLFSSL_CTX *ctx;
   wolfSSL_Init();
@@ -164,11 +167,31 @@ int main(int argc, char *argv[]) {
         SSL_SUCCESS) {
       fprintf(stderr,
               "Error loading root certificates please check the file.\n");
+      wolfSSL_CTX_free(ctx);
       exit(EXIT_FAILURE);
     }
   } else {
     wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
   }
+
+  // if certs an keyfile are both provided then load them
+  if (strlen(args.certs) > 0 && strlen(args.keyfile) > 0) {
+    ssl_err = wolfSSL_CTX_use_certificate_chain_file_format(ctx, args.certs,
+                                                            SSL_FILETYPE_PEM);
+    if (ssl_err != SSL_SUCCESS) {
+      fprintf(stderr, "Failed to load certificate chain (err %d)\n", ssl_err);
+      wolfSSL_CTX_free(ctx);
+      exit(EXIT_FAILURE);
+    }
+    ssl_err =
+        wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
+    if (ssl_err != SSL_SUCCESS) {
+      fprintf(stderr, "Failed to load private key (err %d)\n", ssl_err);
+      wolfSSL_CTX_free(ctx);
+      exit(EXIT_FAILURE);
+    }
+  }
+
   ssl = wolfSSL_new(ctx);
   if (!ssl) {
     printf("Failed to create WolfSSL object\n");
