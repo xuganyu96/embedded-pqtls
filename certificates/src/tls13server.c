@@ -1,10 +1,16 @@
 /**
  * TLS 1.3 server
  */
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include "wolfssl/ssl.h"
 
 #define PATH_MAX_SIZE 1024
 #define HELP_DOC                                                               \
@@ -32,6 +38,23 @@ void cli_args_init(cli_args_t *args) {
   if (args) {
     memset(args, 0, sizeof(cli_args_t));
   }
+}
+
+/**
+ * Debug networking peer
+ *
+ * Retrieve and display the host name and port of the peer
+ */
+void debug_network_peer(int stream) {
+  // get and display peer's address
+  struct sockaddr_in peer_addr;
+  size_t peer_addr_len = sizeof(peer_addr);
+  char peer_addr_str[INET_ADDRSTRLEN];
+  getpeername(stream, (struct sockaddr *)&peer_addr,
+              (socklen_t *)&peer_addr_len);
+  inet_ntop(AF_INET, &(peer_addr.sin_addr), peer_addr_str, INET_ADDRSTRLEN);
+  int peer_port = ntohs(peer_addr.sin_port);
+  printf("Connected to %s:%d\n", peer_addr_str, peer_port);
 }
 
 /**
@@ -99,10 +122,58 @@ int parse_args(cli_args_t *args, int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
   int err;
+  int ret = 0;
   cli_args_t args;
   cli_args_init(&args);
   if ((err = parse_args(&args, argc, argv)) != 0) {
     exit(err);
   }
-  return 0;
+
+  int listener, stream = 0;
+  struct sockaddr_in addr;
+  size_t addr_size = sizeof(addr);
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = INADDR_ANY;
+  addr.sin_port = htons(args.port);
+
+  listener = socket(AF_INET, SOCK_STREAM, 0);
+  if (!listener) {
+    fprintf(stderr, "Failed to create socket\n");
+    ret = -1;
+    goto shutdown;
+  }
+  err = bind(listener, (struct sockaddr *)&addr, addr_size);
+  if (err < 0) {
+    fprintf(stderr, "Failed to bind socket to port %d\n", args.port);
+    ret = -1;
+    goto shutdown;
+  }
+  err = listen(listener, 5);
+  if (err < 0) {
+    fprintf(stderr, "Failed to listen on port %d\n", args.port);
+    ret = -1;
+    goto shutdown;
+  } else {
+    printf("Listening on port %d\n", args.port);
+  }
+
+  while (true) {
+    stream =
+        accept(listener, (struct sockaddr *)&addr, (socklen_t *)&addr_size);
+    if (stream < 0) {
+      fprintf(stderr, "Failed to accept incoming connection\n");
+      goto shutdown;
+    } else {
+      debug_network_peer(stream);
+    }
+  }
+
+shutdown:
+  if (listener) {
+    close(listener);
+  }
+  if (stream) {
+    close(stream);
+  }
+  return ret;
 }
