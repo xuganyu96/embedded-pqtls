@@ -235,7 +235,7 @@ extern "C" {
 /* Ed25519 / Curve25519 */
 #undef HAVE_CURVE25519
 #undef HAVE_ED25519
-#if 0
+#if 1
 #define HAVE_CURVE25519
 #define HAVE_ED25519 /* ED25519 Requires SHA512 */
 
