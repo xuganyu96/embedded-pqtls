@@ -183,6 +183,8 @@ int main(int argc, char *argv[]) {
       wolfSSL_CTX_free(ctx);
       exit(EXIT_FAILURE);
     }
+    // TODO: openssl's private keys work, maybe I should export ML-DSA private key instead of the
+    // whole key?
     ssl_err =
         wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
     if (ssl_err != SSL_SUCCESS) {
