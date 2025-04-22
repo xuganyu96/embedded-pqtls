@@ -566,6 +566,8 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define WOLFSSL_ASN_TEMPLATE
 #define WOLFSSL_ALT_NAMES /* Support subject alternative names extension */
 #define WOLFSSL_ASN_PRINT
+// #define WOLFSSL_EXPERIMENTAL_SETTINGS
+// #define WOLFSSL_DUAL_ALG_CERTS /* allow ALT_PRIVATEKEY_TYPE */
 
 #ifdef __cplusplus
 }

@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
     DEBUG_printf("root key DER size %d\n", root_key_der_size);
   }
   root_key_pem_size = wc_DerToPem(root_key_der, root_key_der_size, root_key_pem,
-                                  sizeof(root_key_pem), ML_DSA_LEVEL2_TYPE);
+                                  sizeof(root_key_pem), PKCS8_PRIVATEKEY_TYPE);
   if (root_key_pem_size < 0) {
     fprintf(stderr, "Failed to convert root key to PEM (err %d)\n",
             root_key_pem_size);
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
     DEBUG_printf("int key DER size %d\n", int_key_der_size);
   }
   int_key_pem_size = wc_DerToPem(int_key_der, int_key_der_size, int_key_pem,
-                                 sizeof(int_key_pem), ML_DSA_LEVEL2_TYPE);
+                                 sizeof(int_key_pem), PKCS8_PRIVATEKEY_TYPE);
   if (int_key_pem_size < 0) {
     fprintf(stderr, "Failed to convert int key to PEM (err %d)\n",
             int_key_pem_size);
@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
     DEBUG_printf("leaf key DER size %d\n", leaf_key_der_size);
   }
   leaf_key_pem_size = wc_DerToPem(leaf_key_der, leaf_key_der_size, leaf_key_pem,
-                                  sizeof(leaf_key_pem), ML_DSA_LEVEL2_TYPE);
+                                  sizeof(leaf_key_pem), PKCS8_PRIVATEKEY_TYPE);
   if (leaf_key_pem_size < 0) {
     fprintf(stderr, "Failed to convert leaf key to PEM (err %d)\n",
             leaf_key_pem_size);
@@ -368,7 +368,7 @@ int main(int argc, char *argv[]) {
   }
   client_key_pem_size =
       wc_DerToPem(client_key_der, client_key_der_size, client_key_pem,
-                  sizeof(client_key_pem), ML_DSA_LEVEL2_TYPE);
+                  sizeof(client_key_pem), PKCS8_PRIVATEKEY_TYPE);
   if (client_key_pem_size < 0) {
     fprintf(stderr, "Failed to convert client key to PEM (err %d)\n",
             client_key_pem_size);
