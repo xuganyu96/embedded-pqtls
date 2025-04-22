@@ -35,3 +35,6 @@ target_link_libraries(asn1 wolfssl)
 
 add_executable(tls13client src/tls13client.c)
 target_link_libraries(tls13client wolfssl)
+
+add_executable(tls13server src/tls13server.c)
+target_link_libraries(tls13server wolfssl)
