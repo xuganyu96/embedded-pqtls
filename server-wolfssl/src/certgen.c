@@ -1,5 +1,6 @@
 /**
  * Generate a certificate chain: root, int, leaf, client
+ * BUG: sometimes the output of certgen will cause client to reject server's certificates
  */
 #include <stdio.h>
 

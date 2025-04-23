@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
     printf("Listening on port %d\n", args.port);
   }
 
-  // wolfSSL_Debugging_ON();
+  wolfSSL_Debugging_ON();
   err = wolfSSL_Init();
   if (err != WOLFSSL_SUCCESS) {
     fprintf(stderr, "Failed to initialize WolfSSL\n");
