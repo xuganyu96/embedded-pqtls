@@ -128,6 +128,9 @@ int main(int argc, char *argv[]) {
   if ((err = parse_args(&args, argc, argv)) != 0) {
     exit(err);
   }
+  if (args.help) {
+    exit(EXIT_SUCCESS);
+  }
 
   WOLFSSL_CTX *ctx = NULL;
   WOLFSSL *ssl = NULL;
