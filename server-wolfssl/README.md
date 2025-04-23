@@ -1,4 +1,5 @@
 # Post-quantum certificates
+**use [WolfSSL @ c22505a7](https://github.com/wolfSSL/wolfssl/tree/c22505a7)** or there will be weird issues with Dilithium/ML-DSA certificates and keys.
 
 ## Server and client with classic handshake
 The `certgen-openssl.sh` script will generate a set of certificates and keys using classic cryptographic primitives (ed25519 if it is available and 2048-bit RSA as a fallback):
