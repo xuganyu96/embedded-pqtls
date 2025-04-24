@@ -20,7 +20,6 @@ require_env_var(WIFI_SSID)
 require_env_var(WIFI_PASSWORD)
 require_env_var(TEST_TCP_SERVER_IP)
 require_env_var(TEST_TCP_SERVER_PORT)
-require_env_var(WOLFSSL_ROOT)
 
 include(pico_sdk_import.cmake)
 project(pico-pqtls C CXX ASM)
@@ -34,6 +33,12 @@ include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
 # user_settings:
 # - Need to set WOLFSSL_KEY_GEN to enable RSA key gen
 # - Need to enable USE_FAST_MATH or RSA will take too long
+set(WOLFSSL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../wolfssl" CACHE PATH "Path to WolfSSL installation")
+get_filename_component(WOLFSSL_ROOT "${WOLFSSL_ROOT}" ABSOLUTE)
+if(NOT IS_DIRECTORY "${WOLFSSL_ROOT}")
+    message(FATAL_ERROR "WOLFSSL_ROOT is set to '${WOLFSSL_ROOT}', but this is not a valid directory.")
+endif()
+message(STATUS "Using wolfSSL from ${WOLFSSL_ROOT}")
 include_directories(${WOLFSSL_ROOT})
 file(GLOB WOLFSSL_SRC
     "${WOLFSSL_ROOT}/src/*.c"
@@ -120,22 +125,22 @@ target_link_libraries(bench_wolfcrypt
 )
 pico_add_extra_outputs(bench_wolfcrypt)
 
-add_executable(tls_client src/tls_client.c ${COMMON_SRC})
-pico_enable_stdio_uart(tls_client 0)
-pico_enable_stdio_usb(tls_client 1)
-target_link_libraries(tls_client
+add_executable(https_client src/https_client.c ${COMMON_SRC})
+pico_enable_stdio_uart(https_client 0)
+pico_enable_stdio_usb(https_client 1)
+target_link_libraries(https_client
     wolfssl
     pico_stdlib
     pico_rand
     pico_cyw43_arch_lwip_poll
 )
-target_compile_definitions(tls_client PRIVATE
+target_compile_definitions(https_client PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
     TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
     TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
 )
-pico_add_extra_outputs(tls_client)
+pico_add_extra_outputs(https_client)
 
 add_executable(nettime src/nettime.c ${COMMON_SRC})
 pico_enable_stdio_uart(nettime 0)

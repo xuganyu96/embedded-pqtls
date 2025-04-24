@@ -544,6 +544,19 @@ unsigned long get_rand_32(void);
 // #define NO_CERTS
 // #define NO_SIG_WRAPPER
 
+/* ------------------------------------------------------------------------- */
+/* Post-quantum cryptography (PQC) */
+/* ------------------------------------------------------------------------- */
+#define HAVE_DILITHIUM
+#define WOLFSSL_WC_DILITHIUM
+// NOTE: enable it to use Dilithium instead of ML-DSA
+// #define WOLFSSL_DILITHIUM_FIPS204_DRAFT
+#define WOLFSSL_HAVE_MLKEM
+#define WOLFSSL_WC_MLKEM
+#define WOLFSSL_SHA3
+#define WOLFSSL_SHAKE128
+#define WOLFSSL_SHAKE256
+
 #ifdef __cplusplus
 }
 #endif
