@@ -192,8 +192,6 @@ int main(int argc, char *argv[]) {
     ret = -1;
     goto shutdown;
   }
-  // BUG: this private key is not well formed
-  //   sendtls13certificateverify calls decodePrivateKey, which returns -133
   err = wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
   if (err != WOLFSSL_SUCCESS) {
     fprintf(stderr, "Failed to load private key\n");
@@ -212,6 +210,8 @@ int main(int argc, char *argv[]) {
   } else {
     wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
   }
+  // TODO: with debugging, wolfssl will report calling `set_groups`, but I need
+  // more explicit way of knowing that it is actually using ML-KEM
   wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
 
   while (true) {
