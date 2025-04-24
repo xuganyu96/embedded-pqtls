@@ -13,10 +13,8 @@
 # KEMTLS and PQ-TLS on Raspberry Pi Pico
 Content of this repository:
 - **pico**: C project for running TLS client on Raspberry Pi Pico 2 W
-- **desktop**: C project for running on a desktop environment (Apple Silicon + MacOS)
-- **server**: scripts and stuff for setting up TLS server (x86_64 Ubuntu?)
-
-## References
+- **server-wolfssl**: TLS client, server, and certificate generator on desktop environment
+- **server-rustls**: some wrapper scripts around Thom Wiggers' original repository
 
 ```bibtex
 @InProceedings{CCS:SchSteWig20,
