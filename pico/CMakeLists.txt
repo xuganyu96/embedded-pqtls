@@ -19,6 +19,7 @@ endmacro()
 require_env_var(WIFI_SSID)
 require_env_var(WIFI_PASSWORD)
 require_env_var(TEST_TCP_SERVER_IP)
+require_env_var(TEST_TCP_SERVER_HOSTNAME)
 require_env_var(TEST_TCP_SERVER_PORT)
 
 include(pico_sdk_import.cmake)
@@ -141,6 +142,24 @@ target_compile_definitions(https_client PRIVATE
     TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
 )
 pico_add_extra_outputs(https_client)
+
+add_executable(tls_client src/tls_client.c ${COMMON_SRC})
+pico_enable_stdio_uart(tls_client 0)
+pico_enable_stdio_usb(tls_client 1)
+target_link_libraries(tls_client
+    wolfssl
+    pico_stdlib
+    pico_rand
+    pico_cyw43_arch_lwip_poll
+)
+target_compile_definitions(tls_client PRIVATE
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
+    TEST_TCP_SERVER_HOSTNAME=\"${TEST_TCP_SERVER_HOSTNAME}\"
+    TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
+)
+pico_add_extra_outputs(tls_client)
 
 add_executable(nettime src/nettime.c ${COMMON_SRC})
 pico_enable_stdio_uart(nettime 0)
