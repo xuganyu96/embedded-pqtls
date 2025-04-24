@@ -5,7 +5,7 @@
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
 
-#define SLEEP_MS (60 * 1000)
+#define SLEEP_MS (5 * 1000)
 #define ML_DSA_CA_CERT                                                         \
   "-----BEGIN CERTIFICATE-----\n"                                              \
   "MIIP+DCCBm6gAwIBAgIQW7blRbQEqt2Rkx+oFa7PEzALBglghkgBZQMEAxEwbzEL\n"         \
@@ -148,7 +148,7 @@ int wolfssl_send_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx) {
 
 int main(void) {
   stdio_init_all();
-  countdown_s(10);
+  countdown_s(5);
 
   if (cyw43_arch_init()) {
     CRITICAL_printf("cyw43_arch_init failed\n");
