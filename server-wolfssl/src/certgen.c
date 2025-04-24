@@ -2,6 +2,7 @@
  * Generate a certificate chain: root, int, leaf, client
  * BUG: sometimes the output of certgen will cause client to reject server's certificates
  */
+#include <stdin.h>
 #include <stdio.h>
 
 #include "wolfssl/wolfcrypt/asn.h"
