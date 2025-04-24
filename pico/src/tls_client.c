@@ -193,6 +193,9 @@ int main(void) {
   }
   uint8_t ca_certs[] = ML_DSA_CA_CERT;
   size_t ca_certs_size = sizeof(ca_certs);
+  // BUG: 04-24-2025, can perform one successful handshake; on second loop,
+  // handshake will fail with error code -155 `ASN_SIG_CONFIRM_E`. This error
+  // cannot be re-produced with the desktop client.
   wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
   ssl_err = wolfSSL_CTX_load_verify_buffer(ctx, ca_certs, ca_certs_size,
                                            SSL_FILETYPE_PEM);
@@ -250,17 +253,13 @@ int main(void) {
 
     DEBUG_printf("TLS Connecting\n");
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
-      WARNING_printf("TLS handshake failed (%d)\n",
-                     wolfSSL_get_error(ssl, ssl_err));
-      char errmsg[80];
-      wolfSSL_ERR_error_string(ssl_err, errmsg);
-      WARNING_printf("Error string: %s\n", errmsg);
-      goto shutdown;
+      CRITICAL_printf("TLS handshake failed (%d)\n",
+                      wolfSSL_get_error(ssl, ssl_err));
+      return -1;
     } else {
       INFO_printf("TLS handshake success\n");
     }
 
-  shutdown:
     ntp_client_close(&ntp_client);
     if (ssl) {
       wolfSSL_shutdown(ssl);
