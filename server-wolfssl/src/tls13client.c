@@ -146,6 +146,11 @@ static int tcp_connect(const char *host, int port) {
 
 static void tcp_close(int sockfd) { close(sockfd); }
 
+static int kex_groups_pqonly[] = {
+    WOLFSSL_ML_KEM_512,
+};
+static int kex_groups_nelems = 1;
+
 int main(int argc, char *argv[]) {
   cli_args_t args;
   cli_args_init(&args);
@@ -197,6 +202,12 @@ int main(int argc, char *argv[]) {
       wolfSSL_CTX_free(ctx);
       exit(EXIT_FAILURE);
     }
+  }
+  ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
+  if (ssl_err != WOLFSSL_SUCCESS) {
+    fprintf(stderr, "Failed to set key exchange groups\n");
+    wolfSSL_CTX_free(ctx);
+    exit(EXIT_FAILURE);
   }
 
   ssl = wolfSSL_new(ctx);

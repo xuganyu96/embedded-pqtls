@@ -125,6 +125,11 @@ int parse_args(cli_args_t *args, int argc, char *argv[]) {
   return 0;
 }
 
+static int kex_groups_pqonly[] = {
+    WOLFSSL_ML_KEM_512,
+};
+static int kex_groups_nelems = 1;
+
 int main(int argc, char *argv[]) {
   int err;
   int ret = 0;
@@ -207,6 +212,7 @@ int main(int argc, char *argv[]) {
   } else {
     wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
   }
+  wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
 
   while (true) {
     stream =

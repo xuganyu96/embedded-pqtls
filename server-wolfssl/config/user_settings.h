@@ -530,6 +530,8 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define WOLFSSL_WC_DILITHIUM
 // NOTE: enable it to use Dilithium instead of ML-DSA
 // #define WOLFSSL_DILITHIUM_FIPS204_DRAFT
+#define WOLFSSL_HAVE_MLKEM
+#define WOLFSSL_WC_MLKEM
 #define WOLFSSL_SHA3
 #define WOLFSSL_SHAKE128
 #define WOLFSSL_SHAKE256
