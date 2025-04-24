@@ -32,7 +32,6 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
 #include <time.h>
 #define TARGET_EMBEDDED
 

@@ -94,7 +94,7 @@
   "sh5xMx5IzXwoU/rfGwWjFqqIs03wOUo8Aw4wNztBS15jb5KusbLKHygyTYGLjZaa\n"         \
   "oqiuxd/6CxIdLDY3dXqBibTN0N0DDBUaICQnRVJtbnGHp7rB1tfY+vz/AAAAAAAA\n"         \
   "AAAAAAAAAAAPHixC\n"                                                         \
-  "-----END CERTIFICATE-----\n"
+  "-----END CERTIFICATE-----"
 
 static ntp_client_t ntp_client;
 static int kex_groups_pqonly[] = {WOLFSSL_ML_KEM_512, WOLFSSL_ML_KEM_768,
@@ -148,6 +148,8 @@ int wolfssl_send_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx) {
 
 int main(void) {
   stdio_init_all();
+  countdown_s(10);
+
   if (cyw43_arch_init()) {
     CRITICAL_printf("cyw43_arch_init failed\n");
     return -1;
@@ -157,6 +159,26 @@ int main(void) {
   dns_result_t peer_dns, ntp_dns;
   err_t lwip_err, ntp_err;
   int ssl_err;
+
+  ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
+                                  CYW43_AUTH_WPA2_AES_PSK);
+
+  // Synchronize the clock
+  dns_result_init(&ntp_dns);
+  dns_gethostbyname_blocking(NTP_HOSTNAME, &ntp_dns);
+  if (!ntp_dns.resolved) {
+    CRITICAL_printf("Failed to resolve %s\n", NTP_HOSTNAME);
+    exit(-1);
+  } else {
+    INFO_printf("%s resolved to %s\n", NTP_HOSTNAME,
+                ipaddr_ntoa(&ntp_dns.addr));
+  }
+  ntp_client_init(&ntp_client, ntp_dns.addr, NTP_PORT);
+  ntp_err = ntp_client_sync_timeout_ms(&ntp_client, NTP_TIMEOUT_MS);
+  if (ntp_err == ERR_TIMEOUT) {
+    CRITICAL_printf("NTP server timed out\n");
+    return -1;
+  }
 
   WOLFSSL_CTX *ctx = NULL;
   WOLFSSL *ssl = NULL;
@@ -175,7 +197,7 @@ int main(void) {
   ssl_err = wolfSSL_CTX_load_verify_buffer(ctx, ca_certs, ca_certs_size,
                                            SSL_FILETYPE_PEM);
   if (ssl_err != SSL_SUCCESS) {
-    CRITICAL_printf("Failed to load CA certificate\n");
+    CRITICAL_printf("Failed to load CA certificate (err %d)\n", ssl_err);
     return -1;
   }
   wolfSSL_SetIORecv(ctx, wolfssl_recv_cb);
@@ -185,24 +207,6 @@ int main(void) {
   while (1) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                     CYW43_AUTH_WPA2_AES_PSK);
-
-    // Synchronize the clock
-    dns_result_init(&ntp_dns);
-    dns_gethostbyname_blocking(NTP_HOSTNAME, &ntp_dns);
-    if (!ntp_dns.resolved) {
-      CRITICAL_printf("Failed to resolve %s\n", NTP_HOSTNAME);
-      exit(-1);
-    } else {
-      INFO_printf("%s resolved to %s\n", NTP_HOSTNAME,
-                  ipaddr_ntoa(&ntp_dns.addr));
-    }
-
-    ntp_client_init(&ntp_client, ntp_dns.addr, NTP_PORT);
-    ntp_err = ntp_client_sync_timeout_ms(&ntp_client, NTP_TIMEOUT_MS);
-    if (ntp_err == ERR_TIMEOUT) {
-      WARNING_printf("NTP server timed out\n");
-      goto shutdown;
-    }
 
     // Look up IP address of peer
     dns_result_init(&peer_dns);
