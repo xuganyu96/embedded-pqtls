@@ -22,6 +22,8 @@
 typedef struct cli_args {
   // if --help is provided then print help string
   bool help;
+  // --debug will turn on wolfssl debugging
+  bool debug;
   // optional, --cafile <path> should point to a file that contains PEM-encoded
   // CA certificate. If --cafile is provided, then client will perform server
   // authentication, else it will skip server authentication
@@ -74,6 +76,8 @@ int parse_args(int argc, char *argv[], cli_args_t *args) {
       args->help = true;
       printf("%s\n", HELP_DOC);
       exit(EXIT_SUCCESS);
+    } else if (strcmp(argv[i], "--debug") == 0) {
+      args->debug = true;
     } else if (strcmp(argv[i], "--cafile") == 0 && i + 1 < argc) {
       strncpy(args->cafile, argv[++i], PATH_MAX_SIZE - 1);
     } else if (strcmp(argv[i], "--certs") == 0 && i + 1 < argc) {
@@ -153,6 +157,7 @@ int main(int argc, char *argv[]) {
   int sockfd, ssl_err;
   WOLFSSL *ssl;
   WOLFSSL_CTX *ctx;
+  args.debug ? wolfSSL_Debugging_ON() : wolfSSL_Debugging_OFF();
   wolfSSL_Init();
   ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
   if (!ctx) {
@@ -183,8 +188,8 @@ int main(int argc, char *argv[]) {
       wolfSSL_CTX_free(ctx);
       exit(EXIT_FAILURE);
     }
-    // TODO: openssl's private keys work, maybe I should export ML-DSA private key instead of the
-    // whole key?
+    // TODO: openssl's private keys work, maybe I should export ML-DSA private
+    // key instead of the whole key?
     ssl_err =
         wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
     if (ssl_err != SSL_SUCCESS) {

@@ -30,6 +30,8 @@ typedef struct cli_args {
   // certificate for authenticating the client. If --cafile is provided, then
   // client authentication will be required
   char cafile[PATH_MAX_SIZE];
+  // --debug will turn on wolfssl debugging
+  bool debug;
   // Port is required
   int port;
 } cli_args_t;
@@ -37,6 +39,7 @@ typedef struct cli_args {
 void cli_args_init(cli_args_t *args) {
   if (args) {
     memset(args, 0, sizeof(cli_args_t));
+    args->debug = false;
   }
 }
 
@@ -73,6 +76,8 @@ int parse_args(cli_args_t *args, int argc, char *argv[]) {
       args->help = true;
       printf("%s\n", HELP_DOC);
       return 0;
+    } else if (strcmp(argv[i], "--debug") == 0) {
+      args->debug = true;
     } else if (strcmp(argv[i], "--certs") == 0) {
       if (i + 1 >= argc) {
         fprintf(stderr, "Error: Missing value for --certs\n");
@@ -163,7 +168,7 @@ int main(int argc, char *argv[]) {
     printf("Listening on port %d\n", args.port);
   }
 
-  wolfSSL_Debugging_ON();
+  args.debug ? wolfSSL_Debugging_ON() : wolfSSL_Debugging_OFF();
   err = wolfSSL_Init();
   if (err != WOLFSSL_SUCCESS) {
     fprintf(stderr, "Failed to initialize WolfSSL\n");

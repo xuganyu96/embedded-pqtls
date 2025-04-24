@@ -14,10 +14,12 @@ include_directories(
 
 # Compile WolfSSL into static library
 # Instead of using autogen and configure, use header file `user_settings.h`
-set(WOLFSSL_ROOT "" CACHE PATH "Path to WolfSSL installation")
-if(NOT WOLFSSL_ROOT)
-    message(FATAL_ERROR "WOLFSSL_ROOT not set. Please specify -DWOLFSSL_ROOT=/path/to/wolfssl")
+set(WOLFSSL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../wolfssl" CACHE PATH "Path to WolfSSL installation")
+get_filename_component(WOLFSSL_ROOT "${WOLFSSL_ROOT}" ABSOLUTE)
+if(NOT IS_DIRECTORY "${WOLFSSL_ROOT}")
+    message(FATAL_ERROR "WOLFSSL_ROOT is set to '${WOLFSSL_ROOT}', but this is not a valid directory.")
 endif()
+message(STATUS "Using wolfSSL from ${WOLFSSL_ROOT}")
 include_directories(${WOLFSSL_ROOT})
 file(GLOB WOLFSSL_SRC "${WOLFSSL_ROOT}/src/*.c" "${WOLFSSL_ROOT}/wolfcrypt/src/*.c")
 add_library(wolfssl STATIC ${WOLFSSL_SRC})
