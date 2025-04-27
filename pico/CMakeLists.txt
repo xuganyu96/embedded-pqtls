@@ -111,6 +111,18 @@ target_compile_definitions(tcp_stream PRIVATE
 )
 pico_add_extra_outputs(tcp_stream)
 
+add_executable(colonytcp src/colonytcp.c src/common/utils.c)
+pico_enable_stdio_uart(colonytcp 0)
+pico_enable_stdio_usb(colonytcp 1)
+target_link_libraries(colonytcp pico_stdlib pico_cyw43_arch_lwip_poll)
+target_compile_definitions(colonytcp PRIVATE
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
+    TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
+)
+pico_add_extra_outputs(colonytcp)
+
 add_executable(bench_wolfcrypt
     src/bench_wolfcrypt.c
     ${COMMON_SRC}
