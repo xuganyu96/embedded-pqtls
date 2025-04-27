@@ -1,14 +1,7 @@
-- [ ] Benchmark post-quantum primitives on Pico 2 W
-    - [x] ML-KEM
-    - [x] HQC
-    - [x] ML-DSA
-    - [x] Falcon (FN-DSA)
-    - [ ] SPHINCS+ (SLH-DSA)
-    - [ ] one-time ML-KEM (not yet implemented)
-    - [ ] one-time HQC (not yet implemented)
-- [x] Get Wifi working on Pico 2 W
-- [x] Get WolfSSL working on Pico 2 W
-- [ ] Start modifying WolfSSL for PQ-TLS and KEM-TLS
+- [ ] Fix the TCP stack on Pico so it can perform handshake repeatedly
+- [ ] Add to the TCP stack so Pico can listen and become a TCP server
+- [ ] Add SLH-DSA, Falcon, and HQC
+- [ ] Add KEM-based authentication
 
 # KEMTLS and PQ-TLS on Raspberry Pi Pico
 Content of this repository:
