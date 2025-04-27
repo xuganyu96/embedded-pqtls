@@ -36,6 +36,7 @@ add_executable(asn1 src/asn1.c)
 target_link_libraries(asn1 wolfssl)
 
 add_executable(echoserver src/echoserver.c)
+add_executable(tcp_bench_client src/tcp_bench_client.c)
 
 add_executable(tls13client src/tls13client.c)
 target_link_libraries(tls13client wolfssl)
