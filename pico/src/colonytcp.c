@@ -1,18 +1,24 @@
+#include <lwip/ip4_addr.h>
+#include <lwip/ip_addr.h>
 #include <lwip/pbuf.h>
 #include <lwip/tcp.h>
 #include <pico/cyw43_arch.h>
 #include <pico/stdio.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "pico-pqtls/utils.h"
 
+#define CYW43_LWIP_TCP_TICK 1
+#define TCP_CONNECT_TIMEOUT_MS (1000 * 10)
+
 typedef struct tcp_stream {
   struct tcp_pcb *pcb;
+  ip_addr_t peer_addr;
   struct pbuf *rx_pbuf;
   uint16_t rx_offset;
+  bool connected;
 } tcp_stream_t;
-
-static err_t connected_handler(void *arg, struct tcp_pcb *tpcb, err_t err);
 
 static err_t recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
                           err_t err) {
@@ -87,6 +93,93 @@ static void err_handler(void *arg, err_t err) {
   cyw43_arch_lwip_end();
 }
 
+static err_t connected_handler(void *arg, struct tcp_pcb *tpcb, err_t err) {
+  tcp_stream_t *stream = (tcp_stream_t *)arg;
+  if (err != ERR_OK) {
+    return err;
+  }
+  stream->connected = true;
+  return ERR_OK;
+}
+
+void tcp_stream_init(tcp_stream_t *stream) {
+  if (stream) {
+    memset(stream, 0, sizeof(tcp_stream_t));
+  }
+}
+
+err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
+                              uint16_t port, uint32_t timeout_ms) {
+  stream->pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
+  if (!stream->pcb) {
+    DEBUG_printf("Failed to allocate for tcp_pcb\n");
+    return ERR_MEM;
+  }
+  stream->connected = false;
+
+  // set the callbacks
+  tcp_arg(stream->pcb, stream);
+  tcp_poll(stream->pcb, poll_handler, CYW43_LWIP_TCP_TICK);
+  tcp_sent(stream->pcb, sent_handler);
+  tcp_recv(stream->pcb, recv_handler);
+  tcp_err(stream->pcb, err_handler);
+
+  // convert address
+  if (ip4addr_aton(peer_ipv4, &stream->peer_addr) != 1) {
+    WARNING_printf("%s is not a valid IPv4 address\n", peer_ipv4);
+    return ERR_ARG;
+  }
+  DEBUG_printf("Connecting to %s:%d\n", ip4addr_ntoa(&stream->peer_addr), port);
+
+  // connect!
+  err_t lwip_err =
+      tcp_connect(stream->pcb, &stream->peer_addr, port, connected_handler);
+  if (lwip_err != ERR_OK) {
+    return lwip_err;
+  }
+  uint32_t elapsed = 0;
+  while (!stream->connected && elapsed < timeout_ms) {
+    cyw43_arch_poll();
+    sleep_ms(10);
+    elapsed += 10;
+  }
+  cyw43_arch_lwip_end();
+  if (!stream->connected) {
+    return ERR_TIMEOUT;
+  }
+  return ERR_OK;
+}
+
+err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
+                      size_t *outlen, uint32_t timeout_ms);
+err_t tcp_stream_write(tcp_stream_t *stream, const uint8_t *data, size_t len,
+                       uint32_t timeout_ms);
+
+err_t tcp_stream_close(tcp_stream_t *stream) {
+  err_t err = ERR_OK;
+
+  if (stream->pcb) {
+    tcp_arg(stream->pcb, NULL);
+    tcp_poll(stream->pcb, NULL, 0);
+    tcp_sent(stream->pcb, NULL);
+    tcp_recv(stream->pcb, NULL);
+    tcp_err(stream->pcb, NULL);
+    err = tcp_close(stream->pcb);
+    if (err != ERR_OK) {
+      WARNING_printf("Failed to close stream pcb (err %d), aborting\n", err);
+      tcp_abort(stream->pcb);
+      err = ERR_ABRT;
+    }
+    stream->pcb = NULL;
+  }
+  if (stream->rx_pbuf) {
+    pbuf_free(stream->rx_pbuf);
+  }
+
+  memset(stream, 0, sizeof(tcp_stream_t));
+  return err;
+}
+
 int main(void) {
   stdio_init_all();
 
@@ -96,12 +189,34 @@ int main(void) {
     return -1;
   }
   cyw43_arch_enable_sta_mode();
+
   ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                   CYW43_AUTH_WPA2_AES_PSK);
 
+  tcp_stream_t stream;
+  err_t lwip_err;
   while (1) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                     CYW43_AUTH_WPA2_AES_PSK);
+
+    tcp_stream_init(&stream);
+    lwip_err =
+        tcp_stream_connect_ipv4(&stream, TEST_TCP_SERVER_IP,
+                                TEST_TCP_SERVER_PORT, TCP_CONNECT_TIMEOUT_MS);
+    if (lwip_err == ERR_OK) {
+      INFO_printf("Connected to %s:%d\n", TEST_TCP_SERVER_IP,
+                  TEST_TCP_SERVER_PORT);
+    } else {
+      WARNING_printf("Failed to connect to %s:%d\n", TEST_TCP_SERVER_IP,
+                     TEST_TCP_SERVER_PORT);
+    }
+    if ((lwip_err = tcp_stream_close(&stream)) == ERR_OK) {
+      INFO_printf("Gracefully closed connection\n");
+    } else {
+      WARNING_printf("Failed to gracefully close connection (err %d)\n",
+                     lwip_err);
+    }
+
     sleep_ms(1000);
   }
 }
