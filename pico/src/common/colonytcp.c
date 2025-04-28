@@ -1,12 +1,17 @@
 #include "pico-pqtls/colonytcp.h"
 #include "pico-pqtls/utils.h"
+#include <lwip/err.h>
 
+/**
+ * One can tell that peer has hung by if this callback is invoked with a NULL pbuf
+ */
 static err_t recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
                           err_t err) {
   tcp_stream_t *stream = (tcp_stream_t *)arg;
   err_t lwip_err = ERR_OK;
 
   cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   if (stream == NULL) {
     tcp_abort(tpcb);
     lwip_err = ERR_ABRT;
@@ -22,6 +27,9 @@ static err_t recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
     stream->pcb = NULL;
     tcp_abort(tpcb);
     lwip_err = ERR_ABRT;
+  } else if (!p) {
+    // peer hung up
+    stream->terminated = true;
   } else if (p) {
     if (stream->rx_pbuf) {
       uint32_t remaining_cap = 0xFFFF - stream->rx_pbuf->tot_len;
@@ -48,6 +56,7 @@ static err_t poll_handler(void *arg, struct tcp_pcb *tpcb) {
 
   // flush unprocessed output
   cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   if (stream != NULL && tpcb != NULL) {
     lwip_err = tcp_output(tpcb);
   }
@@ -60,6 +69,7 @@ static void err_handler(void *arg, err_t err) {
   tcp_stream_t *stream = (tcp_stream_t *)arg;
 
   cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   if (stream) {
     struct tcp_pcb *pcb = stream->pcb;
     struct pbuf *rx_pbuf = stream->rx_pbuf;
@@ -135,20 +145,24 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
  * Return true if there is data to read
  */
 bool tcp_stream_can_read(tcp_stream_t *stream) {
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   if (!stream || !stream->pcb) {
     return false;
   }
-  return (stream->rx_pbuf != NULL);
+  bool ready = (stream->rx_pbuf != NULL);
+  cyw43_arch_lwip_end();
+  return ready;
 }
 
 err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
                       size_t *outlen, uint32_t timeout_ms) {
   err_t lwip_err = ERR_OK;
   cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   if (stream == NULL || buf == NULL || bufcap == 0) {
     lwip_err = ERR_ARG;
   } else if (stream->pcb == NULL) {
-    // TODO: how to distinguish between "connection closed" and "waiting"
     lwip_err = ERR_CLSD;
   } else if (stream->rx_pbuf != NULL) {
     // there is data to read, so read and exit
@@ -164,9 +178,12 @@ err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
     } else {
       stream->rx_offset += *outlen;
     }
+  } else if (stream->terminated) {
+    // there is no data to read, and peer has hung up
+    *outlen = 0;
+    lwip_err = ERR_CLSD;
   } else {
-    // there is no data to read
-    // TODO: for now, just exit, but later we should implement timeout
+    // there is no data to read, but peer has not hung up
     *outlen = 0;
   }
   cyw43_arch_lwip_end();
@@ -178,6 +195,7 @@ err_t tcp_stream_write(tcp_stream_t *stream, const uint8_t *data,
                        uint32_t timeout_ms) {
   err_t lwip_err = ERR_OK;
   cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   if (stream == NULL || data == NULL) {
     lwip_err = ERR_ARG;
   } else if (stream->pcb == NULL) {
@@ -207,6 +225,7 @@ err_t tcp_stream_write(tcp_stream_t *stream, const uint8_t *data,
 
 void tcp_stream_flush(tcp_stream_t *stream) {
   cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   if (stream != NULL && stream->pcb != NULL) {
     tcp_output(stream->pcb);
   }
@@ -238,4 +257,3 @@ err_t tcp_stream_close(tcp_stream_t *stream) {
   memset(stream, 0, sizeof(tcp_stream_t));
   return err;
 }
-

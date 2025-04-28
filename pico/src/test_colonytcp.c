@@ -49,7 +49,6 @@ static int test_tcp_stream(tcp_stream_t *stream) {
       if (send_err == ERR_OK) {
         send_tot_len += send_len;
       }
-      cyw43_arch_poll();
     }
     if (send_err == ERR_OK) {
       // DEBUG_printf("Successfully sent %zu bytes\n", send_tot_len);
@@ -63,7 +62,6 @@ static int test_tcp_stream(tcp_stream_t *stream) {
       if (recv_err == ERR_OK) {
         recv_tot_len += recv_len;
       }
-      cyw43_arch_poll();
     }
 
     uint8_t diff = 0;

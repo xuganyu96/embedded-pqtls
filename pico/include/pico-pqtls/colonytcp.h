@@ -23,6 +23,8 @@ typedef struct tcp_stream {
   ip_addr_t peer_addr;
   struct pbuf *rx_pbuf;
   uint16_t rx_offset;
+  // This flag is turned on if `tcp_recv` callback is called with a NULL pbuf
+  bool terminated;
   // This flag is flipped at the `connected` callback
   bool connected;
 } tcp_stream_t;
