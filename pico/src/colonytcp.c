@@ -1,9 +1,14 @@
+/**
+ * BUG: there must be some memory leaks; after a few reflection tests there will
+ * be a "Failed to allocate for tcp_pcb"
+ */
 #include <lwip/err.h>
 #include <lwip/ip4_addr.h>
 #include <lwip/ip_addr.h>
 #include <lwip/pbuf.h>
 #include <lwip/tcp.h>
 #include <lwip/tcpbase.h>
+#include <malloc.h>
 #include <pico/cyw43_arch.h>
 #include <pico/stdio.h>
 #include <stdbool.h>
@@ -13,7 +18,7 @@
 
 #define CYW43_LWIP_TCP_TICK 1
 #define TCP_CONNECT_TIMEOUT_MS (1000 * 10)
-#define TEST_MSG_MAX_SIZE 8192
+#define TEST_MSG_MAX_SIZE (1 << 14)
 #define TEST_MSG_MIN_SIZE 1024
 
 typedef struct tcp_stream {
@@ -116,7 +121,7 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
                               uint16_t port, uint32_t timeout_ms) {
   stream->pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
   if (!stream->pcb) {
-    DEBUG_printf("Failed to allocate for tcp_pcb\n");
+    WARNING_printf("Failed to allocate for tcp_pcb\n");
     return ERR_MEM;
   }
   stream->connected = false;
@@ -255,6 +260,7 @@ err_t tcp_stream_close(tcp_stream_t *stream) {
   }
   if (stream->rx_pbuf) {
     pbuf_free(stream->rx_pbuf);
+    stream->rx_pbuf = NULL;
   }
 
   memset(stream, 0, sizeof(tcp_stream_t));
@@ -274,7 +280,7 @@ static int test_tcp_stream(tcp_stream_t *stream) {
        msglen = msglen << 1) {
     send_tot_len = 0;
     recv_tot_len = 0;
-    DEBUG_printf("testing read/write size %zu\n", msglen);
+    // DEBUG_printf("testing read/write size %zu bytes\n", msglen);
     memset(app_rx_buf, 0x00, sizeof(app_rx_buf));
     memset(app_tx_buf, 0xFF, sizeof(app_rx_buf));
 
@@ -290,7 +296,7 @@ static int test_tcp_stream(tcp_stream_t *stream) {
       cyw43_arch_poll();
     }
     if (send_err == ERR_OK) {
-      DEBUG_printf("Successfully sent %zu bytes\n", send_tot_len);
+      // DEBUG_printf("Successfully sent %zu bytes\n", send_tot_len);
     } else {
       WARNING_printf("Failed to send %zu bytes (err %d)\n", msglen, send_err);
     }
@@ -312,6 +318,7 @@ static int test_tcp_stream(tcp_stream_t *stream) {
       WARNING_printf("Reflection failed at msglen=%zu\n", msglen);
       return 1;
     }
+    INFO_printf("Reflection(msglen=%zu) succeeded\n", msglen);
   }
 
   return 0;
@@ -332,6 +339,10 @@ int main(void) {
 
   tcp_stream_t stream;
   err_t lwip_err;
+  // struct mallinfo mi;
+  // mi = mallinfo();
+  // DEBUG_printf("arena: %d, non-inuse: %d\n", mi.arena, mi.fordblks);
+
   while (1) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                     CYW43_AUTH_WPA2_AES_PSK);
@@ -361,7 +372,9 @@ int main(void) {
       WARNING_printf("Failed to gracefully close connection (err %d)\n",
                      lwip_err);
     }
+    // mi = mallinfo();
+    // DEBUG_printf("arena: %d, non-inuse: %d\n", mi.arena, mi.fordblks);
 
-    sleep_ms(10000);
+    sleep_ms(1000);
   }
 }
