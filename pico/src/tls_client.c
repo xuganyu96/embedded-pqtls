@@ -6,6 +6,21 @@
 #include "pico-pqtls/utils.h"
 
 #define SLEEP_MS (5 * 1000)
+#define ED25519_CERT                                                           \
+  "-----BEGIN CERTIFICATE-----\n"                                              \
+  "MIIB9TCCAaegAwIBAgIUEFuCl97lFaf362CNYX1UncW8QOswBQYDK2VwMHcxCzAJ\n"         \
+  "BgNVBAYTAkNBMQswCQYDVQQIDAJPTjERMA8GA1UEBwwIV2F0ZXJsb28xHzAdBgNV\n"         \
+  "BAoMFlVuaXZlcnNpdHkgb2YgV2F0ZXJsb28xJzAlBgNVBAMMHlVuaXZlcnNpdHkg\n"         \
+  "b2YgV2F0ZXJsb28gUm9vdCBDQTAeFw0yNTA0MjgxOTQ2MDVaFw0zNTA0MjYxOTQ2\n"         \
+  "MDVaMHcxCzAJBgNVBAYTAkNBMQswCQYDVQQIDAJPTjERMA8GA1UEBwwIV2F0ZXJs\n"         \
+  "b28xHzAdBgNVBAoMFlVuaXZlcnNpdHkgb2YgV2F0ZXJsb28xJzAlBgNVBAMMHlVu\n"         \
+  "aXZlcnNpdHkgb2YgV2F0ZXJsb28gUm9vdCBDQTAqMAUGAytlcAMhAMu5D19SMqEu\n"         \
+  "D+s90ONc7ts01A4IDtWmWwkSVNTj7E4vo0UwQzASBgNVHRMBAf8ECDAGAQH/AgEB\n"         \
+  "MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUAIpquV5UgJLhGOriDjFIct1FUSMw\n"         \
+  "BQYDK2VwA0EAV+UELt/kw/X/CeBa5aVAKFt33MAzNplDYszr0vG0e+9/XmkK5ef9\n"         \
+  "TfGCBwWHIREziasGweKIF3+bJeHK3txiBQ==\n"                                     \
+  "-----END CERTIFICATE-----\n"
+
 #define ML_DSA_CA_CERT                                                         \
   "-----BEGIN CERTIFICATE-----\n"                                              \
   "MIIP+DCCBm6gAwIBAgIQW7blRbQEqt2Rkx+oFa7PEzALBglghkgBZQMEAxEwbzEL\n"         \
@@ -199,7 +214,8 @@ int main(void) {
     CRITICAL_printf("failed to create new wolfssl ctx\n");
     return -1;
   }
-  uint8_t ca_certs[] = ML_DSA_CA_CERT;
+  // uint8_t ca_certs[] = ML_DSA_CA_CERT;
+  uint8_t ca_certs[] = ED25519_CERT;
   size_t ca_certs_size = sizeof(ca_certs);
   // BUG: 04-24-2025, can perform one successful handshake; on second loop,
   // handshake will fail with error code -155 `ASN_SIG_CONFIRM_E`. This error
