@@ -156,6 +156,9 @@ bool tcp_stream_can_read(tcp_stream_t *stream) {
   return ready;
 }
 
+/**
+ * Will block if peer does not hang up but no data comes through
+ */
 err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
                       size_t *outlen) {
   err_t lwip_err = ERR_OK;
@@ -163,9 +166,18 @@ err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
   cyw43_arch_poll();
   if (stream == NULL || buf == NULL || bufcap == 0) {
     lwip_err = ERR_ARG;
-  } else if (stream->pcb == NULL) {
+    goto finish_read;
+  }
+  if (stream->pcb == NULL) {
     lwip_err = ERR_CLSD;
-  } else if (stream->rx_pbuf != NULL) {
+    goto finish_read;
+  }
+  while (stream->rx_pbuf == NULL && !stream->terminated) {
+    // TODO: get rid of this busy waiting
+    cyw43_arch_poll();
+    // sleep_ms(1);
+  }
+  if (stream->rx_pbuf != NULL) {
     // there is data to read, so read and exit
     uint16_t remaining_len = stream->rx_pbuf->tot_len - stream->rx_offset;
     size_t copylen = MIN(remaining_len, bufcap);
@@ -185,8 +197,11 @@ err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
     lwip_err = ERR_CLSD;
   } else {
     // there is no data to read, but peer has not hung up
-    *outlen = 0;
+    CRITICAL_printf("unreachable!\n");
+    exit(-1);
   }
+
+finish_read:
   cyw43_arch_lwip_end();
   return lwip_err;
 }

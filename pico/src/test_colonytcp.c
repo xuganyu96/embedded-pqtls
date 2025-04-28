@@ -58,7 +58,7 @@ static int test_tcp_stream(tcp_stream_t *stream) {
 
     while (recv_err == ERR_OK && recv_tot_len < msglen) {
       recv_err = tcp_stream_read(stream, app_rx_buf + recv_tot_len,
-                                 msglen - recv_tot_len, &recv_len, 0);
+                                 msglen - recv_tot_len, &recv_len);
       if (recv_err == ERR_OK) {
         recv_tot_len += recv_len;
       }

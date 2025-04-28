@@ -66,8 +66,8 @@ int wolfssl_recv_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx) {
   size_t outlen = 0;
 
   err_t err = tcp_stream_read(stream, (uint8_t *)buf, sz, &outlen);
-  DEBUG_printf("WolfSSL wants to read %d bytes and TCP received %zu bytes\n",
-               sz, outlen);
+  // DEBUG_printf("WolfSSL wants to read %d bytes and TCP received %zu bytes\n",
+  //              sz, outlen);
 
   if (err == ERR_OK && outlen >= 0) {
     return (int)outlen; // partial reads are OK
@@ -90,8 +90,9 @@ int wolfssl_send_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx) {
   tcp_stream_t *stream = (tcp_stream_t *)ctx;
   size_t written_len = 0;
   err_t err = tcp_stream_write(stream, (uint8_t *)buf, sz, &written_len, 0);
-  DEBUG_printf("WolfSSL wants to write %d bytes and TCP wrote %zu bytes\n", sz,
-               written_len);
+  // DEBUG_printf("WolfSSL wants to write %d bytes and TCP wrote %zu bytes\n",
+  // sz,
+  //              written_len);
   tcp_stream_flush(stream);
 
   if (err == ERR_OK) {
@@ -146,7 +147,7 @@ int main(void) {
 
   // Look up IP address of peer
   dns_result_init(&peer_dns);
-  DEBUG_printf("resolving %s\n", REMOTE_HOSTNAME);
+  // DEBUG_printf("resolving %s\n", REMOTE_HOSTNAME);
   dns_gethostbyname_blocking(REMOTE_HOSTNAME, &peer_dns);
   if (peer_dns.resolved) {
     INFO_printf("%s resolved to %s\n", REMOTE_HOSTNAME,
@@ -206,7 +207,7 @@ int main(void) {
     wolfSSL_SetIOWriteCtx(ssl, &stream);
 
     // TLS handshake
-    DEBUG_printf("TLS Connecting\n");
+    // DEBUG_printf("TLS Connecting\n");
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
       WARNING_printf("TLS handshake failed (%d)\n",
                      wolfSSL_get_error(ssl, ssl_err));
@@ -241,7 +242,7 @@ int main(void) {
     wolfSSL_shutdown(ssl);
     lwip_err = tcp_stream_close(&stream);
     if (lwip_err == ERR_OK) {
-      DEBUG_printf("Gracefully terminated connection\n");
+      INFO_printf("Gracefully terminated connection\n");
     } else if (lwip_err == ERR_ABRT) {
       WARNING_printf("Aborted connection\n");
     } else {
