@@ -71,6 +71,11 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Failed to create listener\n");
     exit(EXIT_FAILURE);
   }
+  if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) <
+      0) {
+    fprintf(stderr, "Failed to set listener to re-use port\n");
+    exit(EXIT_FAILURE);
+  }
   if ((err = bind(listener, (struct sockaddr *)&addr, addr_size)) < 0) {
     fprintf(stderr, "Failed to bind listener to port %d\n", args.port);
     close(listener);
