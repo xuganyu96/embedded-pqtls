@@ -1,7 +1,9 @@
+#include <lwip/err.h>
 #include <lwip/ip4_addr.h>
 #include <lwip/ip_addr.h>
 #include <lwip/pbuf.h>
 #include <lwip/tcp.h>
+#include <lwip/tcpbase.h>
 #include <pico/cyw43_arch.h>
 #include <pico/stdio.h>
 #include <stdbool.h>
@@ -150,10 +152,87 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
   return ERR_OK;
 }
 
+/**
+ * Return true if there is data to read
+ */
+bool tcp_stream_can_read(tcp_stream_t *stream) {
+  if (!stream || !stream->pcb) {
+    return false;
+  }
+  return (stream->rx_pbuf != NULL);
+}
+
 err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
-                      size_t *outlen, uint32_t timeout_ms);
-err_t tcp_stream_write(tcp_stream_t *stream, const uint8_t *data, size_t len,
-                       uint32_t timeout_ms);
+                      size_t *outlen, uint32_t timeout_ms) {
+  err_t lwip_err = ERR_OK;
+  cyw43_arch_lwip_begin();
+  if (stream == NULL || buf == NULL || bufcap == 0) {
+    lwip_err = ERR_ARG;
+  } else if (stream->pcb == NULL) {
+    // TODO: how to distinguish between "connection closed" and "waiting"
+    lwip_err = ERR_CLSD;
+  } else if (stream->rx_pbuf != NULL) {
+    // there is data to read, so read and exit
+    uint16_t remaining_len = stream->rx_pbuf->tot_len - stream->rx_offset;
+    size_t copylen = MIN(remaining_len, bufcap);
+    *outlen =
+        pbuf_copy_partial(stream->rx_pbuf, buf, copylen, stream->rx_offset);
+    tcp_recved(stream->pcb, *outlen);
+    if (stream->rx_pbuf->tot_len == *outlen + stream->rx_offset) {
+      pbuf_free(stream->rx_pbuf);
+      stream->rx_pbuf = NULL;
+      stream->rx_offset = 0;
+    } else {
+      stream->rx_offset += *outlen;
+    }
+  } else {
+    // there is no data to read
+    // TODO: for now, just exit, but later we should implement timeout
+    *outlen = 0;
+  }
+  cyw43_arch_lwip_end();
+  return lwip_err;
+}
+
+err_t tcp_stream_write(tcp_stream_t *stream, const uint8_t *data,
+                       size_t data_len, size_t *written_len,
+                       uint32_t timeout_ms) {
+  err_t lwip_err = ERR_OK;
+  cyw43_arch_lwip_begin();
+  if (stream == NULL || data == NULL) {
+    lwip_err = ERR_ARG;
+  } else if (stream->pcb == NULL) {
+    lwip_err = ERR_CLSD;
+  } else if (data_len == 0) {
+    *written_len = 0;
+  } else {
+    // tcp_sndbuf usage is described here:
+    // https://www.nongnu.org/lwip/2_1_x/group__tcp__raw.html#ga6b2aa0efbf10e254930332b7c89cd8c5
+    tcpwnd_size_t send_buflen = tcp_sndbuf(stream->pcb);
+    if ((int16_t)send_buflen == ERR_MEM || send_buflen == 0) {
+      // write buffer is currently full
+      *written_len = 0;
+    } else {
+      size_t write_len = MIN(send_buflen, data_len);
+      lwip_err = tcp_write(stream->pcb, data, write_len, TCP_WRITE_FLAG_COPY);
+      if (lwip_err == ERR_OK) {
+        *written_len = write_len;
+      } else if (lwip_err == ERR_MEM) {
+        *written_len = 0;
+      }
+    }
+  }
+  cyw43_arch_lwip_end();
+  return lwip_err;
+}
+
+void tcp_stream_flush(tcp_stream_t *stream) {
+  cyw43_arch_lwip_begin();
+  if (stream != NULL && stream->pcb != NULL) {
+    tcp_output(stream->pcb);
+  }
+  cyw43_arch_lwip_end();
+}
 
 err_t tcp_stream_close(tcp_stream_t *stream) {
   err_t err = ERR_OK;
