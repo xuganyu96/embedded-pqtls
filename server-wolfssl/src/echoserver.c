@@ -27,9 +27,9 @@ int cli_args_parse(int argc, char *argv[], cli_args_t *args) {
     return -1;
   }
   args->port = atoi(argv[1]);
-  if (args->port < 1 || args->port > 65535) {
-    printf("Invalid port number");
-  }
+  // if (args->port < 1 || args->port > 65535) {
+  //   printf("Invalid port number");
+  // }
   return 0;
 }
 
