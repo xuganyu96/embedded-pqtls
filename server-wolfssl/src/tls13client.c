@@ -164,53 +164,54 @@ int main(int argc, char *argv[]) {
   WOLFSSL_CTX *ctx;
   args.debug ? wolfSSL_Debugging_ON() : wolfSSL_Debugging_OFF();
   wolfSSL_Init();
-  ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
-  if (!ctx) {
-    fprintf(stderr, "Failed to create WolfSSL ctx\n");
-    exit(EXIT_FAILURE);
-  }
-
-  // if cafile is provided then verify peer
-  if (strlen(args.cafile) > 0) {
-    wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
-    if (wolfSSL_CTX_load_verify_locations(ctx, args.cafile, NULL) !=
-        SSL_SUCCESS) {
-      fprintf(stderr,
-              "Error loading root certificates please check the file.\n");
-      wolfSSL_CTX_free(ctx);
-      exit(EXIT_FAILURE);
-    }
-  } else {
-    wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
-  }
-
-  // if certs an keyfile are both provided then load them
-  if (strlen(args.certs) > 0 && strlen(args.keyfile) > 0) {
-    ssl_err = wolfSSL_CTX_use_certificate_chain_file_format(ctx, args.certs,
-                                                            SSL_FILETYPE_PEM);
-    if (ssl_err != SSL_SUCCESS) {
-      fprintf(stderr, "Failed to load certificate chain (err %d)\n", ssl_err);
-      wolfSSL_CTX_free(ctx);
-      exit(EXIT_FAILURE);
-    }
-    // TODO: openssl's private keys work, maybe I should export ML-DSA private
-    // key instead of the whole key?
-    ssl_err =
-        wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
-    if (ssl_err != SSL_SUCCESS) {
-      fprintf(stderr, "Failed to load private key (err %d)\n", ssl_err);
-      wolfSSL_CTX_free(ctx);
-      exit(EXIT_FAILURE);
-    }
-  }
-  ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
-  if (ssl_err != WOLFSSL_SUCCESS) {
-    fprintf(stderr, "Failed to set key exchange groups\n");
-    wolfSSL_CTX_free(ctx);
-    exit(EXIT_FAILURE);
-  }
 
   for (int round = 0; round < 100; round++) {
+    ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
+    if (!ctx) {
+      fprintf(stderr, "Failed to create WolfSSL ctx\n");
+      exit(EXIT_FAILURE);
+    }
+
+    // if cafile is provided then verify peer
+    if (strlen(args.cafile) > 0) {
+      wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
+      if (wolfSSL_CTX_load_verify_locations(ctx, args.cafile, NULL) !=
+          SSL_SUCCESS) {
+        fprintf(stderr,
+                "Error loading root certificates please check the file.\n");
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_FAILURE);
+      }
+    } else {
+      wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
+    }
+
+    // if certs an keyfile are both provided then load them
+    if (strlen(args.certs) > 0 && strlen(args.keyfile) > 0) {
+      ssl_err = wolfSSL_CTX_use_certificate_chain_file_format(ctx, args.certs,
+                                                              SSL_FILETYPE_PEM);
+      if (ssl_err != SSL_SUCCESS) {
+        fprintf(stderr, "Failed to load certificate chain (err %d)\n", ssl_err);
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_FAILURE);
+      }
+      // TODO: openssl's private keys work, maybe I should export ML-DSA private
+      // key instead of the whole key?
+      ssl_err =
+          wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
+      if (ssl_err != SSL_SUCCESS) {
+        fprintf(stderr, "Failed to load private key (err %d)\n", ssl_err);
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_FAILURE);
+      }
+    }
+    ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
+    if (ssl_err != WOLFSSL_SUCCESS) {
+      fprintf(stderr, "Failed to set key exchange groups\n");
+      wolfSSL_CTX_free(ctx);
+      exit(EXIT_FAILURE);
+    }
+
     ssl = wolfSSL_new(ctx);
     if (!ssl) {
       printf("Failed to create WolfSSL object\n");
@@ -247,10 +248,12 @@ int main(int argc, char *argv[]) {
     wolfSSL_shutdown(ssl);
     tcp_close(sockfd);
     wolfSSL_free(ssl);
+    ssl = NULL;
+    wolfSSL_CTX_free(ctx);
+    ctx = NULL;
     sleep(5);
   }
 
-  wolfSSL_CTX_free(ctx);
   wolfSSL_Cleanup();
   return 0;
 }
