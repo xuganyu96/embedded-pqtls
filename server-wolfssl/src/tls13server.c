@@ -158,6 +158,11 @@ int main(int argc, char *argv[]) {
     ret = -1;
     goto shutdown;
   }
+  if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) <
+      0) {
+    fprintf(stderr, "Failed to set listener to re-use port\n");
+    exit(EXIT_FAILURE);
+  }
   err = bind(listener, (struct sockaddr *)&addr, addr_size);
   if (err < 0) {
     fprintf(stderr, "Failed to bind socket to port %d\n", args.port);
