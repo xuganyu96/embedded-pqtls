@@ -210,44 +210,47 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  ssl = wolfSSL_new(ctx);
-  if (!ssl) {
-    printf("Failed to create WolfSSL object\n");
-    wolfSSL_CTX_free(ctx);
-    return -1;
-  }
+  for (int round = 0; round < 100; round++) {
+    ssl = wolfSSL_new(ctx);
+    if (!ssl) {
+      printf("Failed to create WolfSSL object\n");
+      wolfSSL_CTX_free(ctx);
+      return -1;
+    }
 
-  if ((sockfd = tcp_connect(args.hostname, args.port)) < 0) {
-    printf("Failed to connect to server\n");
-    wolfSSL_free(ssl);
-    wolfSSL_CTX_free(ctx);
-    return -1;
-  }
-  printf("Connected to %s:%d\n", args.hostname, args.port);
-  wolfSSL_set_fd(ssl, sockfd);
+    if ((sockfd = tcp_connect(args.hostname, args.port)) < 0) {
+      printf("Failed to connect to server\n");
+      wolfSSL_free(ssl);
+      wolfSSL_CTX_free(ctx);
+      return -1;
+    }
+    printf("Connected to %s:%d\n", args.hostname, args.port);
+    wolfSSL_set_fd(ssl, sockfd);
 
-  int ssl_conn_ret;
-  if ((ssl_conn_ret = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
-    // https://www.wolfssl.com/documentation/manuals/wolfssl/chapter08.html
-    // Examples shows errmsg only needs 80 bytes
-    char errmsg[80];
-    int err = wolfSSL_get_error(ssl, ssl_conn_ret);
-    printf("TLS handshake failed: %d\n", err);
-    wolfSSL_ERR_error_string(err, errmsg);
-    printf("Error string: %s\n", errmsg);
+    int ssl_conn_ret;
+    if ((ssl_conn_ret = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
+      // https://www.wolfssl.com/documentation/manuals/wolfssl/chapter08.html
+      // Examples shows errmsg only needs 80 bytes
+      char errmsg[80];
+      int err = wolfSSL_get_error(ssl, ssl_conn_ret);
+      printf("TLS handshake failed: %d\n", err);
+      wolfSSL_ERR_error_string(err, errmsg);
+      printf("Error string: %s\n", errmsg);
+      tcp_close(sockfd);
+      wolfSSL_free(ssl);
+      wolfSSL_CTX_free(ctx);
+      return -1;
+    }
+    printf("Handshake succeeded %s\n", args.hostname);
+
+    // Clean up
+    wolfSSL_shutdown(ssl);
     tcp_close(sockfd);
     wolfSSL_free(ssl);
-    wolfSSL_CTX_free(ctx);
-    return -1;
+    sleep(5);
   }
-  printf("Handshake succeeded %s\n", args.hostname);
 
-  // Clean up
-  wolfSSL_shutdown(ssl);
-  tcp_close(sockfd);
-  wolfSSL_free(ssl);
   wolfSSL_CTX_free(ctx);
   wolfSSL_Cleanup();
-
   return 0;
 }
