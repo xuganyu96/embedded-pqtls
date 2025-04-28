@@ -442,6 +442,7 @@ void ntp_client_close(ntp_client_t *client) {
  */
 err_t ntp_client_sync_timeout_ms(ntp_client_t *client, uint32_t timeout_ms) {
   cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
   struct pbuf *ntp_req = pbuf_alloc(PBUF_TRANSPORT, NTP_MSG_LEN, PBUF_RAM);
   if (!ntp_req) {
     WARNING_printf("Failed to allocate %d pbuf\n", NTP_MSG_LEN);

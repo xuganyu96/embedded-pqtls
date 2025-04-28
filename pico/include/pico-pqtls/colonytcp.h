@@ -34,7 +34,7 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
                               uint16_t port, uint32_t timeout_ms);
 bool tcp_stream_can_read(tcp_stream_t *stream);
 err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
-                      size_t *outlen, uint32_t timeout_ms);
+                      size_t *outlen);
 err_t tcp_stream_write(tcp_stream_t *stream, const uint8_t *data,
                        size_t data_len, size_t *written_len,
                        uint32_t timeout_ms);

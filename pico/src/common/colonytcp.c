@@ -3,7 +3,8 @@
 #include <lwip/err.h>
 
 /**
- * One can tell that peer has hung by if this callback is invoked with a NULL pbuf
+ * One can tell that peer has hung by if this callback is invoked with a NULL
+ * pbuf
  */
 static err_t recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
                           err_t err) {
@@ -147,7 +148,7 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
 bool tcp_stream_can_read(tcp_stream_t *stream) {
   cyw43_arch_lwip_begin();
   cyw43_arch_poll();
-  if (!stream || !stream->pcb) {
+  if (!stream || !stream->pcb || stream->terminated) {
     return false;
   }
   bool ready = (stream->rx_pbuf != NULL);
@@ -156,7 +157,7 @@ bool tcp_stream_can_read(tcp_stream_t *stream) {
 }
 
 err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
-                      size_t *outlen, uint32_t timeout_ms) {
+                      size_t *outlen) {
   err_t lwip_err = ERR_OK;
   cyw43_arch_lwip_begin();
   cyw43_arch_poll();
