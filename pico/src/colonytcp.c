@@ -13,6 +13,8 @@
 
 #define CYW43_LWIP_TCP_TICK 1
 #define TCP_CONNECT_TIMEOUT_MS (1000 * 10)
+#define TEST_MSG_MAX_SIZE 8192
+#define TEST_MSG_MIN_SIZE 1024
 
 typedef struct tcp_stream {
   struct tcp_pcb *pcb;
@@ -259,6 +261,62 @@ err_t tcp_stream_close(tcp_stream_t *stream) {
   return err;
 }
 
+static int test_tcp_stream(tcp_stream_t *stream) {
+  if (!stream || !stream->pcb || !stream->connected) {
+    return 1;
+  }
+  uint8_t app_rx_buf[TEST_MSG_MAX_SIZE];
+  uint8_t app_tx_buf[TEST_MSG_MAX_SIZE];
+  err_t send_err = ERR_OK, recv_err = ERR_OK;
+  size_t send_tot_len, send_len, recv_tot_len, recv_len;
+
+  for (size_t msglen = TEST_MSG_MIN_SIZE; msglen <= sizeof(app_rx_buf);
+       msglen = msglen << 1) {
+    send_tot_len = 0;
+    recv_tot_len = 0;
+    DEBUG_printf("testing read/write size %zu\n", msglen);
+    memset(app_rx_buf, 0x00, sizeof(app_rx_buf));
+    memset(app_tx_buf, 0xFF, sizeof(app_rx_buf));
+
+    // assume that the peer is an echo server, send messages of increasing
+    // sizes, then check if the same message was sent back
+    while (send_err == ERR_OK && send_tot_len < msglen) {
+      send_err = tcp_stream_write(stream, app_tx_buf + send_tot_len,
+                                  msglen - send_tot_len, &send_len, 0);
+      tcp_stream_flush(stream);
+      if (send_err == ERR_OK) {
+        send_tot_len += send_len;
+      }
+      cyw43_arch_poll();
+    }
+    if (send_err == ERR_OK) {
+      DEBUG_printf("Successfully sent %zu bytes\n", send_tot_len);
+    } else {
+      WARNING_printf("Failed to send %zu bytes (err %d)\n", msglen, send_err);
+    }
+
+    while (recv_err == ERR_OK && recv_tot_len < msglen) {
+      recv_err = tcp_stream_read(stream, app_rx_buf + recv_tot_len,
+                                 msglen - recv_tot_len, &recv_len, 0);
+      if (recv_err == ERR_OK) {
+        recv_tot_len += recv_len;
+      }
+      cyw43_arch_poll();
+    }
+
+    uint8_t diff = 0;
+    for (size_t i = 0; i < msglen; i++) {
+      diff |= app_rx_buf[i] ^ app_tx_buf[i];
+    }
+    if (diff) {
+      WARNING_printf("Reflection failed at msglen=%zu\n", msglen);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 int main(void) {
   stdio_init_all();
 
@@ -289,6 +347,14 @@ int main(void) {
       WARNING_printf("Failed to connect to %s:%d\n", TEST_TCP_SERVER_IP,
                      TEST_TCP_SERVER_PORT);
     }
+
+    int tcp_test_fail = test_tcp_stream(&stream);
+    if (tcp_test_fail) {
+      WARNING_printf("TCP stream test failed\n");
+    } else {
+      INFO_printf("TCP stream test succeeded\n");
+    }
+
     if ((lwip_err = tcp_stream_close(&stream)) == ERR_OK) {
       INFO_printf("Gracefully closed connection\n");
     } else {
@@ -296,6 +362,6 @@ int main(void) {
                      lwip_err);
     }
 
-    sleep_ms(1000);
+    sleep_ms(10000);
   }
 }
