@@ -1,11 +1,12 @@
 #include <pico/cyw43_arch.h>
 #include <pico/stdio.h>
 #include <wolfssl/ssl.h>
+#include <inttypes.h>
 
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
 
-#define SLEEP_MS (5 * 1000)
+#define SLEEP_MS (100)
 #define ED25519_CERT                                                           \
   "-----BEGIN CERTIFICATE-----\n"                                              \
   "MIIB9TCCAaegAwIBAgIUEFuCl97lFaf362CNYX1UncW8QOswBQYDK2VwMHcxCzAJ\n"         \
@@ -179,6 +180,7 @@ int main(void) {
   err_t lwip_err, ntp_err;
   int ssl_err;
   tcp_stream_t stream;
+  uint16_t round = 0;
 
   // Synchronize the clock
   dns_result_init(&ntp_dns);
@@ -193,7 +195,7 @@ int main(void) {
 
   // Look up IP address of peer
   dns_result_init(&peer_dns);
-  DEBUG_printf("resolving %s\n", TEST_TCP_SERVER_HOSTNAME);
+  // DEBUG_printf("resolving %s\n", TEST_TCP_SERVER_HOSTNAME);
   dns_gethostbyname_blocking(TEST_TCP_SERVER_HOSTNAME, &peer_dns);
   if (peer_dns.resolved) {
     INFO_printf("%s resolved to %s\n", TEST_TCP_SERVER_HOSTNAME,
@@ -209,31 +211,33 @@ int main(void) {
     CRITICAL_printf("wolfssl failed to initialize\n");
     return -1;
   }
-  ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
-  if (ctx == NULL) {
-    CRITICAL_printf("failed to create new wolfssl ctx\n");
-    return -1;
-  }
-  // uint8_t ca_certs[] = ML_DSA_CA_CERT;
-  uint8_t ca_certs[] = ED25519_CERT;
-  size_t ca_certs_size = sizeof(ca_certs);
-  // BUG: 04-24-2025, can perform one successful handshake; on second loop,
-  // handshake will fail with error code -155 `ASN_SIG_CONFIRM_E`. This error
-  // cannot be re-produced with the desktop client.
-  wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
-  ssl_err = wolfSSL_CTX_load_verify_buffer(ctx, ca_certs, ca_certs_size,
-                                           SSL_FILETYPE_PEM);
-  if (ssl_err != SSL_SUCCESS) {
-    CRITICAL_printf("Failed to load CA certificate (err %d)\n", ssl_err);
-    return -1;
-  }
-  wolfSSL_SetIORecv(ctx, wolfssl_recv_cb);
-  wolfSSL_SetIOSend(ctx, wolfssl_send_cb);
-  wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_pqonly_nelems);
 
+  // main loop
   while (1) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                     CYW43_AUTH_WPA2_AES_PSK);
+
+    ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
+    if (ctx == NULL) {
+      CRITICAL_printf("failed to create new wolfssl ctx\n");
+      return -1;
+    }
+    uint8_t ca_certs[] = ML_DSA_CA_CERT;
+    // uint8_t ca_certs[] = ED25519_CERT;
+    size_t ca_certs_size = sizeof(ca_certs);
+    // BUG: 04-24-2025, can perform one successful handshake; on second loop,
+    // handshake will fail with error code -155 `ASN_SIG_CONFIRM_E`. This error
+    // cannot be re-produced with the desktop client.
+    wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
+    ssl_err = wolfSSL_CTX_load_verify_buffer(ctx, ca_certs, ca_certs_size,
+                                             SSL_FILETYPE_PEM);
+    if (ssl_err != SSL_SUCCESS) {
+      CRITICAL_printf("Failed to load CA certificate (err %d)\n", ssl_err);
+      return -1;
+    }
+    wolfSSL_SetIORecv(ctx, wolfssl_recv_cb);
+    wolfSSL_SetIOSend(ctx, wolfssl_send_cb);
+    wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_pqonly_nelems);
 
     // Establish TCP connection
     tcp_stream_init(&stream);
@@ -258,18 +262,18 @@ int main(void) {
     wolfSSL_SetIOReadCtx(ssl, &stream);
     wolfSSL_SetIOWriteCtx(ssl, &stream);
 
-    DEBUG_printf("TLS Connecting\n");
+    //DEBUG_printf("TLS Connecting\n");
+    absolute_time_t tls_hs_start = get_absolute_time();
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
       CRITICAL_printf("TLS handshake failed (%d)\n",
                       wolfSSL_get_error(ssl, ssl_err));
       return -1;
     } else {
-      INFO_printf("TLS handshake success\n");
+      absolute_time_t tls_hs_end = get_absolute_time();
+      uint64_t hs_dur_us = absolute_time_diff_us(tls_hs_start, tls_hs_end);
+      INFO_printf("TLS handshake #%03d success, dur=%" PRIu32 " ms\n", round, us_to_ms(hs_dur_us));
     }
 
-    if (ssl) {
-      wolfSSL_shutdown(ssl);
-    }
     lwip_err = tcp_stream_close(&stream);
     if (lwip_err == ERR_OK) {
       INFO_printf("Gracefully terminated connection\n");
@@ -280,13 +284,20 @@ int main(void) {
       return -1;
     }
     if (ssl) {
+      wolfSSL_shutdown(ssl);
       wolfSSL_free(ssl);
       ssl = NULL;
+    }
+    if (ctx) {
+      wolfSSL_CTX_free(ctx);
+      ctx = NULL;
     }
     cyw43_arch_poll();
 
   sleep:
-    DEBUG_printf("Taking a nap for %d ms\n", SLEEP_MS);
+    // DEBUG_printf("Taking a nap for %d ms\n", SLEEP_MS);
+    printf("\n\n");
+    round++;
     sleep_ms(SLEEP_MS);
   }
 }

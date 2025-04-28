@@ -78,7 +78,7 @@ target_link_libraries(wolfssl
 
 
 # comment out to get plain logging, good for logging to file
-add_compile_definitions(USE_COLORED_LOGGING)
+# add_compile_definitions(USE_COLORED_LOGGING)
 
 file(GLOB COMMON_SRC src/common/*.c)
 

@@ -130,7 +130,7 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
     WARNING_printf("%s is not a valid IPv4 address\n", peer_ipv4);
     return ERR_ARG;
   }
-  DEBUG_printf("Connecting to %s:%d\n", ip4addr_ntoa(&stream->peer_addr), port);
+  // DEBUG_printf("Connecting to %s:%d\n", ip4addr_ntoa(&stream->peer_addr), port);
 
   // connect!
   err_t lwip_err =
