@@ -99,29 +99,17 @@ target_compile_definitions(connect_wifi  PRIVATE
 )
 pico_add_extra_outputs(connect_wifi)
 
-add_executable(tcp_stream src/tcp_stream.c ${COMMON_SRC})
-pico_enable_stdio_uart(tcp_stream 0)
-pico_enable_stdio_usb(tcp_stream 1)
-target_link_libraries(tcp_stream pico_stdlib pico_cyw43_arch_lwip_poll)
-target_compile_definitions(tcp_stream PRIVATE
+add_executable(test_tcp_stream src/test_tcp_stream.c ${COMMON_SRC})
+pico_enable_stdio_uart(test_tcp_stream 0)
+pico_enable_stdio_usb(test_tcp_stream 1)
+target_link_libraries(test_tcp_stream pico_stdlib pico_cyw43_arch_lwip_poll)
+target_compile_definitions(test_tcp_stream PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
     TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
     TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
 )
-pico_add_extra_outputs(tcp_stream)
-
-add_executable(test_colonytcp src/test_colonytcp.c src/common/utils.c src/common/colonytcp.c)
-pico_enable_stdio_uart(test_colonytcp 0)
-pico_enable_stdio_usb(test_colonytcp 1)
-target_link_libraries(test_colonytcp pico_stdlib pico_cyw43_arch_lwip_poll)
-target_compile_definitions(test_colonytcp PRIVATE
-    WIFI_SSID=\"${WIFI_SSID}\"
-    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
-    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
-    TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
-)
-pico_add_extra_outputs(test_colonytcp)
+pico_add_extra_outputs(test_tcp_stream)
 
 add_executable(bench_wolfcrypt
     src/bench_wolfcrypt.c

@@ -9,7 +9,7 @@
 #include <wolfssl/ssl.h>
 #include <wolfssl/wolfio.h>
 
-#include "pico-pqtls/colonytcp.h"
+#include "pico-pqtls/tcp.h"
 #include "pico-pqtls/mozilla-ca.h"
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"

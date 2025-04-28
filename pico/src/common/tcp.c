@@ -10,6 +10,279 @@
 #include <pico/types.h>
 #include <string.h>
 
+
+/**
+ * One can tell that peer has hung by if this callback is invoked with a NULL
+ * pbuf
+ */
+static err_t recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
+                          err_t err) {
+  tcp_stream_t *stream = (tcp_stream_t *)arg;
+  err_t lwip_err = ERR_OK;
+
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
+  if (stream == NULL) {
+    tcp_abort(tpcb);
+    lwip_err = ERR_ABRT;
+  } else if (tpcb == NULL || err != ERR_OK) {
+    // something went wrong, free resources and abort
+    if (stream->rx_pbuf) {
+      pbuf_free(stream->rx_pbuf);
+    }
+    if (p) {
+      pbuf_free(p);
+    }
+    stream->rx_pbuf = NULL;
+    stream->pcb = NULL;
+    tcp_abort(tpcb);
+    lwip_err = ERR_ABRT;
+  } else if (!p) {
+    // peer hung up
+    stream->terminated = true;
+  } else if (p) {
+    if (stream->rx_pbuf) {
+      uint32_t remaining_cap = 0xFFFF - stream->rx_pbuf->tot_len;
+      if (remaining_cap > p->tot_len) {
+        lwip_err = ERR_WOULDBLOCK;
+      } else {
+        pbuf_cat(stream->rx_pbuf, p);
+      }
+    } else {
+      stream->rx_pbuf = p;
+    }
+  }
+  cyw43_arch_lwip_end();
+  return lwip_err;
+}
+
+static err_t sent_handler(void *arg, struct tcp_pcb *tpcb, u16_t len) {
+  return ERR_OK;
+}
+
+static err_t poll_handler(void *arg, struct tcp_pcb *tpcb) {
+  tcp_stream_t *stream = (tcp_stream_t *)arg;
+  err_t lwip_err = ERR_OK;
+
+  // flush unprocessed output
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
+  if (stream != NULL && tpcb != NULL) {
+    lwip_err = tcp_output(tpcb);
+  }
+  cyw43_arch_lwip_end();
+
+  return lwip_err;
+}
+
+static void err_handler(void *arg, err_t err) {
+  tcp_stream_t *stream = (tcp_stream_t *)arg;
+
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
+  if (stream) {
+    struct tcp_pcb *pcb = stream->pcb;
+    struct pbuf *rx_pbuf = stream->rx_pbuf;
+    memset(stream, 0, sizeof(tcp_stream_t));
+    if (pcb && err != ERR_ABRT) {
+      tcp_close(pcb);
+    }
+    if (rx_pbuf) {
+      pbuf_free(rx_pbuf);
+    }
+  }
+  cyw43_arch_lwip_end();
+}
+
+static err_t connected_handler(void *arg, struct tcp_pcb *tpcb, err_t err) {
+  tcp_stream_t *stream = (tcp_stream_t *)arg;
+  if (err != ERR_OK) {
+    return err;
+  }
+  stream->connected = true;
+  return ERR_OK;
+}
+
+void tcp_stream_init(tcp_stream_t *stream) {
+  if (stream) {
+    memset(stream, 0, sizeof(tcp_stream_t));
+  }
+}
+
+err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
+                              uint16_t port, uint32_t timeout_ms) {
+  stream->pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
+  if (!stream->pcb) {
+    WARNING_printf("Failed to allocate for tcp_pcb\n");
+    return ERR_MEM;
+  }
+  stream->connected = false;
+
+  // set the callbacks
+  tcp_arg(stream->pcb, stream);
+  tcp_poll(stream->pcb, poll_handler, COLONY_TCP_TICK);
+  tcp_sent(stream->pcb, sent_handler);
+  tcp_recv(stream->pcb, recv_handler);
+  tcp_err(stream->pcb, err_handler);
+
+  // convert address
+  if (ip4addr_aton(peer_ipv4, &stream->peer_addr) != 1) {
+    WARNING_printf("%s is not a valid IPv4 address\n", peer_ipv4);
+    return ERR_ARG;
+  }
+  DEBUG_printf("Connecting to %s:%d\n", ip4addr_ntoa(&stream->peer_addr), port);
+
+  // connect!
+  err_t lwip_err =
+      tcp_connect(stream->pcb, &stream->peer_addr, port, connected_handler);
+  if (lwip_err != ERR_OK) {
+    return lwip_err;
+  }
+  uint32_t elapsed = 0;
+  while (!stream->connected && elapsed < timeout_ms) {
+    cyw43_arch_poll();
+    sleep_ms(10);
+    elapsed += 10;
+  }
+  cyw43_arch_lwip_end();
+  if (!stream->connected) {
+    return ERR_TIMEOUT;
+  }
+  return ERR_OK;
+}
+
+/**
+ * Return true if there is data to read
+ */
+bool tcp_stream_can_read(tcp_stream_t *stream) {
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
+  if (!stream || !stream->pcb || stream->terminated) {
+    return false;
+  }
+  bool ready = (stream->rx_pbuf != NULL);
+  cyw43_arch_lwip_end();
+  return ready;
+}
+
+/**
+ * Will block if peer does not hang up but no data comes through
+ */
+err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
+                      size_t *outlen) {
+  err_t lwip_err = ERR_OK;
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
+  if (stream == NULL || buf == NULL || bufcap == 0) {
+    lwip_err = ERR_ARG;
+    goto finish_read;
+  }
+  if (stream->pcb == NULL) {
+    lwip_err = ERR_CLSD;
+    goto finish_read;
+  }
+  while (stream->rx_pbuf == NULL && !stream->terminated) {
+    // TODO: get rid of this busy waiting
+    cyw43_arch_poll();
+    // sleep_ms(1);
+  }
+  if (stream->rx_pbuf != NULL) {
+    // there is data to read, so read and exit
+    uint16_t remaining_len = stream->rx_pbuf->tot_len - stream->rx_offset;
+    size_t copylen = MIN(remaining_len, bufcap);
+    *outlen =
+        pbuf_copy_partial(stream->rx_pbuf, buf, copylen, stream->rx_offset);
+    tcp_recved(stream->pcb, *outlen);
+    if (stream->rx_pbuf->tot_len == *outlen + stream->rx_offset) {
+      pbuf_free(stream->rx_pbuf);
+      stream->rx_pbuf = NULL;
+      stream->rx_offset = 0;
+    } else {
+      stream->rx_offset += *outlen;
+    }
+  } else if (stream->terminated) {
+    // there is no data to read, and peer has hung up
+    *outlen = 0;
+    lwip_err = ERR_CLSD;
+  } else {
+    // there is no data to read, but peer has not hung up
+    CRITICAL_printf("unreachable!\n");
+    exit(-1);
+  }
+
+finish_read:
+  cyw43_arch_lwip_end();
+  return lwip_err;
+}
+
+err_t tcp_stream_write(tcp_stream_t *stream, const uint8_t *data,
+                       size_t data_len, size_t *written_len,
+                       uint32_t timeout_ms) {
+  err_t lwip_err = ERR_OK;
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
+  if (stream == NULL || data == NULL) {
+    lwip_err = ERR_ARG;
+  } else if (stream->pcb == NULL) {
+    lwip_err = ERR_CLSD;
+  } else if (data_len == 0) {
+    *written_len = 0;
+  } else {
+    // tcp_sndbuf usage is described here:
+    // https://www.nongnu.org/lwip/2_1_x/group__tcp__raw.html#ga6b2aa0efbf10e254930332b7c89cd8c5
+    tcpwnd_size_t send_buflen = tcp_sndbuf(stream->pcb);
+    if ((int16_t)send_buflen == ERR_MEM || send_buflen == 0) {
+      // write buffer is currently full
+      *written_len = 0;
+    } else {
+      size_t write_len = MIN(send_buflen, data_len);
+      lwip_err = tcp_write(stream->pcb, data, write_len, TCP_WRITE_FLAG_COPY);
+      if (lwip_err == ERR_OK) {
+        *written_len = write_len;
+      } else if (lwip_err == ERR_MEM) {
+        *written_len = 0;
+      }
+    }
+  }
+  cyw43_arch_lwip_end();
+  return lwip_err;
+}
+
+void tcp_stream_flush(tcp_stream_t *stream) {
+  cyw43_arch_lwip_begin();
+  cyw43_arch_poll();
+  if (stream != NULL && stream->pcb != NULL) {
+    tcp_output(stream->pcb);
+  }
+  cyw43_arch_lwip_end();
+}
+
+err_t tcp_stream_close(tcp_stream_t *stream) {
+  err_t err = ERR_OK;
+
+  if (stream->pcb) {
+    tcp_arg(stream->pcb, NULL);
+    tcp_poll(stream->pcb, NULL, 0);
+    tcp_sent(stream->pcb, NULL);
+    tcp_recv(stream->pcb, NULL);
+    tcp_err(stream->pcb, NULL);
+    err = tcp_close(stream->pcb);
+    if (err != ERR_OK) {
+      WARNING_printf("Failed to close stream pcb (err %d), aborting\n", err);
+      tcp_abort(stream->pcb);
+      err = ERR_ABRT;
+    }
+    stream->pcb = NULL;
+  }
+  if (stream->rx_pbuf) {
+    pbuf_free(stream->rx_pbuf);
+    stream->rx_pbuf = NULL;
+  }
+
+  memset(stream, 0, sizeof(tcp_stream_t));
+  return err;
+}
+
 static void dns_handler(const char *name, const ip_addr_t *ipaddr, void *arg) {
   dns_result_t *dns_res = (dns_result_t *)arg;
   if (ipaddr) {
@@ -47,322 +320,6 @@ void dns_gethostbyname_blocking(const char *hostname, dns_result_t *dns_res) {
     CRITICAL_printf("Unhandled error (err %d)!\n", err);
     exit(-1);
   }
-}
-
-static void tcp_stream_flush_send_buffer(PICO_PQTLS_tcp_stream_t *stream) {
-  if (!stream || !stream->connected || stream->tx_buflen == 0)
-    return;
-
-  while (stream->tx_buf_sent < stream->tx_buflen) {
-    size_t unsent = stream->tx_buflen - stream->tx_buf_sent;
-    size_t can_send = tcp_sndbuf(stream->tcp_pcb);
-
-    size_t chunk = MIN(unsent, can_send);
-    if (chunk == 0)
-      break;
-
-    err_t err = tcp_write(stream->tcp_pcb, stream->tx_buf + stream->tx_buf_sent,
-                          chunk, TCP_WRITE_FLAG_COPY);
-    if (err != ERR_OK)
-      break;
-
-    stream->tx_buf_sent += chunk;
-  }
-
-  tcp_output(stream->tcp_pcb);
-
-  // If all sent, reset buffer
-  if (stream->tx_buf_sent == stream->tx_buflen) {
-    stream->tx_buf_sent = 0;
-    stream->tx_buflen = 0;
-  }
-}
-
-/**
- * The polling callback in lwIP is your chance to handle periodic tasks for a
- * TCP connection—especially when the connection is idle:
- * - Tries to send unsent data (if any).
- * - Optionally closes the connection if the job is complete.
- * - Uses tcp_output() to push data down the stack.
- */
-static err_t tcp_stream_poll(void *arg, struct tcp_pcb *tpcb) {
-  // DEBUG_printf("tcp_stream_poll\n");
-  cyw43_arch_poll();
-  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
-  tcp_stream_flush_send_buffer(stream);
-
-  // // If everything has been sent and marked complete, close the connection
-  // if (state->complete && state->sent_len >= state->buffer_len) {
-  //   tcp_arg(tpcb, NULL);
-  //   tcp_sent(tpcb, NULL);
-  //   tcp_recv(tpcb, NULL);
-  //   tcp_err(tpcb, NULL);
-  //   tcp_poll(tpcb, NULL, 0);
-  //   tcp_close(tpcb);
-  //   return ERR_OK;
-  // }
-  return ERR_OK;
-}
-
-static err_t tcp_stream_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
-  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
-  tcp_stream_flush_send_buffer(stream);
-  return ERR_OK;
-}
-
-static err_t tcp_stream_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
-                             err_t err) {
-  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
-  cyw43_arch_poll();
-  if (!p) { // peer has hung up
-    stream->complete = true;
-    return ERR_OK;
-  }
-  size_t to_copy = MIN(TCP_STREAM_BUF_SIZE - stream->rx_buflen, p->tot_len);
-  if (to_copy > 0) {
-    pbuf_copy_partial(p, stream->rx_buf + stream->rx_buflen, to_copy, 0);
-    stream->rx_buflen += to_copy;
-    tcp_recved(tpcb, to_copy);
-  }
-  // TODO: if to_copy is less than p->tot_len, then freeing pbuf_free will cause
-  // uncopied data to be lost. Need to find a way to process these data.
-  pbuf_free(p);
-  return ERR_OK;
-}
-
-static void tcp_stream_err(void *arg, err_t err) {
-  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
-  stream->connected = false;
-  stream->complete = true;
-  if (err != ERR_ABRT) {
-    DEBUG_printf("Non-abort error (err %d)\n", err);
-  }
-}
-
-static err_t tcp_stream_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
-  // DEBUG_printf("callback: tcp_stream_connected\n");
-  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)arg;
-  if (err != ERR_OK) {
-    DEBUG_printf("connect failed %d\n", err);
-    return err;
-  }
-  stream->connected = true;
-  cyw43_arch_poll();
-  return ERR_OK;
-}
-
-PICO_PQTLS_tcp_stream_t *PICO_PQTLS_tcp_stream_new(void) {
-  PICO_PQTLS_tcp_stream_t *stream = malloc(sizeof(PICO_PQTLS_tcp_stream_t));
-  if (!stream) {
-    DEBUG_printf("Failed to allocate for stream\n");
-    return NULL;
-  }
-  // memset(stream, 0, sizeof(PICO_PQTLS_tcp_stream_t));
-  // DEBUG_printf("IP address type: %d\n", IPADDR_TYPE_V4);
-  stream->tcp_pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
-  if (!stream->tcp_pcb) {
-    DEBUG_printf("Failed to allocate for tcp_pcb\n");
-    free(stream);
-    return NULL;
-  }
-  stream->rx_buflen = 0;
-  stream->tx_buflen = 0;
-  stream->complete = false;
-  stream->connected = false;
-
-  // set the callbacks
-  tcp_arg(stream->tcp_pcb, stream);
-  tcp_poll(stream->tcp_pcb, tcp_stream_poll, 10);
-  tcp_sent(stream->tcp_pcb, tcp_stream_sent);
-  tcp_recv(stream->tcp_pcb, tcp_stream_recv);
-  tcp_err(stream->tcp_pcb, tcp_stream_err);
-
-  return stream;
-}
-
-void PICO_PQTLS_tcp_stream_free(PICO_PQTLS_tcp_stream_t *stream) {
-  if (stream) {
-    free(stream);
-  }
-}
-
-/**
- * If fail, caller is responsible for freeing the stream with
- * PICO_PQTLS_tcp_stream_free()
- */
-err_t PICO_PQTLS_tcp_stream_connect_timeout_ms(PICO_PQTLS_tcp_stream_t *stream,
-                                               const char *server_ipv4,
-                                               uint16_t port,
-                                               uint32_t timeout_ms) {
-  err_t err = ERR_OK;
-  if (ip4addr_aton(server_ipv4, &stream->remote_addr) != 1) {
-    DEBUG_printf("%s is not valid address\n", server_ipv4);
-    return ERR_ARG;
-  }
-  cyw43_arch_lwip_begin();
-  DEBUG_printf("Connecting to %s:%d\n", ip4addr_ntoa(&stream->remote_addr),
-               port);
-  err = tcp_connect(stream->tcp_pcb, &stream->remote_addr, port,
-                    tcp_stream_connected);
-  if (err != ERR_OK) {
-    // no need to wait for connection callback, but clean up of pcb and stream
-    // will be left to the user calling tcp_stream_close(stream)
-    return err;
-  }
-  // continue polling until the callback is executed
-  uint32_t elapsed = 0;
-  while (!stream->connected && elapsed < timeout_ms) {
-    cyw43_arch_poll();
-    sleep_ms(10);
-    elapsed += 10;
-  }
-  cyw43_arch_lwip_end();
-  if (!stream->connected) {
-    return ERR_TIMEOUT;
-  }
-  return err;
-}
-
-PICO_PQTLS_tcp_err_t PICO_PQTLS_tcp_stream_read(PICO_PQTLS_tcp_stream_t *stream,
-                                                uint8_t *buf, size_t buflen,
-                                                size_t *outlen,
-                                                uint32_t timeout) {
-  if (!stream || !stream->connected || !buf || buflen == 0 || !outlen)
-    return TCP_RESULT_ERROR;
-
-  absolute_time_t start = get_absolute_time();
-
-  while (stream->rx_buflen == 0 && !stream->complete) {
-    cyw43_arch_poll();
-    if (timeout > 0 &&
-        to_ms_since_boot(get_absolute_time()) - to_ms_since_boot(start) >
-            timeout) {
-      return TCP_RESULT_TIMEOUT;
-    }
-    sleep_ms(1);
-  }
-
-  if (stream->rx_buflen == 0 && stream->complete) {
-    return TCP_RESULT_EOF;
-  }
-  size_t to_copy = MIN(buflen, stream->rx_buflen);
-  memcpy(buf, stream->rx_buf, to_copy);
-  memmove(stream->rx_buf, stream->rx_buf + to_copy,
-          stream->rx_buflen - to_copy);
-  stream->rx_buflen -= to_copy;
-  *outlen = to_copy;
-  return TCP_RESULT_OK;
-}
-
-PICO_PQTLS_tcp_err_t
-PICO_PQTLS_tcp_stream_read_exact(PICO_PQTLS_tcp_stream_t *stream, uint8_t *dst,
-                                 size_t len, uint32_t timeout_ms) {
-  size_t total = 0;
-
-  while (total < len) {
-    size_t n = 0;
-    PICO_PQTLS_tcp_err_t result = PICO_PQTLS_tcp_stream_read(
-        stream, dst + total, len - total, &n, timeout_ms);
-    if (result == TCP_RESULT_OK) {
-      total += n;
-    } else if (result == TCP_RESULT_TIMEOUT || result == TCP_RESULT_ERROR) {
-      return result;
-    } else if (result == TCP_RESULT_EOF) {
-      return TCP_RESULT_EOF;
-    }
-  }
-
-  return TCP_RESULT_OK;
-}
-
-// TODO: Add tcp_stream_flush() and let callers choose when to flush. Only flush
-// automatically on: timeouts, buffer full, or stream close
-PICO_PQTLS_tcp_err_t
-PICO_PQTLS_tcp_stream_write(PICO_PQTLS_tcp_stream_t *stream,
-                            const uint8_t *data, size_t len,
-                            uint32_t timeout_ms) {
-  if (!stream || !stream->connected || !data || len == 0) {
-    return TCP_RESULT_ERROR;
-  }
-
-  size_t total_sent = 0;
-  absolute_time_t start = get_absolute_time();
-
-  while (total_sent < len) {
-    // Determine space in the buffer
-    size_t space = TCP_STREAM_BUF_SIZE - stream->tx_buflen;
-    if (space == 0) {
-      // Give lwip time to asynchronously call tcp_stream_sent, which will flush
-      // unsent data and reset stream->tx_buflen to 0
-      cyw43_arch_poll();
-      err_t err = tcp_output(stream->tcp_pcb);
-      if (err != ERR_OK)
-        return TCP_RESULT_ERROR;
-      // TODO: Use sleep_us(100) or exponential backoff for better performance
-      // vs CPU usage.
-      sleep_ms(1);
-      if (timeout_ms > 0 &&
-          absolute_time_diff_us(start, get_absolute_time()) / 1000 >=
-              timeout_ms) {
-        return TCP_RESULT_TIMEOUT;
-      }
-      continue;
-    }
-
-    // Copy as much as we can into the TX buffer
-    size_t to_copy = MIN(len - total_sent, space);
-    memcpy(stream->tx_buf + stream->tx_buflen, data + total_sent, to_copy);
-    stream->tx_buflen += to_copy;
-    total_sent += to_copy;
-
-    // Try to write to TCP
-    size_t send_now = stream->tx_buflen;
-    err_t err = tcp_write(stream->tcp_pcb, stream->tx_buf, send_now,
-                          TCP_WRITE_FLAG_COPY);
-
-    if (err == ERR_OK) {
-      stream->tx_buflen = 0;
-      tcp_output(stream->tcp_pcb);
-    } else if (err == ERR_MEM) {
-      // Not enough room in TCP buffer, wait a bit
-      sleep_ms(1);
-      if (timeout_ms > 0 &&
-          absolute_time_diff_us(start, get_absolute_time()) / 1000 >=
-              timeout_ms) {
-        return TCP_RESULT_TIMEOUT;
-      }
-    } else {
-      return TCP_RESULT_ERROR;
-    }
-  }
-
-  return TCP_RESULT_OK;
-}
-
-/**
- * This method will free the stream on success
- */
-err_t PICO_PQTLS_tcp_stream_close(PICO_PQTLS_tcp_stream_t *stream) {
-  err_t err = ERR_OK;
-
-  if (stream->tcp_pcb) {
-    tcp_arg(stream->tcp_pcb, stream);
-    tcp_poll(stream->tcp_pcb, NULL, 0);
-    tcp_sent(stream->tcp_pcb, NULL);
-    tcp_recv(stream->tcp_pcb, NULL);
-    tcp_err(stream->tcp_pcb, NULL);
-    // tcp_close will free the pcb
-    err = tcp_close(stream->tcp_pcb);
-    if (err != ERR_OK) {
-      DEBUG_printf("close failed %d, calling abort\n", err);
-      // tcp_abort will free the pcb
-      tcp_abort(stream->tcp_pcb);
-      err = ERR_ABRT;
-    }
-    stream->tcp_pcb = NULL;
-  }
-  PICO_PQTLS_tcp_stream_free(stream);
-  return err;
 }
 
 static void ntp_resp_handler(void *arg, struct udp_pcb *pcb, struct pbuf *p,

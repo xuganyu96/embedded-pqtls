@@ -108,17 +108,18 @@ int wolfssl_recv_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx) {
   if (!ctx || !buf || sz <= 0)
     return WOLFSSL_CBIO_ERR_GENERAL;
 
-  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)ctx;
+  tcp_stream_t *stream = (tcp_stream_t *)ctx;
   size_t outlen = 0;
 
-  PICO_PQTLS_tcp_err_t err = PICO_PQTLS_tcp_stream_read(
-      stream, (uint8_t *)buf, (size_t)sz, &outlen, TCP_READ_TIMEOUT_MS);
+  err_t err = tcp_stream_read(stream, (uint8_t *)buf, sz, &outlen);
+  // DEBUG_printf("WolfSSL wants to read %d bytes and TCP received %zu bytes\n",
+  //              sz, outlen);
 
-  if (err == TCP_RESULT_OK) {
+  if (err == ERR_OK && outlen >= 0) {
     return (int)outlen; // partial reads are OK
-  } else if (err == TCP_RESULT_TIMEOUT) {
+  } else if (err == ERR_OK && outlen == 0) {
     return WOLFSSL_CBIO_ERR_WANT_READ;
-  } else if (err == TCP_RESULT_EOF) {
+  } else if (err == ERR_CLSD) {
     return 0; // graceful close
   } else {
     return WOLFSSL_CBIO_ERR_GENERAL;
@@ -132,15 +133,16 @@ int wolfssl_send_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx) {
   if (!ctx || !buf || sz <= 0)
     return WOLFSSL_CBIO_ERR_GENERAL;
 
-  PICO_PQTLS_tcp_stream_t *stream = (PICO_PQTLS_tcp_stream_t *)ctx;
+  tcp_stream_t *stream = (tcp_stream_t *)ctx;
+  size_t written_len = 0;
+  err_t err = tcp_stream_write(stream, (uint8_t *)buf, sz, &written_len, 0);
+  // DEBUG_printf("WolfSSL wants to write %d bytes and TCP wrote %zu bytes\n",
+  // sz,
+  //              written_len);
+  tcp_stream_flush(stream);
 
-  PICO_PQTLS_tcp_err_t err = PICO_PQTLS_tcp_stream_write(
-      stream, (const uint8_t *)buf, (size_t)sz, TCP_WRITE_TIMEOUT_MS);
-
-  if (err == TCP_RESULT_OK) {
-    return sz; // we always try to write all `sz` bytes
-  } else if (err == TCP_RESULT_TIMEOUT) {
-    return WOLFSSL_CBIO_ERR_WANT_WRITE;
+  if (err == ERR_OK) {
+    return written_len;
   } else {
     return WOLFSSL_CBIO_ERR_GENERAL;
   }
@@ -155,29 +157,35 @@ int main(void) {
     return -1;
   }
   cyw43_arch_enable_sta_mode();
+  ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
+                                  CYW43_AUTH_WPA2_AES_PSK);
 
   dns_result_t peer_dns, ntp_dns;
   err_t lwip_err, ntp_err;
   int ssl_err;
-
-  ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
-                                  CYW43_AUTH_WPA2_AES_PSK);
+  tcp_stream_t stream;
 
   // Synchronize the clock
   dns_result_init(&ntp_dns);
   dns_gethostbyname_blocking(NTP_HOSTNAME, &ntp_dns);
-  if (!ntp_dns.resolved) {
-    CRITICAL_printf("Failed to resolve %s\n", NTP_HOSTNAME);
-    exit(-1);
-  } else {
-    INFO_printf("%s resolved to %s\n", NTP_HOSTNAME,
-                ipaddr_ntoa(&ntp_dns.addr));
-  }
   ntp_client_init(&ntp_client, ntp_dns.addr, NTP_PORT);
-  ntp_err = ntp_client_sync_timeout_ms(&ntp_client, NTP_TIMEOUT_MS);
-  if (ntp_err == ERR_TIMEOUT) {
-    CRITICAL_printf("NTP server timed out\n");
-    return -1;
+  while (!ntp_client.processed) {
+    ntp_err = ntp_client_sync_timeout_ms(&ntp_client, NTP_TIMEOUT_MS);
+    if (ntp_err == ERR_TIMEOUT) {
+      WARNING_printf("NTP server timed out\n");
+    }
+  }
+
+  // Look up IP address of peer
+  dns_result_init(&peer_dns);
+  DEBUG_printf("resolving %s\n", TEST_TCP_SERVER_HOSTNAME);
+  dns_gethostbyname_blocking(TEST_TCP_SERVER_HOSTNAME, &peer_dns);
+  if (peer_dns.resolved) {
+    INFO_printf("%s resolved to %s\n", TEST_TCP_SERVER_HOSTNAME,
+                ipaddr_ntoa(&peer_dns.addr));
+  } else {
+    CRITICAL_printf("%s failed to resolve\n", TEST_TCP_SERVER_HOSTNAME);
+    exit(-1);
   }
 
   WOLFSSL_CTX *ctx = NULL;
@@ -211,35 +219,18 @@ int main(void) {
     ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
                                     CYW43_AUTH_WPA2_AES_PSK);
 
-    // Look up IP address of peer
-    dns_result_init(&peer_dns);
-    DEBUG_printf("resolving %s\n", TEST_TCP_SERVER_HOSTNAME);
-    dns_gethostbyname_blocking(TEST_TCP_SERVER_HOSTNAME, &peer_dns);
-    if (peer_dns.resolved) {
-      INFO_printf("%s resolved to %s\n", TEST_TCP_SERVER_HOSTNAME,
-                  ipaddr_ntoa(&peer_dns.addr));
-    } else {
-      WARNING_printf("%s failed to resolve\n", TEST_TCP_SERVER_HOSTNAME);
-      goto sleep;
-    }
-
     // Establish TCP connection
-    PICO_PQTLS_tcp_stream_t *stream = PICO_PQTLS_tcp_stream_new();
-    if (!stream) {
-      CRITICAL_printf("fail to instantiate TCP stream\n");
-      return -1;
-    }
-
-    lwip_err = PICO_PQTLS_tcp_stream_connect_timeout_ms(
-        stream, ipaddr_ntoa(&peer_dns.addr), TEST_TCP_SERVER_PORT,
-        TCP_CONNECT_TIMEOUT_MS);
+    tcp_stream_init(&stream);
+    lwip_err =
+        tcp_stream_connect_ipv4(&stream, ipaddr_ntoa(&peer_dns.addr),
+                                TEST_TCP_SERVER_PORT, TCP_CONNECT_TIMEOUT_MS);
     if (lwip_err == ERR_OK) {
-      INFO_printf("Connected to %s:%d\n", TEST_TCP_SERVER_HOSTNAME,
+      INFO_printf("Connected to %s:%d\n", ipaddr_ntoa(&peer_dns.addr),
                   TEST_TCP_SERVER_PORT);
     } else {
       WARNING_printf("Failed to establish connection within %d ms (err=%d)\n",
                      TCP_CONNECT_TIMEOUT_MS, lwip_err);
-      PICO_PQTLS_tcp_stream_close(stream);
+      tcp_stream_close(&stream);
       goto sleep;
     }
 
@@ -248,8 +239,8 @@ int main(void) {
       CRITICAL_printf("Failed to create ssl\n");
       return -1;
     }
-    wolfSSL_SetIOReadCtx(ssl, stream);
-    wolfSSL_SetIOWriteCtx(ssl, stream);
+    wolfSSL_SetIOReadCtx(ssl, &stream);
+    wolfSSL_SetIOWriteCtx(ssl, &stream);
 
     DEBUG_printf("TLS Connecting\n");
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
@@ -260,13 +251,12 @@ int main(void) {
       INFO_printf("TLS handshake success\n");
     }
 
-    ntp_client_close(&ntp_client);
     if (ssl) {
       wolfSSL_shutdown(ssl);
     }
-    lwip_err = PICO_PQTLS_tcp_stream_close(stream);
+    lwip_err = tcp_stream_close(&stream);
     if (lwip_err == ERR_OK) {
-      DEBUG_printf("Gracefully terminated connection\n");
+      INFO_printf("Gracefully terminated connection\n");
     } else if (lwip_err == ERR_ABRT) {
       WARNING_printf("Aborted connection\n");
     } else {

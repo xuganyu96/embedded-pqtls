@@ -14,10 +14,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "pico-pqtls/colonytcp.h"
+#include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
 
-#define TCP_CONNECT_TIMEOUT_MS (1000 * 10)
 #define TCP_TEST_ROUNDS 20
 #define TEST_MSG_MAX_SIZE (1 << 14)
 #define TEST_MSG_MIN_SIZE 1024
