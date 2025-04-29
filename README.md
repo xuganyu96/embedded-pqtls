@@ -1,7 +1,18 @@
-- [ ] Fix the TCP stack on Pico so it can perform handshake repeatedly
-- [ ] Add to the TCP stack so Pico can listen and become a TCP server
-- [ ] Add SLH-DSA, Falcon, and HQC
-- [ ] Add KEM-based authentication
+- [ ] Networking stack on Pico
+    - [ ] DNS: resolve hostname to IPv4 address. IPv6 is a non-goal for now
+    - [ ] NTP: obtain time from network and sync local clock
+    - [ ] TCP: can connect and listen
+- [ ] Certificate and key management: CLI application for generating certificate chain and keys
+- [ ] FIPS compliant TLS 1.3 handshakes
+    - [ ] ECDHE + RSA/ECDSA/EdDSA
+    - [ ] ML-KEM/HQC + RSA/ECDSA/EdDSA
+    - [ ] ML-KEM/HQC + ML-DSA/SLH-DSA/FN-DSA
+    - [ ] Mutual authentication, but without secret key protection
+- [ ] Further improvements
+    - [ ] Protect secret key in client: OTP memory in Pico, generate signing key from seed
+    - [ ] Cache leaf certificates (RFC 7924): client sends some id in `ClientHello` so the server does not need to send `Certificate`
+    - [ ] KEM-based authentication
+- [ ] **DTLS** seems to also be a good fit for secure embedded communication
 
 # KEMTLS and PQ-TLS on Raspberry Pi Pico
 Content of this repository:
