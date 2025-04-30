@@ -497,6 +497,7 @@ unsigned long get_rand_32(void);
 #define WOLFSSL_BASE64_ENCODE
 
 #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
+#define HAVE_SNI
 // #define KEEP_PEER_CERT
 // #define HAVE_COMP_KEY
 

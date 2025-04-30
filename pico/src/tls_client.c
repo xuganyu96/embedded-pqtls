@@ -1,12 +1,12 @@
+#include <inttypes.h>
 #include <pico/cyw43_arch.h>
 #include <pico/stdio.h>
 #include <wolfssl/ssl.h>
-#include <inttypes.h>
 
 #include "pico-pqtls/tcp.h"
 #include "pico-pqtls/utils.h"
 
-#define SLEEP_MS (100)
+#define SLEEP_MS (1000)
 #define ED25519_CERT                                                           \
   "-----BEGIN CERTIFICATE-----\n"                                              \
   "MIIB9TCCAaegAwIBAgIUEFuCl97lFaf362CNYX1UncW8QOswBQYDK2VwMHcxCzAJ\n"         \
@@ -222,8 +222,8 @@ int main(void) {
       CRITICAL_printf("failed to create new wolfssl ctx\n");
       return -1;
     }
-    uint8_t ca_certs[] = ML_DSA_CA_CERT;
-    // uint8_t ca_certs[] = ED25519_CERT;
+    // uint8_t ca_certs[] = ML_DSA_CA_CERT;
+    uint8_t ca_certs[] = ED25519_CERT;
     size_t ca_certs_size = sizeof(ca_certs);
     // BUG: 04-24-2025, can perform one successful handshake; on second loop,
     // handshake will fail with error code -155 `ASN_SIG_CONFIRM_E`. This error
@@ -235,9 +235,16 @@ int main(void) {
       CRITICAL_printf("Failed to load CA certificate (err %d)\n", ssl_err);
       return -1;
     }
+    ssl_err =
+        wolfSSL_CTX_UseSNI(ctx, WOLFSSL_SNI_HOST_NAME, TEST_TCP_SERVER_HOSTNAME,
+                           strlen(TEST_TCP_SERVER_HOSTNAME));
+    if (ssl_err != SSL_SUCCESS) {
+      CRITICAL_printf("Failed to load SNI\n");
+      return -1;
+    }
     wolfSSL_SetIORecv(ctx, wolfssl_recv_cb);
     wolfSSL_SetIOSend(ctx, wolfssl_send_cb);
-    wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_pqonly_nelems);
+    // wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_pqonly_nelems);
 
     // Establish TCP connection
     tcp_stream_init(&stream);
@@ -262,7 +269,7 @@ int main(void) {
     wolfSSL_SetIOReadCtx(ssl, &stream);
     wolfSSL_SetIOWriteCtx(ssl, &stream);
 
-    //DEBUG_printf("TLS Connecting\n");
+    // DEBUG_printf("TLS Connecting\n");
     absolute_time_t tls_hs_start = get_absolute_time();
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
       CRITICAL_printf("TLS handshake failed (%d)\n",
@@ -271,7 +278,8 @@ int main(void) {
     } else {
       absolute_time_t tls_hs_end = get_absolute_time();
       uint64_t hs_dur_us = absolute_time_diff_us(tls_hs_start, tls_hs_end);
-      INFO_printf("TLS handshake #%03d success, dur=%" PRIu32 " ms\n", round, us_to_ms(hs_dur_us));
+      INFO_printf("TLS handshake #%03d success, dur=%" PRIu32 " ms\n", round,
+                  us_to_ms(hs_dur_us));
     }
 
     lwip_err = tcp_stream_close(&stream);
