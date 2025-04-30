@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
   }
   // TODO: with debugging, wolfssl will report calling `set_groups`, but I need
   // more explicit way of knowing that it is actually using ML-KEM
-  wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
+  // wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
 
   while (true) {
     stream =
@@ -247,8 +247,10 @@ int main(int argc, char *argv[]) {
     }
     printf("Successful handshake\n");
 
-    close(stream);
+    wolfSSL_shutdown(ssl);
     wolfSSL_free(ssl);
+    ssl = NULL;
+    close(stream);
   }
 
 shutdown:
