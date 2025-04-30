@@ -82,35 +82,6 @@ target_link_libraries(wolfssl
 
 file(GLOB COMMON_SRC src/common/*.c)
 
-add_executable(colors src/colors.c ${COMMON_SRC})
-pico_enable_stdio_uart(colors 0)
-pico_enable_stdio_usb(colors 1)
-target_link_libraries(colors pico_stdlib pico_cyw43_arch_lwip_poll)
-pico_add_extra_outputs(colors)
-
-
-add_executable(connect_wifi src/connect_wifi.c ${COMMON_SRC})
-pico_enable_stdio_uart(connect_wifi 0)
-pico_enable_stdio_usb(connect_wifi 1)
-target_link_libraries(connect_wifi pico_stdlib pico_cyw43_arch_lwip_poll)
-target_compile_definitions(connect_wifi  PRIVATE
-    WIFI_SSID=\"${WIFI_SSID}\"
-    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
-)
-pico_add_extra_outputs(connect_wifi)
-
-add_executable(test_tcp_stream src/test_tcp_stream.c ${COMMON_SRC})
-pico_enable_stdio_uart(test_tcp_stream 0)
-pico_enable_stdio_usb(test_tcp_stream 1)
-target_link_libraries(test_tcp_stream pico_stdlib pico_cyw43_arch_lwip_poll)
-target_compile_definitions(test_tcp_stream PRIVATE
-    WIFI_SSID=\"${WIFI_SSID}\"
-    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
-    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
-    TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
-)
-pico_add_extra_outputs(test_tcp_stream)
-
 add_executable(bench_wolfcrypt
     src/bench_wolfcrypt.c
     ${COMMON_SRC}
@@ -126,22 +97,17 @@ target_link_libraries(bench_wolfcrypt
 )
 pico_add_extra_outputs(bench_wolfcrypt)
 
-add_executable(https_client src/https_client.c ${COMMON_SRC})
-pico_enable_stdio_uart(https_client 0)
-pico_enable_stdio_usb(https_client 1)
-target_link_libraries(https_client
-    wolfssl
-    pico_stdlib
-    pico_rand
-    pico_cyw43_arch_lwip_poll
-)
-target_compile_definitions(https_client PRIVATE
+add_executable(test_tcp_stream src/test_tcp_stream.c ${COMMON_SRC})
+pico_enable_stdio_uart(test_tcp_stream 0)
+pico_enable_stdio_usb(test_tcp_stream 1)
+target_link_libraries(test_tcp_stream pico_stdlib pico_cyw43_arch_lwip_poll)
+target_compile_definitions(test_tcp_stream PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
     TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
     TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
 )
-pico_add_extra_outputs(https_client)
+pico_add_extra_outputs(test_tcp_stream)
 
 add_executable(tls_client src/tls_client.c ${COMMON_SRC})
 pico_enable_stdio_uart(tls_client 0)
@@ -161,17 +127,19 @@ target_compile_definitions(tls_client PRIVATE
 )
 pico_add_extra_outputs(tls_client)
 
-add_executable(nettime src/nettime.c ${COMMON_SRC})
-pico_enable_stdio_uart(nettime 0)
-pico_enable_stdio_usb(nettime 1)
-target_link_libraries(nettime
+add_executable(https_client src/https_client.c ${COMMON_SRC})
+pico_enable_stdio_uart(https_client 0)
+pico_enable_stdio_usb(https_client 1)
+target_link_libraries(https_client
     wolfssl
     pico_stdlib
     pico_rand
     pico_cyw43_arch_lwip_poll
 )
-target_compile_definitions(nettime PRIVATE
+target_compile_definitions(https_client PRIVATE
     WIFI_SSID=\"${WIFI_SSID}\"
     WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+    TEST_TCP_SERVER_IP=\"${TEST_TCP_SERVER_IP}\"
+    TEST_TCP_SERVER_PORT=${TEST_TCP_SERVER_PORT}
 )
-pico_add_extra_outputs(nettime)
+pico_add_extra_outputs(https_client)

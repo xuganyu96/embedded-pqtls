@@ -1,6 +1,6 @@
 - [ ] Networking stack on Pico
-    - [ ] DNS: resolve hostname to IPv4 address. IPv6 is a non-goal for now
-    - [ ] NTP: obtain time from network and sync local clock
+    - [x] DNS: resolve hostname to IPv4 address. IPv6 is a non-goal for now
+    - [x] NTP: obtain time from network and sync local clock
     - [ ] TCP: can connect and listen
 - [ ] Certificate and key management: CLI application for generating certificate chain and keys
 - [ ] FIPS compliant TLS 1.3 handshakes
