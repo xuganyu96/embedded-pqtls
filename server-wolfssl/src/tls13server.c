@@ -242,10 +242,9 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "TLS handshake failed: %d\n", err);
       wolfSSL_ERR_error_string(wolfSSL_get_error(ssl, err), errmsg);
       fprintf(stderr, "Error string: %s\n", errmsg);
-      ret = -1;
-      goto shutdown;
+    } else {
+      printf("Successful handshake\n");
     }
-    printf("Successful handshake\n");
 
     wolfSSL_shutdown(ssl);
     wolfSSL_free(ssl);

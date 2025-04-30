@@ -113,9 +113,17 @@
   "-----END CERTIFICATE-----"
 
 static ntp_client_t ntp_client;
-static int kex_groups_pqonly[] = {WOLFSSL_ML_KEM_512, WOLFSSL_ML_KEM_768,
-                                  WOLFSSL_ML_KEM_1024};
-static int kex_groups_pqonly_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
+static int kex_groups[] = {
+    WOLFSSL_ECC_SECP256R1,
+    // WOLFSSL_ECC_SECP384R1,
+    // WOLFSSL_ECC_SECP521R1,
+    // WOLFSSL_ECC_X25519,
+    // WOLFSSL_ECC_X448,
+    // WOLFSSL_ML_KEM_512,
+    // WOLFSSL_ML_KEM_768,
+    // WOLFSSL_ML_KEM_1024
+};
+static int kex_groups_nelems = sizeof(kex_groups) / sizeof(int);
 
 /**
  * WolfSSL will call this when it wants to read stuff
@@ -244,7 +252,7 @@ int main(void) {
     }
     wolfSSL_SetIORecv(ctx, wolfssl_recv_cb);
     wolfSSL_SetIOSend(ctx, wolfssl_send_cb);
-    // wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_pqonly_nelems);
+    wolfSSL_CTX_set_groups(ctx, kex_groups, kex_groups_nelems);
 
     // Establish TCP connection
     tcp_stream_init(&stream);
@@ -272,9 +280,8 @@ int main(void) {
     // DEBUG_printf("TLS Connecting\n");
     absolute_time_t tls_hs_start = get_absolute_time();
     if ((ssl_err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
-      CRITICAL_printf("TLS handshake failed (%d)\n",
-                      wolfSSL_get_error(ssl, ssl_err));
-      return -1;
+      WARNING_printf("TLS handshake failed (%d)\n",
+                     wolfSSL_get_error(ssl, ssl_err));
     } else {
       absolute_time_t tls_hs_end = get_absolute_time();
       uint64_t hs_dur_us = absolute_time_diff_us(tls_hs_start, tls_hs_end);
