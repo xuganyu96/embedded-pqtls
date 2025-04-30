@@ -15,7 +15,7 @@
  * One can tell that peer has hung by if this callback is invoked with a NULL
  * pbuf
  */
-static err_t recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
+static err_t tcp_recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
                           err_t err) {
   tcp_stream_t *stream = (tcp_stream_t *)arg;
   err_t lwip_err = ERR_OK;
@@ -56,11 +56,11 @@ static err_t recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
   return lwip_err;
 }
 
-static err_t sent_handler(void *arg, struct tcp_pcb *tpcb, u16_t len) {
+static err_t tcp_sent_handler(void *arg, struct tcp_pcb *tpcb, u16_t len) {
   return ERR_OK;
 }
 
-static err_t poll_handler(void *arg, struct tcp_pcb *tpcb) {
+static err_t tcp_poll_handler(void *arg, struct tcp_pcb *tpcb) {
   tcp_stream_t *stream = (tcp_stream_t *)arg;
   err_t lwip_err = ERR_OK;
 
@@ -75,7 +75,7 @@ static err_t poll_handler(void *arg, struct tcp_pcb *tpcb) {
   return lwip_err;
 }
 
-static void err_handler(void *arg, err_t err) {
+static void tcp_err_handler(void *arg, err_t err) {
   tcp_stream_t *stream = (tcp_stream_t *)arg;
 
   cyw43_arch_lwip_begin();
@@ -94,7 +94,7 @@ static void err_handler(void *arg, err_t err) {
   cyw43_arch_lwip_end();
 }
 
-static err_t connected_handler(void *arg, struct tcp_pcb *tpcb, err_t err) {
+static err_t tcp_connected_handler(void *arg, struct tcp_pcb *tpcb, err_t err) {
   tcp_stream_t *stream = (tcp_stream_t *)arg;
   if (err != ERR_OK) {
     return err;
@@ -120,10 +120,10 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
 
   // set the callbacks
   tcp_arg(stream->pcb, stream);
-  tcp_poll(stream->pcb, poll_handler, COLONY_TCP_TICK);
-  tcp_sent(stream->pcb, sent_handler);
-  tcp_recv(stream->pcb, recv_handler);
-  tcp_err(stream->pcb, err_handler);
+  tcp_poll(stream->pcb, tcp_poll_handler, COLONY_TCP_TICK);
+  tcp_sent(stream->pcb, tcp_sent_handler);
+  tcp_recv(stream->pcb, tcp_recv_handler);
+  tcp_err(stream->pcb, tcp_err_handler);
 
   // convert address
   if (ip4addr_aton(peer_ipv4, &stream->peer_addr) != 1) {
@@ -134,7 +134,7 @@ err_t tcp_stream_connect_ipv4(tcp_stream_t *stream, const char *peer_ipv4,
 
   // connect!
   err_t lwip_err =
-      tcp_connect(stream->pcb, &stream->peer_addr, port, connected_handler);
+      tcp_connect(stream->pcb, &stream->peer_addr, port, tcp_connected_handler);
   if (lwip_err != ERR_OK) {
     return lwip_err;
   }
