@@ -1,7 +1,11 @@
 - [ ] Networking stack on Pico
     - [x] DNS: resolve hostname to IPv4 address. IPv6 is a non-goal for now
     - [x] NTP: obtain time from network and sync local clock
-    - [ ] TCP: can connect and listen
+    - [x] TCP: can connect
+    - [ ] TCP: can listen
+- [ ] Expand cryptographic primitive selections
+    - [ ] Compare ML-KEM/ML-DSA across WolfSSL, PQClean, pqm4, and OQS
+    - [ ] Add implementation for McEliece, HQC ([security note](https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/Wiu4ZQo3fP8)), Falcon, and SPHINCS
 - [ ] Certificate and key management: CLI application for generating certificate chain and keys
 - [ ] FIPS compliant TLS 1.3 handshakes
     - [ ] ECDHE + RSA/ECDSA/EdDSA
