@@ -1,15 +1,7 @@
-# WolfSSL dev log
+# May 1, 2025
+I want to add implementations of SPHINCS+ and Falcon to WolfSSL without using liboqs.
 
-## May 1, 2025
-The initial goals are to port Falcon and SPHINCS to wolfcrypt. According to the [installation instruction](https://github.com/wolfSSL/wolfssl/blob/master/INSTALL), "primary development uses automake", which will generate a `wolfssl/options.h` that may interfere with builds that use `user_settings.h`, so a separate copy of WolfSSL source code is checked out elsewhere for development.
-
-After cloning:
-
-```
-./autogen.sh
-./configure
-make
-make check
-make test
-```
-
+There are two workspaces to manage:
+- `wolfssl`'s source code, located as a submodule under this project. I will not run `configure` within this source code. Instead, I will rely on `wolfssl/.clangd` to set macro flags when working on wolfssl source code.
+- `server-wolfssl`, which will compile `wolfssl` using `server-wolfssl/config/user_settings.h` and its cmake setup. This is the primary place where I will be running tests the stuff
+- `pico`, this is the final place where the wolfssl changes will go into

@@ -536,6 +536,8 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define WOLFSSL_SHAKE128
 #define WOLFSSL_SHAKE256
 
+#define HAVE_SPHINCS
+
 /* ------------------------------------------------------------------------- */
 /* Key and certificate generation */
 /* ------------------------------------------------------------------------- */
