@@ -5,7 +5,23 @@ THe OID of [FIPS 205: SLH-DSA](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.
 
 WolfSSL needs the (almost) black box implementation of `keygen`, `sign`, `verify`; PQClean needs WolfSSL's RNG and SHA2/Shake.
 
+Resolved a nasty problem where previous installation of WolfSSL (in `/usr/local/include` and `/usr/local/bin`) resulted in conflicting header files.
 
+**How to port PQClean into WolfSSL**:
+- definitely need to change source code, so I cannot just do a sub-module
+- need to separate headers (`wolfssl/wolfcrypt/pqclean/...`) from sources (`wolfcrypt/src/pqclean/...`), **but how can I preserve the namespacing?**
+    - Move all `.h` files from PQClean
+    - Move all source files
+    - See if things compile
+
+Moving header files to preserve the original PQClean project layout.
+
+Implemented `wc_sphincs_make_key` and `wc_sphincs_make_key_from_seed` using APIs from PQClean's `api.h` headers, but cannot compile because missing source files.
+
+Copy `pqclean/crypto_sign/sphincs-shake-128f-simple/clean/*.c` to `wolfssl/wolfcrypt/src/pqclean/crypto_sign/sphincs-shake-128f-simple/clean/`. There are things I need to change:
+- pathing of PQClean header files
+- `randombytes.h` needs to be replaced with wolfcrypt's RNG, which means some `api.h` needs to change
+- `fips202.h` actually should not be replaced since I am not sure if PQClean's shake is identical to that of wolfssl :(
 
 # May 1, 2025
 I want to add implementations of SPHINCS+ and Falcon to WolfSSL without using liboqs.

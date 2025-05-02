@@ -21,8 +21,13 @@ if(NOT IS_DIRECTORY "${WOLFSSL_ROOT}")
 endif()
 message(STATUS "Using wolfSSL from ${WOLFSSL_ROOT}")
 include_directories(${WOLFSSL_ROOT})
-file(GLOB WOLFSSL_SRC "${WOLFSSL_ROOT}/src/*.c" "${WOLFSSL_ROOT}/wolfcrypt/src/*.c")
-add_library(wolfssl STATIC ${WOLFSSL_SRC})
+file(GLOB_RECURSE PQCLEAN_SRC "${WOLFSSL_ROOT}/wolfcrypt/src/pqclean/*.c")
+# message(STATUS "PQCLEAN sources ${PQCLEAN_SRC}")
+file(GLOB WOLFSSL_SRC 
+  "${WOLFSSL_ROOT}/src/*.c" 
+  "${WOLFSSL_ROOT}/wolfcrypt/src/*.c"
+)
+add_library(wolfssl STATIC ${WOLFSSL_SRC} ${PQCLEAN_SRC})
 target_compile_definitions(wolfssl PUBLIC WOLFSSL_USER_SETTINGS)
 target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations)
 

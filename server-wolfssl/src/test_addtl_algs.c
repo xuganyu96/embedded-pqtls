@@ -9,7 +9,7 @@ int main(void) {
   int sphincs_err;
 
   wc_sphincs_init(&key);
-  wc_sphincs_set_level_and_optim(&key, 1, FAST_VARIANT);
+  wc_sphincs_set_level_and_optim(&key, 1, SPHINCS_FAST_VARIANT);
   sphincs_err = wc_sphincs_make_key(&key, &rng);
   if (sphincs_err) {
     printf("Failed to make SPHINCS key (err %d)\n", sphincs_err);
