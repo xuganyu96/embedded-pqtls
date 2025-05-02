@@ -1,5 +1,6 @@
 /**
  * TLS 1.3 server
+ * TODO: consider making it multi-threaded so multiple clients can connect at the same time
  */
 #include <arpa/inet.h>
 #include <netinet/in.h>
