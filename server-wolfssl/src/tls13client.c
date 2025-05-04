@@ -10,7 +10,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "wolfssl/options.h"
 #include "wolfssl/ssl.h"
 
 #define PATH_MAX_SIZE 1024

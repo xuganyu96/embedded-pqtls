@@ -126,10 +126,10 @@ int parse_args(cli_args_t *args, int argc, char *argv[]) {
   return 0;
 }
 
-static int kex_groups_pqonly[] = {
-    WOLFSSL_ML_KEM_512,
-};
-static int kex_groups_nelems = 1;
+// static int kex_groups_pqonly[] = {
+//     WOLFSSL_ML_KEM_512,
+// };
+// static int kex_groups_nelems = 1;
 
 int main(int argc, char *argv[]) {
   int err;

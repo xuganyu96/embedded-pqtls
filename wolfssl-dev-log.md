@@ -1,3 +1,10 @@
+# May 4, 2025
+Goal: `sphincs-shake-128f-simple` self-signed certificates.
+
+First need to implement the three basic functions: generate key pair, sign a message, and verify a standalone signature.
+
+Call PQClean implementations
+
 # May 2, 2025
 THe OID of [FIPS 205: SLH-DSA](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.205.pdf) is being discussed [here](https://datatracker.ietf.org/doc/html/draft-ietf-lamps-x509-slhdsa-06)
 
