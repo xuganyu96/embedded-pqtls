@@ -3,7 +3,103 @@ Goal: `sphincs-shake-128f-simple` self-signed certificates.
 
 First need to implement the three basic functions: generate key pair, sign a message, and verify a standalone signature.
 
-Call PQClean implementations
+What about the OID of SPHINCS keys and signatures? They are probably needed in:
+- wc_Sphincs_PrivateKeyDecode
+- wc_Sphincs_PublicKeyDecode
+- wc_Sphincs_KeyToDer
+- wc_Sphincs_PrivateKeyToDer
+- wc_Sphincs_PublicKeyToDer
+
+PrivateKeyDecode calls `DecodeAsymKey` from `wolfcrypt/asn.h`. `DecodeAsymKey` calls `DecodeAsymKey_Assign`. `DecodeAsymKey_Assign` will call `OidFromId` if caller supplied key type, which is true in `wc_Sphincs_PrivateKeyDecode`. Check `asn.c` for `keySphincsFast_Leve1Oid`:
+
+```c
+// wolfssl/wolfcrypt/src/asn.c
+#ifdef HAVE_SPHINCS
+    /* Sphincs Fast Level 1: 1 3 9999 6 7 4 */
+    static const byte keySphincsFast_Level1Oid[] =
+        {43, 206, 15, 6, 7, 4};
+
+    /* Sphincs Fast Level 3: 1 3 9999 6 8 3 */
+    static const byte keySphincsFast_Level3Oid[] =
+        {43, 206, 15, 6, 8, 3};
+
+    /* Sphincs Fast Level 5: 1 3 9999 6 9 3 */
+    static const byte keySphincsFast_Level5Oid[] =
+        {43, 206, 15, 6, 9, 3};
+
+    /* Sphincs Small Level 1: 1 3 9999 6 7 10 */
+    static const byte keySphincsSmall_Level1Oid[] =
+        {43, 206, 15, 6, 7, 10};
+
+    /* Sphincs Small Level 3: 1 3 9999 6 8 7 */
+    static const byte keySphincsSmall_Level3Oid[] =
+        {43, 206, 15, 6, 8, 7};
+
+    /* Sphincs Small Level 5: 1 3 9999 6 9 7 */
+    static const byte keySphincsSmall_Level5Oid[] =
+        {43, 206, 15, 6, 9, 7};
+#endif /* HAVE_SPHINCS */
+#ifdef HAVE_SPHINCS
+    /* Sphincs Fast Level 1: 1 3 9999 6 7 4 */
+    static const byte sigSphincsFast_Level1Oid[] =
+        {43, 206, 15, 6, 7, 4};
+
+    /* Sphincs Fast Level 3: 1 3 9999 6 8 3 */
+    static const byte sigSphincsFast_Level3Oid[] =
+        {43, 206, 15, 6, 8, 3};
+
+    /* Sphincs Fast Level 5: 1 3 9999 6 9 3 */
+    static const byte sigSphincsFast_Level5Oid[] =
+        {43, 206, 15, 6, 9, 3};
+
+    /* Sphincs Small Level 1: 1 3 9999 6 7 10 */
+    static const byte sigSphincsSmall_Level1Oid[] =
+        {43, 206, 15, 6, 7, 10};
+
+    /* Sphincs Small Level 3: 1 3 9999 6 8 7 */
+    static const byte sigSphincsSmall_Level3Oid[] =
+        {43, 206, 15, 6, 8, 7};
+
+    /* Sphincs Small Level 5: 1 3 9999 6 9 7 */
+    static const byte sigSphincsSmall_Level5Oid[] =
+        {43, 206, 15, 6, 9, 7};
+#endif /* HAVE_SPHINCS */
+```
+
+There are different types of OIDs, see `wolfssl/wolfcrypt/asn.h`:
+
+```c
+// wolfssl/wolfssl/wolfcrypt/asn.h
+enum Oid_Types {
+    oidHashType         = 0,
+    oidSigType          = 1,
+    oidKeyType          = 2,
+    oidCurveType        = 3,
+    oidBlkType          = 4,
+    oidOcspType         = 5,
+    oidCertExtType      = 6,
+    oidCertAuthInfoType = 7,
+    oidCertPolicyType   = 8,
+    oidCertAltNameType  = 9,
+    oidCertKeyUseType   = 10,
+    oidKdfType          = 11,
+    oidKeyWrapType      = 12,
+    oidCmsKeyAgreeType  = 13,
+    oidPBEType          = 14,
+    oidHmacType         = 15,
+    oidCompressType     = 16,
+    oidCertNameType     = 17,
+    oidTlsExtType       = 18,
+    oidCrlExtType       = 19,
+    oidCsrAttrType      = 20,
+#ifdef WOLFSSL_SUBJ_DIR_ATTR
+    oidSubjDirAttrType  = 21,
+#endif
+    oidIgnoreType
+};
+```
+
+I am okay with not updating these OID's for now as long as my handshake works.
 
 # May 2, 2025
 THe OID of [FIPS 205: SLH-DSA](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.205.pdf) is being discussed [here](https://datatracker.ietf.org/doc/html/draft-ietf-lamps-x509-slhdsa-06)

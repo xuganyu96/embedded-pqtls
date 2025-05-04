@@ -1,6 +1,7 @@
 /**
  * Generate a certificate chain: root, int, leaf, client
- * BUG: sometimes the output of certgen will cause client to reject server's certificates
+ * BUG: sometimes the output of certgen will cause client to reject server's
+ * certificates
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -8,6 +9,7 @@
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/dilithium.h"
+#include "wolfssl/wolfcrypt/sphincs.h"
 #include "wolfssl/wolfcrypt/types.h"
 
 #ifndef QUIET
@@ -30,9 +32,9 @@
 #define ROOT_COMMONNAME "*.eng.uwaterloo.ca"
 #define NOT_BEFORE_DATE "250101000000Z"
 #define NOT_AFTER_DATE "350101000000Z"
-#define CERT_DER_MAX_SIZE 8192
+#define CERT_DER_MAX_SIZE 44000
+#define CERT_PEM_MAX_SIZE 44000
 #define KEY_DER_MAX_SIZE 8192
-#define CERT_PEM_MAX_SIZE 12000
 #define KEY_PEM_MAX_SIZE 12000
 #define PATH_MAX_SIZE 1024
 
@@ -71,13 +73,16 @@ int main(int argc, char *argv[]) {
 
   // root certificate
   Cert root_cert;
-  MlDsaKey root_key;
+  // MlDsaKey root_key;
+  sphincs_key root_key;
+  int root_key_type = SPHINCS_FAST_LEVEL1_TYPE;
   uint8_t root_cert_der[CERT_DER_MAX_SIZE], root_cert_pem[CERT_PEM_MAX_SIZE],
       root_key_der[KEY_DER_MAX_SIZE], root_key_pem[CERT_PEM_MAX_SIZE];
   int root_cert_der_size, root_cert_pem_size, root_key_der_size,
       root_key_pem_size;
   wc_InitCert(&root_cert);
-  root_cert.sigType = CTC_ML_DSA_LEVEL2;
+  // root_cert.sigType = CTC_ML_DSA_LEVEL2;
+  root_cert.sigType = CTC_SPHINCS_FAST_LEVEL1;
   root_cert.isCA = 1;
   set_certname(&root_cert.subject, ROOT_COUNTRY, ROOT_STATE, ROOT_LOCALITY,
                ROOT_ORG, ROOT_COMMONNAME);
@@ -85,24 +90,30 @@ int main(int argc, char *argv[]) {
                ROOT_ORG, ROOT_COMMONNAME);
   set_before_date_utctime(&root_cert, NOT_BEFORE_DATE);
   set_after_date_utctime(&root_cert, NOT_AFTER_DATE);
-  wc_err = wc_MlDsaKey_Init(&root_key, NULL, INVALID_DEVID);
+  // wc_err = wc_MlDsaKey_Init(&root_key, NULL, INVALID_DEVID);
+  wc_err = wc_sphincs_init(&root_key);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to init ML-DSA key (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to init SPHINCS+ key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
-  wc_err = wc_MlDsaKey_SetParams(&root_key, 2);
+  // wc_err = wc_MlDsaKey_SetParams(&root_key, 2);
+  wc_err = wc_sphincs_set_level_and_optim(&root_key, 1, SPHINCS_FAST_VARIANT);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to set ML-DSA level to 2 (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to set SPHINCS+ params to 128f (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
-  wc_err = wc_MlDsaKey_MakeKey(&root_key, &rng);
+  // wc_err = wc_MlDsaKey_MakeKey(&root_key, &rng);
+  wc_err = wc_sphincs_make_key(&root_key, &rng);
   if (wc_err != 0) {
     fprintf(stderr, "Failed to generate ML-DSA-44 keypair (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+  // root_cert_der_size =
+  //     wc_MakeCert_ex(&root_cert, root_cert_der, sizeof(root_cert_der),
+  //                    ML_DSA_LEVEL2_TYPE, &root_key, &rng);
   root_cert_der_size =
       wc_MakeCert_ex(&root_cert, root_cert_der, sizeof(root_cert_der),
-                     ML_DSA_LEVEL2_TYPE, &root_key, &rng);
+                     SPHINCS_FAST_LEVEL1_TYPE, &root_key, &rng);
   if (root_cert_der_size < 0) {
     fprintf(stderr, "Failed to make unsigned root certificate (err %d)\n",
             root_cert_der_size);
@@ -110,9 +121,12 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("root cert (unsigned) DER size %d\n", root_cert_der_size);
   }
-  root_cert_der_size = wc_SignCert_ex(root_cert.bodySz, root_cert.sigType,
-                                      root_cert_der, sizeof(root_cert_der),
-                                      ML_DSA_LEVEL2_TYPE, &root_key, &rng);
+  // root_cert_der_size = wc_SignCert_ex(root_cert.bodySz, root_cert.sigType,
+  //                                     root_cert_der, sizeof(root_cert_der),
+  //                                     ML_DSA_LEVEL2_TYPE, &root_key, &rng);
+  root_cert_der_size = wc_SignCert_ex(
+      root_cert.bodySz, root_cert.sigType, root_cert_der, sizeof(root_cert_der),
+      root_key_type, &root_key, &rng);
   if (root_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign root cert body (err %d)\n",
             root_cert_der_size);
@@ -120,8 +134,10 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("root cert (signed) DER size %d\n", root_cert_der_size);
   }
+  // root_key_der_size =
+  //     wc_MlDsa_KeyToDer(&root_key, root_key_der, sizeof(root_key_der));
   root_key_der_size =
-      wc_MlDsa_KeyToDer(&root_key, root_key_der, sizeof(root_key_der));
+      wc_Sphincs_KeyToDer(&root_key, root_key_der, sizeof(root_key_der));
   if (root_key_der_size < 0) {
     fprintf(stderr, "Failed to convert root key to DER (err %d)\n",
             root_key_der_size);
@@ -152,11 +168,12 @@ int main(int argc, char *argv[]) {
   // intermediate
   Cert int_cert;
   MlDsaKey int_key;
+  int int_key_type = ML_DSA_LEVEL2_TYPE;
   uint8_t int_cert_der[CERT_DER_MAX_SIZE], int_cert_pem[CERT_PEM_MAX_SIZE],
       int_key_der[KEY_DER_MAX_SIZE], int_key_pem[CERT_PEM_MAX_SIZE];
   int int_cert_der_size, int_cert_pem_size, int_key_der_size, int_key_pem_size;
   wc_InitCert(&int_cert);
-  int_cert.sigType = CTC_ML_DSA_LEVEL2;
+  int_cert.sigType = CTC_SPHINCS_FAST_LEVEL1;
   int_cert.isCA = 1;
   wc_SetIssuerBuffer(&int_cert, root_cert_der, root_cert_der_size);
   set_certname(&int_cert.subject, ROOT_COUNTRY, ROOT_STATE, ROOT_LOCALITY,
@@ -190,7 +207,7 @@ int main(int argc, char *argv[]) {
   }
   int_cert_der_size =
       wc_SignCert_ex(int_cert.bodySz, int_cert.sigType, int_cert_der,
-                     sizeof(int_cert_der), ML_DSA_LEVEL2_TYPE, &root_key, &rng);
+                     sizeof(int_cert_der), root_key_type, &root_key, &rng);
   if (int_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign int cert body (err %d)\n",
             int_cert_der_size);
@@ -268,7 +285,7 @@ int main(int argc, char *argv[]) {
   }
   leaf_cert_der_size =
       wc_SignCert_ex(leaf_cert.bodySz, leaf_cert.sigType, leaf_cert_der,
-                     sizeof(leaf_cert_der), ML_DSA_LEVEL2_TYPE, &int_key, &rng);
+                     sizeof(leaf_cert_der), int_key_type, &int_key, &rng);
   if (leaf_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign leaf cert body (err %d)\n",
             leaf_cert_der_size);
@@ -349,7 +366,7 @@ int main(int argc, char *argv[]) {
   }
   client_cert_der_size = wc_SignCert_ex(
       client_cert.bodySz, client_cert.sigType, client_cert_der,
-      sizeof(client_cert_der), ML_DSA_LEVEL2_TYPE, &root_key, &rng);
+      sizeof(client_cert_der), root_key_type, &root_key, &rng);
   if (client_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign client cert body (err %d)\n",
             client_cert_der_size);

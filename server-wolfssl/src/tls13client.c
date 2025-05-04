@@ -12,6 +12,8 @@
 
 #include "wolfssl/ssl.h"
 
+#define SLEEP_MS 100
+#define TEST_ROUNDS 100
 #define PATH_MAX_SIZE 1024
 #define HOSTNAME_MAX_SIZE 128
 #define HELP_DOC                                                               \
@@ -164,7 +166,7 @@ int main(int argc, char *argv[]) {
   args.debug ? wolfSSL_Debugging_ON() : wolfSSL_Debugging_OFF();
   wolfSSL_Init();
 
-  for (int round = 0; round < 100; round++) {
+  for (int round = 0; round < TEST_ROUNDS; round++) {
     ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
     if (!ctx) {
       fprintf(stderr, "Failed to create WolfSSL ctx\n");
@@ -250,7 +252,7 @@ int main(int argc, char *argv[]) {
     ssl = NULL;
     wolfSSL_CTX_free(ctx);
     ctx = NULL;
-    sleep(5);
+    usleep(SLEEP_MS * 1000);
   }
 
   wolfSSL_Cleanup();
