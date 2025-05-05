@@ -239,7 +239,7 @@ extern "C" {
 #define HAVE_CURVE25519
 #define HAVE_ED25519 /* ED25519 Requires SHA512 */
 
-    /* Optionally use small math (less flash usage, but much slower) */
+/* Optionally use small math (less flash usage, but much slower) */
 #if 1
 #define CURVED25519_SMALL
 #endif
@@ -276,19 +276,19 @@ extern "C" {
 #if 1
 #define WOLFSSL_SHA512
 
-    /* Sha384 */
+/* Sha384 */
 #undef WOLFSSL_SHA384
 #if 1
 #define WOLFSSL_SHA384
 #endif
 
-    /* over twice as small, but 50% slower */
-    //#define USE_SLOW_SHA512
+/* over twice as small, but 50% slower */
+// #define USE_SLOW_SHA512
 #endif
 
 /* Sha3 */
 #undef WOLFSSL_SHA3
-#if 0
+#if 1
 #define WOLFSSL_SHA3
 #endif
 
@@ -526,15 +526,18 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 /* ------------------------------------------------------------------------- */
 /* Post-quantum cryptography (PQC) */
 /* ------------------------------------------------------------------------- */
+#define WOLFSSL_SHAKE128
+#define WOLFSSL_SHAKE256
+
+/* defining WOLFSSL_HAVE_MLKEM will automatically define HAVE_PQC */
+#define WOLFSSL_HAVE_MLKEM
+#define WOLFSSL_WC_MLKEM
+#define HAVE_KYBER
+
 #define HAVE_DILITHIUM
 #define WOLFSSL_WC_DILITHIUM
 // NOTE: enable it to use Dilithium instead of ML-DSA
 // #define WOLFSSL_DILITHIUM_FIPS204_DRAFT
-#define WOLFSSL_HAVE_MLKEM
-#define WOLFSSL_WC_MLKEM
-#define WOLFSSL_SHA3
-#define WOLFSSL_SHAKE128
-#define WOLFSSL_SHAKE256
 
 #define HAVE_SPHINCS
 

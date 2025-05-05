@@ -1,11 +1,32 @@
 # May 5, 2025
 Finish work on porting SPHINCS and Falcon. HQC will have to wait because of [IND-CCA2 security concerns](https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/Wiu4ZQo3fP8), which will likely result in some change in the reference implementation.
 
-- 128s (DONE)
-- 192f (DONE)
-- 192s (DONE)
-- 256f (DONE)
-- 256s
+Finished porting all of `sphincs-shake-XXX-simple/clean` from PQClean to Wolfcrypt. Enable with the `HAVE_SPHINCS` macro. Benchmark results (using `wolfcrypt/benchmark/benchmark.c`) are as follows:
+
+|algorithm|level|operation|avg time (ms)|avg ops/sec|
+|:---|:---|:---|---:|---:|
+|Ed25519|1|sign|8.290 ms|120.623|
+|SPHINCS-FAST-128|1|sign|175.822 ms|5.688|
+|SPHINCS-SMALL-128|1|sign|3673.985 ms|0.272|
+|ML-DSA-44|2|sign|0.577 ms|1732.000|
+|ML-DSA-65|3|sign|0.883 ms|1132.515|
+|SPHINCS-FAST-192|3|sign|287.363 ms|3.480|
+|SPHINCS-SMALL-192|3|sign|6491.991 ms|0.154|
+|ML-DSA-87|5|sign|1.149 ms|869.992|
+|SPHINCS-FAST-256|5|sign|597.988 ms|1.672|
+|SPHINCS-SMALL-256|5|sign|5758.303 ms|0.174|
+|Ed25519|1|verify|17.090 ms|58.513|
+|SPHINCS-FAST-128|1|verify|10.469 ms|95.517|
+|SPHINCS-SMALL-128|1|verify|3.285 ms|304.368|
+|ML-DSA-44|2|verify|0.178 ms|5605.900|
+|ML-DSA-65|3|verify|0.290 ms|3449.601|
+|SPHINCS-FAST-192|3|verify|14.887 ms|67.174|
+|SPHINCS-SMALL-192|3|verify|6.223 ms|160.704|
+|ML-DSA-87|5|verify|0.476 ms|2101.723|
+|SPHINCS-FAST-256|5|verify|15.912 ms|62.846|
+|SPHINCS-SMALL-256|5|verify|8.176 ms|122.306|
+
+Falcon remains the only NIST DSA that needs to be ported, although porting it will not be straightforward copy/paste because the PQClean implementation does not expose API for passing in its own seed. Maybe I can raise a PR with `PQClean`, as well.
 
 # May 4, 2025
 Goal: `sphincs-shake-128f-simple` self-signed certificates.
