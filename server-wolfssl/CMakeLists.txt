@@ -49,5 +49,5 @@ target_link_libraries(tls13client wolfssl)
 add_executable(tls13server src/tls13server.c)
 target_link_libraries(tls13server wolfssl)
 
-add_executable(test_addtl_algs src/test_addtl_algs.c)
+add_executable(test_addtl_algs src/test_addtl_algs.c ${WOLFSSL_ROOT}/wolfcrypt/benchmark/benchmark.c)
 target_link_libraries(test_addtl_algs wolfssl)

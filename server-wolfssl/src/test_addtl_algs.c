@@ -1,4 +1,5 @@
-#include "wolfssl/wolfcrypt/random.h"
+#include <wolfssl/wolfcrypt/random.h>
+#include <wolfcrypt/benchmark/benchmark.h>
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
 
@@ -66,6 +67,29 @@ int main(void) {
   } else {
     printf("sphincs-shake-192f-simple Ok.\n");
   }
-  printf("Ok.\n");
+  fail = test_sphincs_correctness(&rng, 3, SPHINCS_SMALL_VARIANT);
+  if (fail) {
+    fprintf(stderr, "sphincs-shake-192s-simple Fail (err %d)\n", fail);
+    return fail;
+  } else {
+    printf("sphincs-shake-192s-simple Ok.\n");
+  }
+  fail = test_sphincs_correctness(&rng, 5, SPHINCS_FAST_VARIANT);
+  if (fail) {
+    fprintf(stderr, "sphincs-shake-256f-simple Fail (err %d)\n", fail);
+    return fail;
+  } else {
+    printf("sphincs-shake-256f-simple Ok.\n");
+  }
+  fail = test_sphincs_correctness(&rng, 5, SPHINCS_SMALL_VARIANT);
+  if (fail) {
+    fprintf(stderr, "sphincs-shake-256s-simple Fail (err %d)\n", fail);
+    return fail;
+  } else {
+    printf("sphincs-shake-256s-simple Ok.\n");
+  }
+
+  int ret = benchmark_test(NULL);
+  printf("Bench finished: %d\n", ret);
   return 0;
 }

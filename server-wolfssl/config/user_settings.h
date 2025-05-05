@@ -332,7 +332,7 @@ extern "C" {
 
 #undef DEBUG_WOLFSSL
 #undef NO_ERROR_STRINGS
-#if 1
+#if 0
 #define DEBUG_WOLFSSL
 #else
 #if 0
@@ -573,7 +573,9 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 // #define WOLFSSL_EXPERIMENTAL_SETTINGS
 // #define WOLFSSL_DUAL_ALG_CERTS /* allow ALT_PRIVATEKEY_TYPE */
 
-#define DEBUG_WOLFSSL
+/* do not compile any of wolfssl's main functions */
+#define NO_MAIN_DRIVER
+#define NO_MAIN_FUNCTION
 
 #ifdef __cplusplus
 }
