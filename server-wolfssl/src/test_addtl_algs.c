@@ -2,7 +2,7 @@
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
 
-int test_sphincs_correctness(WC_RNG *rng) {
+int test_sphincs_correctness(WC_RNG *rng, int level, int optim) {
   sphincs_key key;
   int fail, verified;
   uint8_t msg[512];
@@ -15,7 +15,7 @@ int test_sphincs_correctness(WC_RNG *rng) {
     return -1;
   }
 
-  wc_sphincs_set_level_and_optim(&key, 1, SPHINCS_FAST_VARIANT);
+  wc_sphincs_set_level_and_optim(&key, level, optim);
   fail = wc_sphincs_make_key(&key, rng);
   if (fail) {
     fprintf(stderr, "Failed to generate SPHINCS keypair\n");
@@ -45,11 +45,26 @@ int main(void) {
   wc_InitRng(&rng);
   int fail;
 
-  fail = test_sphincs_correctness(&rng);
-
+  fail = test_sphincs_correctness(&rng, 1, SPHINCS_FAST_VARIANT);
   if (fail) {
-    fprintf(stderr, "Fail (err %d)\n", fail);
+    fprintf(stderr, "sphincs-shake-128f-simple Fail (err %d)\n", fail);
     return fail;
+  } else {
+    printf("sphincs-shake-128f-simple Ok.\n");
+  }
+  fail = test_sphincs_correctness(&rng, 1, SPHINCS_SMALL_VARIANT);
+  if (fail) {
+    fprintf(stderr, "sphincs-shake-128s-simple Fail (err %d)\n", fail);
+    return fail;
+  } else {
+    printf("sphincs-shake-128s-simple Ok.\n");
+  }
+  fail = test_sphincs_correctness(&rng, 3, SPHINCS_FAST_VARIANT);
+  if (fail) {
+    fprintf(stderr, "sphincs-shake-192f-simple Fail (err %d)\n", fail);
+    return fail;
+  } else {
+    printf("sphincs-shake-192f-simple Ok.\n");
   }
   printf("Ok.\n");
   return 0;

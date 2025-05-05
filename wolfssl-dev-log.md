@@ -1,3 +1,12 @@
+# May 5, 2025
+Finish work on porting SPHINCS and Falcon. HQC will have to wait because of [IND-CCA2 security concerns](https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/Wiu4ZQo3fP8), which will likely result in some change in the reference implementation.
+
+- 128s (DONE)
+- 192f
+- 192s
+- 256f
+- 256s
+
 # May 4, 2025
 Goal: `sphincs-shake-128f-simple` self-signed certificates.
 
