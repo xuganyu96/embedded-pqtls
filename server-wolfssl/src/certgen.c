@@ -6,10 +6,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "wolfssl/wolfcrypt/asn.h"
-#include "wolfssl/wolfcrypt/asn_public.h"
-#include "wolfssl/wolfcrypt/dilithium.h"
-#include "wolfssl/wolfcrypt/types.h"
+#include <wolfssl/wolfcrypt/asn.h>
+#include <wolfssl/wolfcrypt/asn_public.h>
+#include <wolfssl/wolfcrypt/dilithium.h>
+#include <wolfssl/wolfcrypt/sphincs.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #ifndef QUIET
 #define DEBUG_printf(...) fprintf(stderr, __VA_ARGS__)
@@ -51,10 +52,10 @@
 #define USE_FALCON_512 10
 #define USE_FALCON_1024 11
 
-#define ROOT_KEY_TYPE USE_ML_DSA_87
-#define INT_KEY_TYPE USE_ML_DSA_65
-#define LEAF_KEY_TYPE USE_ML_DSA_44
-#define CLIENT_KEY_TYPE USE_ML_DSA_44
+#define ROOT_KEY_TYPE USE_SPHINCS_256F
+#define INT_KEY_TYPE USE_SPHINCS_128F
+#define LEAF_KEY_TYPE USE_SPHINCS_128F
+#define CLIENT_KEY_TYPE USE_SPHINCS_128F
 
 static void set_certname(CertName *cert_name, const char *country,
                          const char *state, const char *locality,
@@ -96,6 +97,42 @@ int main(int argc, char *argv[]) {
   int root_key_sig_type = CTC_ML_DSA_LEVEL5;
   int root_key_type = ML_DSA_LEVEL5_TYPE;
   int root_key_level = 5;
+#elif (ROOT_KEY_TYPE == USE_SPHINCS_128F)
+  sphincs_key root_key;
+  int root_key_sig_type = CTC_SPHINCS_FAST_LEVEL1;
+  int root_key_type = SPHINCS_FAST_LEVEL1_TYPE;
+  int root_key_level = 1;
+  int root_key_optim = SPHINCS_FAST_VARIANT;
+#elif (ROOT_KEY_TYPE == USE_SPHINCS_128S)
+  sphincs_key root_key;
+  int root_key_sig_type = CTC_SPHINCS_SMALL_LEVEL1;
+  int root_key_type = SPHINCS_SMALL_LEVEL1_TYPE;
+  int root_key_level = 1;
+  int root_key_optim = SPHINCS_SMALL_VARIANT;
+#elif (ROOT_KEY_TYPE == USE_SPHINCS_192F)
+  sphincs_key root_key;
+  int root_key_sig_type = CTC_SPHINCS_FAST_LEVEL3;
+  int root_key_type = SPHINCS_FAST_LEVEL3_TYPE;
+  int root_key_level = 3;
+  int root_key_optim = SPHINCS_FAST_VARIANT;
+#elif (ROOT_KEY_TYPE == USE_SPHINCS_192S)
+  sphincs_key root_key;
+  int root_key_sig_type = CTC_SPHINCS_SMALL_LEVEL3;
+  int root_key_type = SPHINCS_SMALL_LEVEL3_TYPE;
+  int root_key_level = 3;
+  int root_key_optim = SPHINCS_SMALL_VARIANT;
+#elif (ROOT_KEY_TYPE == USE_SPHINCS_256F)
+  sphincs_key root_key;
+  int root_key_sig_type = CTC_SPHINCS_FAST_LEVEL5;
+  int root_key_type = SPHINCS_FAST_LEVEL5_TYPE;
+  int root_key_level = 5;
+  int root_key_optim = SPHINCS_FAST_VARIANT;
+#elif (ROOT_KEY_TYPE == USE_SPHINCS_256S)
+  sphincs_key root_key;
+  int root_key_sig_type = CTC_SPHINCS_SMALL_LEVEL5;
+  int root_key_type = SPHINCS_SMALL_LEVEL5_TYPE;
+  int root_key_level = 5;
+  int root_key_optim = SPHINCS_SMALL_VARIANT;
 #else
 #error "unsupported signature type"
 #endif
@@ -115,6 +152,13 @@ int main(int argc, char *argv[]) {
 #if (ROOT_KEY_TYPE == USE_ML_DSA_87 || ROOT_KEY_TYPE == USE_ML_DSA_65 ||       \
      ROOT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&root_key, NULL, INVALID_DEVID);
+#elif (                                                                        \
+    ROOT_KEY_TYPE == USE_SPHINCS_128F || ROOT_KEY_TYPE == USE_SPHINCS_128S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_192F || ROOT_KEY_TYPE == USE_SPHINCS_192S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_init(&root_key);
+#else
+#error "unsupported signature type"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init root key (err %d)\n", wc_err);
@@ -123,6 +167,14 @@ int main(int argc, char *argv[]) {
 #if (ROOT_KEY_TYPE == USE_ML_DSA_87 || ROOT_KEY_TYPE == USE_ML_DSA_65 ||       \
      ROOT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&root_key, root_key_level);
+#elif (                                                                        \
+    ROOT_KEY_TYPE == USE_SPHINCS_128F || ROOT_KEY_TYPE == USE_SPHINCS_128S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_192F || ROOT_KEY_TYPE == USE_SPHINCS_192S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err =
+      wc_sphincs_set_level_and_optim(&root_key, root_key_level, root_key_optim);
+#else
+#error "unsupported signature type"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to set root key params (err %d)\n", wc_err);
@@ -131,6 +183,13 @@ int main(int argc, char *argv[]) {
 #if (ROOT_KEY_TYPE == USE_ML_DSA_87 || ROOT_KEY_TYPE == USE_ML_DSA_65 ||       \
      ROOT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&root_key, &rng);
+#elif (                                                                        \
+    ROOT_KEY_TYPE == USE_SPHINCS_128F || ROOT_KEY_TYPE == USE_SPHINCS_128S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_192F || ROOT_KEY_TYPE == USE_SPHINCS_192S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_make_key(&root_key, &rng);
+#else
+#error "unsupported signature type"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to generate root key pair (err %d)\n", wc_err);
@@ -160,6 +219,14 @@ int main(int argc, char *argv[]) {
      ROOT_KEY_TYPE == USE_ML_DSA_44)
   root_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&root_key, root_key_der,
                                                   sizeof(root_key_der));
+#elif (                                                                        \
+    ROOT_KEY_TYPE == USE_SPHINCS_128F || ROOT_KEY_TYPE == USE_SPHINCS_128S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_192F || ROOT_KEY_TYPE == USE_SPHINCS_192S ||  \
+    ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
+  root_key_der_size =
+      wc_Sphincs_PrivateKeyToDer(&root_key, root_key_der, sizeof(root_key_der));
+#else
+#error "unsupported signature type"
 #endif
   if (root_key_der_size < 0) {
     fprintf(stderr, "Failed to convert root key to DER (err %d)\n",
@@ -195,6 +262,14 @@ int main(int argc, char *argv[]) {
   int int_key_sig_type = CTC_ML_DSA_LEVEL3;
   int int_key_type = ML_DSA_LEVEL3_TYPE;
   int int_key_level = 3;
+#elif (INT_KEY_TYPE == USE_SPHINCS_128F)
+  sphincs_key int_key;
+  int int_key_sig_type = CTC_SPHINCS_FAST_LEVEL1;
+  int int_key_type = SPHINCS_FAST_LEVEL1_TYPE;
+  int int_key_level = 1;
+  int int_key_optim = SPHINCS_FAST_VARIANT;
+#else
+#error "unsupported signature type"
 #endif
   uint8_t int_cert_der[CERT_DER_MAX_SIZE], int_cert_pem[CERT_PEM_MAX_SIZE],
       int_key_der[KEY_DER_MAX_SIZE], int_key_pem[CERT_PEM_MAX_SIZE];
@@ -210,6 +285,12 @@ int main(int argc, char *argv[]) {
 #if (INT_KEY_TYPE == USE_ML_DSA_87 || INT_KEY_TYPE == USE_ML_DSA_65 ||         \
      INT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&int_key, NULL, INVALID_DEVID);
+#elif (INT_KEY_TYPE == USE_SPHINCS_128F || INT_KEY_TYPE == USE_SPHINCS_128S || \
+       INT_KEY_TYPE == USE_SPHINCS_192F || INT_KEY_TYPE == USE_SPHINCS_192S || \
+       INT_KEY_TYPE == USE_SPHINCS_256F || INT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_init(&int_key);
+#else
+#error "unsupported signature type"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init intermediate key (err %d)\n", wc_err);
@@ -218,6 +299,13 @@ int main(int argc, char *argv[]) {
 #if (INT_KEY_TYPE == USE_ML_DSA_87 || INT_KEY_TYPE == USE_ML_DSA_65 ||         \
      INT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&int_key, int_key_level);
+#elif (INT_KEY_TYPE == USE_SPHINCS_128F || INT_KEY_TYPE == USE_SPHINCS_128S || \
+       INT_KEY_TYPE == USE_SPHINCS_192F || INT_KEY_TYPE == USE_SPHINCS_192S || \
+       INT_KEY_TYPE == USE_SPHINCS_256F || INT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err =
+      wc_sphincs_set_level_and_optim(&int_key, int_key_level, int_key_optim);
+#else
+#error "unsupported signature type"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to set intermediate key level (err %d)\n", wc_err);
@@ -226,6 +314,12 @@ int main(int argc, char *argv[]) {
 #if (INT_KEY_TYPE == USE_ML_DSA_87 || INT_KEY_TYPE == USE_ML_DSA_65 ||         \
      INT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&int_key, &rng);
+#elif (INT_KEY_TYPE == USE_SPHINCS_128F || INT_KEY_TYPE == USE_SPHINCS_128S || \
+       INT_KEY_TYPE == USE_SPHINCS_192F || INT_KEY_TYPE == USE_SPHINCS_192S || \
+       INT_KEY_TYPE == USE_SPHINCS_256F || INT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_sphincs_make_key(&int_key, &rng);
+#else
+#error "unsupported signature"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to generate intermediate keypair (err %d)\n",
@@ -256,6 +350,13 @@ int main(int argc, char *argv[]) {
      INT_KEY_TYPE == USE_ML_DSA_44)
   int_key_der_size =
       wc_MlDsaKey_PrivateKeyToDer(&int_key, int_key_der, sizeof(int_key_der));
+#elif (INT_KEY_TYPE == USE_SPHINCS_128F || INT_KEY_TYPE == USE_SPHINCS_128S || \
+       INT_KEY_TYPE == USE_SPHINCS_192F || INT_KEY_TYPE == USE_SPHINCS_192S || \
+       INT_KEY_TYPE == USE_SPHINCS_256F || INT_KEY_TYPE == USE_SPHINCS_256S)
+  int_key_der_size =
+      wc_Sphincs_PrivateKeyToDer(&int_key, int_key_der, sizeof(int_key_der));
+#else
+#error "unsupported signture"
 #endif
   if (int_key_der_size < 0) {
     fprintf(stderr, "Failed to convert int key to DER (err %d)\n",
@@ -289,6 +390,13 @@ int main(int argc, char *argv[]) {
   MlDsaKey leaf_key;
   int leaf_key_type = ML_DSA_LEVEL2_TYPE;
   int leaf_key_level = 2;
+#elif (LEAF_KEY_TYPE == USE_SPHINCS_128F)
+  sphincs_key leaf_key;
+  int leaf_key_type = SPHINCS_FAST_LEVEL1_TYPE;
+  int leaf_key_level = 1;
+  int leaf_key_optim = SPHINCS_FAST_VARIANT;
+#else
+#error "unsupported signature"
 #endif
   uint8_t leaf_cert_der[CERT_DER_MAX_SIZE], leaf_cert_pem[CERT_PEM_MAX_SIZE],
       leaf_key_der[KEY_DER_MAX_SIZE], leaf_key_pem[CERT_PEM_MAX_SIZE];
@@ -304,6 +412,13 @@ int main(int argc, char *argv[]) {
 #if (LEAF_KEY_TYPE == USE_ML_DSA_87 || LEAF_KEY_TYPE == USE_ML_DSA_65 ||       \
      LEAF_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&leaf_key, NULL, INVALID_DEVID);
+#elif (                                                                        \
+    LEAF_KEY_TYPE == USE_SPHINCS_128F || LEAF_KEY_TYPE == USE_SPHINCS_128S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_192F || LEAF_KEY_TYPE == USE_SPHINCS_192S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_256F || LEAF_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_init(&leaf_key);
+#else
+#error "unsupported signature"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init leaf key (err %d)\n", wc_err);
@@ -312,6 +427,14 @@ int main(int argc, char *argv[]) {
 #if (LEAF_KEY_TYPE == USE_ML_DSA_87 || LEAF_KEY_TYPE == USE_ML_DSA_65 ||       \
      LEAF_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&leaf_key, leaf_key_level);
+#elif (                                                                        \
+    LEAF_KEY_TYPE == USE_SPHINCS_128F || LEAF_KEY_TYPE == USE_SPHINCS_128S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_192F || LEAF_KEY_TYPE == USE_SPHINCS_192S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_256F || LEAF_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err =
+      wc_sphincs_set_level_and_optim(&leaf_key, leaf_key_level, leaf_key_optim);
+#else
+#error "unsupported"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to set leaf key params (err %d)\n", wc_err);
@@ -320,6 +443,13 @@ int main(int argc, char *argv[]) {
 #if (LEAF_KEY_TYPE == USE_ML_DSA_87 || LEAF_KEY_TYPE == USE_ML_DSA_65 ||       \
      LEAF_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&leaf_key, &rng);
+#elif (                                                                        \
+    LEAF_KEY_TYPE == USE_SPHINCS_128F || LEAF_KEY_TYPE == USE_SPHINCS_128S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_192F || LEAF_KEY_TYPE == USE_SPHINCS_192S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_256F || LEAF_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_make_key(&leaf_key, &rng);
+#else
+#error "unsupported"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to generate leaf keypair (err %d)\n", wc_err);
@@ -349,6 +479,14 @@ int main(int argc, char *argv[]) {
      LEAF_KEY_TYPE == USE_ML_DSA_44)
   leaf_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&leaf_key, leaf_key_der,
                                                   sizeof(leaf_key_der));
+#elif (                                                                        \
+    LEAF_KEY_TYPE == USE_SPHINCS_128F || LEAF_KEY_TYPE == USE_SPHINCS_128S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_192F || LEAF_KEY_TYPE == USE_SPHINCS_192S ||  \
+    LEAF_KEY_TYPE == USE_SPHINCS_256F || LEAF_KEY_TYPE == USE_SPHINCS_256S)
+  leaf_key_der_size =
+      wc_Sphincs_PrivateKeyToDer(&leaf_key, leaf_key_der, sizeof(leaf_key_der));
+#else
+#error "unsupported"
 #endif
   if (leaf_key_der_size < 0) {
     fprintf(stderr, "Failed to convert leaf key to DER (err %d)\n",
@@ -383,6 +521,13 @@ int main(int argc, char *argv[]) {
   MlDsaKey client_key;
   int client_key_type = ML_DSA_LEVEL2_TYPE;
   int client_key_level = 2;
+#elif (CLIENT_KEY_TYPE == USE_SPHINCS_128F)
+  sphincs_key client_key;
+  int client_key_type = SPHINCS_FAST_LEVEL1_TYPE;
+  int client_key_level = 1;
+  int client_key_optim = SPHINCS_FAST_VARIANT;
+#else
+#error "unsupported"
 #endif
   uint8_t client_cert_der[CERT_DER_MAX_SIZE],
       client_cert_pem[CERT_PEM_MAX_SIZE], client_key_der[KEY_DER_MAX_SIZE],
@@ -399,6 +544,15 @@ int main(int argc, char *argv[]) {
 #if (CLIENT_KEY_TYPE == USE_ML_DSA_87 || CLIENT_KEY_TYPE == USE_ML_DSA_65 ||   \
      CLIENT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&client_key, NULL, INVALID_DEVID);
+#elif (CLIENT_KEY_TYPE == USE_SPHINCS_128F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_128S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_init(&client_key);
+#else
+#error "unsupported"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init client key (err %d)\n", wc_err);
@@ -407,6 +561,16 @@ int main(int argc, char *argv[]) {
 #if (CLIENT_KEY_TYPE == USE_ML_DSA_87 || CLIENT_KEY_TYPE == USE_ML_DSA_65 ||   \
      CLIENT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&client_key, client_key_level);
+#elif (CLIENT_KEY_TYPE == USE_SPHINCS_128F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_128S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_set_level_and_optim(&client_key, client_key_level,
+                                          client_key_optim);
+#else
+#error "unsupported"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to set client params (err %d)\n", wc_err);
@@ -415,6 +579,15 @@ int main(int argc, char *argv[]) {
 #if (CLIENT_KEY_TYPE == USE_ML_DSA_87 || CLIENT_KEY_TYPE == USE_ML_DSA_65 ||   \
      CLIENT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&client_key, &rng);
+#elif (CLIENT_KEY_TYPE == USE_SPHINCS_128F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_128S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256S)
+  wc_err = wc_sphincs_make_key(&client_key, &rng);
+#else
+#error "unsupported"
 #endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to generate client keypair (err %d)\n", wc_err);
@@ -444,6 +617,16 @@ int main(int argc, char *argv[]) {
      CLIENT_KEY_TYPE == USE_ML_DSA_44)
   client_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&client_key, client_key_der,
                                                     sizeof(client_key_der));
+#elif (CLIENT_KEY_TYPE == USE_SPHINCS_128F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_128S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_192S ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256F ||                                  \
+       CLIENT_KEY_TYPE == USE_SPHINCS_256S)
+  client_key_der_size = wc_Sphincs_PrivateKeyToDer(&client_key, client_key_der,
+                                                   sizeof(client_key_der));
+#else
+#error "unsupported"
 #endif
   if (client_key_der_size < 0) {
     fprintf(stderr, "Failed to convert client key to DER (err %d)\n",

@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
   }
   err = wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
   if (err != WOLFSSL_SUCCESS) {
-    fprintf(stderr, "Failed to load private key\n");
+    fprintf(stderr, "Failed to load private key (err %d)\n", err);
     ret = -1;
     goto shutdown;
   }
