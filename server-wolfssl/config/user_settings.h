@@ -540,6 +540,7 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 // #define WOLFSSL_DILITHIUM_FIPS204_DRAFT
 
 #define HAVE_SPHINCS
+#define HAVE_FALCON
 
 /* ------------------------------------------------------------------------- */
 /* Key and certificate generation */
