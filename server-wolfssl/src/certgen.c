@@ -29,11 +29,29 @@
 #define ROOT_COMMONNAME "*.eng.uwaterloo.ca"
 #define NOT_BEFORE_DATE "250101000000Z"
 #define NOT_AFTER_DATE "350101000000Z"
-#define CERT_DER_MAX_SIZE 8192
-#define KEY_DER_MAX_SIZE 8192
-#define CERT_PEM_MAX_SIZE 12000
-#define KEY_PEM_MAX_SIZE 12000
+#define CERT_DER_MAX_SIZE 100000
+#define KEY_DER_MAX_SIZE 100000
+#define CERT_PEM_MAX_SIZE 100000
+#define KEY_PEM_MAX_SIZE 100000
 #define PATH_MAX_SIZE 1024
+
+/* TODO: will enum type work? */
+#define USE_ML_DSA_44 1
+#define USE_ML_DSA_65 2
+#define USE_ML_DSA_87 3
+#define USE_SPHINCS_128F 4
+#define USE_SPHINCS_128S 5
+#define USE_SPHINCS_192F 6
+#define USE_SPHINCS_192S 7
+#define USE_SPHINCS_256F 8
+#define USE_SPHINCS_256S 9
+#define USE_FALCON_512 10
+#define USE_FALCON_1024 11
+
+#define ROOT_KEY_TYPE USE_ML_DSA_87
+#define INT_KEY_TYPE USE_ML_DSA_65
+#define LEAF_KEY_TYPE USE_ML_DSA_44
+#define CLIENT_KEY_TYPE USE_ML_DSA_44
 
 static void set_certname(CertName *cert_name, const char *country,
                          const char *state, const char *locality,
@@ -70,10 +88,14 @@ int main(int argc, char *argv[]) {
 
   // root certificate
   Cert root_cert;
+#if (ROOT_KEY_TYPE == USE_ML_DSA_87)
   MlDsaKey root_key;
   int root_key_sig_type = CTC_ML_DSA_LEVEL5;
   int root_key_type = ML_DSA_LEVEL5_TYPE;
   int root_key_level = 5;
+#else
+#error "unsupported signature type"
+#endif
   uint8_t root_cert_der[CERT_DER_MAX_SIZE], root_cert_pem[CERT_PEM_MAX_SIZE],
       root_key_der[KEY_DER_MAX_SIZE], root_key_pem[CERT_PEM_MAX_SIZE];
   int root_cert_der_size, root_cert_pem_size, root_key_der_size,
@@ -87,17 +109,26 @@ int main(int argc, char *argv[]) {
                ROOT_ORG, ROOT_COMMONNAME);
   set_before_date_utctime(&root_cert, NOT_BEFORE_DATE);
   set_after_date_utctime(&root_cert, NOT_AFTER_DATE);
+#if (ROOT_KEY_TYPE == USE_ML_DSA_87 || ROOT_KEY_TYPE == USE_ML_DSA_65 ||       \
+     ROOT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&root_key, NULL, INVALID_DEVID);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init root key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (ROOT_KEY_TYPE == USE_ML_DSA_87 || ROOT_KEY_TYPE == USE_ML_DSA_65 ||       \
+     ROOT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&root_key, root_key_level);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to set root key params (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (ROOT_KEY_TYPE == USE_ML_DSA_87 || ROOT_KEY_TYPE == USE_ML_DSA_65 ||       \
+     ROOT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&root_key, &rng);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to generate root key pair (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
@@ -112,9 +143,9 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("root cert (unsigned) DER size %d\n", root_cert_der_size);
   }
-  root_cert_der_size = wc_SignCert_ex(root_cert.bodySz, root_cert.sigType,
-                                      root_cert_der, sizeof(root_cert_der),
-                                      root_key_type, &root_key, &rng);
+  root_cert_der_size =
+      wc_SignCert_ex(root_cert.bodySz, root_cert.sigType, root_cert_der,
+                     sizeof(root_cert_der), root_key_type, &root_key, &rng);
   if (root_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign root cert body (err %d)\n",
             root_cert_der_size);
@@ -122,8 +153,11 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("root cert (signed) DER size %d\n", root_cert_der_size);
   }
+#if (ROOT_KEY_TYPE == USE_ML_DSA_87 || ROOT_KEY_TYPE == USE_ML_DSA_65 ||       \
+     ROOT_KEY_TYPE == USE_ML_DSA_44)
   root_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&root_key, root_key_der,
                                                   sizeof(root_key_der));
+#endif
   if (root_key_der_size < 0) {
     fprintf(stderr, "Failed to convert root key to DER (err %d)\n",
             root_key_der_size);
@@ -153,10 +187,12 @@ int main(int argc, char *argv[]) {
 
   // intermediate
   Cert int_cert;
+#if (INT_KEY_TYPE == USE_ML_DSA_65)
   MlDsaKey int_key;
   int int_key_sig_type = CTC_ML_DSA_LEVEL3;
   int int_key_type = ML_DSA_LEVEL3_TYPE;
   int int_key_level = 3;
+#endif
   uint8_t int_cert_der[CERT_DER_MAX_SIZE], int_cert_pem[CERT_PEM_MAX_SIZE],
       int_key_der[KEY_DER_MAX_SIZE], int_key_pem[CERT_PEM_MAX_SIZE];
   int int_cert_der_size, int_cert_pem_size, int_key_der_size, int_key_pem_size;
@@ -168,19 +204,29 @@ int main(int argc, char *argv[]) {
                ROOT_ORG, ROOT_COMMONNAME);
   set_before_date_utctime(&int_cert, NOT_BEFORE_DATE);
   set_after_date_utctime(&int_cert, NOT_AFTER_DATE);
+#if (INT_KEY_TYPE == USE_ML_DSA_87 || INT_KEY_TYPE == USE_ML_DSA_65 ||         \
+     INT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&int_key, NULL, INVALID_DEVID);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init intermediate key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (INT_KEY_TYPE == USE_ML_DSA_87 || INT_KEY_TYPE == USE_ML_DSA_65 ||         \
+     INT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&int_key, int_key_level);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to set intermediate key level (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (INT_KEY_TYPE == USE_ML_DSA_87 || INT_KEY_TYPE == USE_ML_DSA_65 ||         \
+     INT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&int_key, &rng);
+#endif
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate intermediate keypair (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to generate intermediate keypair (err %d)\n",
+            wc_err);
     exit(EXIT_FAILURE);
   }
   int_cert_der_size =
@@ -203,8 +249,11 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("int cert (signed) DER size %d\n", int_cert_der_size);
   }
+#if (INT_KEY_TYPE == USE_ML_DSA_87 || INT_KEY_TYPE == USE_ML_DSA_65 ||         \
+     INT_KEY_TYPE == USE_ML_DSA_44)
   int_key_der_size =
       wc_MlDsaKey_PrivateKeyToDer(&int_key, int_key_der, sizeof(int_key_der));
+#endif
   if (int_key_der_size < 0) {
     fprintf(stderr, "Failed to convert int key to DER (err %d)\n",
             int_key_der_size);
@@ -233,9 +282,11 @@ int main(int argc, char *argv[]) {
 
   // leaf certificate
   Cert leaf_cert;
+#if (LEAF_KEY_TYPE == USE_ML_DSA_44)
   MlDsaKey leaf_key;
   int leaf_key_type = ML_DSA_LEVEL2_TYPE;
   int leaf_key_level = 2;
+#endif
   uint8_t leaf_cert_der[CERT_DER_MAX_SIZE], leaf_cert_pem[CERT_PEM_MAX_SIZE],
       leaf_key_der[KEY_DER_MAX_SIZE], leaf_key_pem[CERT_PEM_MAX_SIZE];
   int leaf_cert_der_size, leaf_cert_pem_size, leaf_key_der_size,
@@ -247,20 +298,28 @@ int main(int argc, char *argv[]) {
                LEAF_ORG, LEAF_COMMONNAME);
   set_before_date_utctime(&leaf_cert, NOT_BEFORE_DATE);
   set_after_date_utctime(&leaf_cert, NOT_AFTER_DATE);
+#if (LEAF_KEY_TYPE == USE_ML_DSA_87 || LEAF_KEY_TYPE == USE_ML_DSA_65 ||       \
+     LEAF_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&leaf_key, NULL, INVALID_DEVID);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init leaf key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (LEAF_KEY_TYPE == USE_ML_DSA_87 || LEAF_KEY_TYPE == USE_ML_DSA_65 ||       \
+     LEAF_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&leaf_key, leaf_key_level);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to set leaf key params (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (LEAF_KEY_TYPE == USE_ML_DSA_87 || LEAF_KEY_TYPE == USE_ML_DSA_65 ||       \
+     LEAF_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&leaf_key, &rng);
+#endif
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate leaf keypair (err %d)\n",
-            wc_err);
+    fprintf(stderr, "Failed to generate leaf keypair (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   leaf_cert_der_size =
@@ -283,8 +342,11 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("leaf cert (signed) DER size %d\n", leaf_cert_der_size);
   }
+#if (LEAF_KEY_TYPE == USE_ML_DSA_87 || LEAF_KEY_TYPE == USE_ML_DSA_65 ||       \
+     LEAF_KEY_TYPE == USE_ML_DSA_44)
   leaf_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&leaf_key, leaf_key_der,
                                                   sizeof(leaf_key_der));
+#endif
   if (leaf_key_der_size < 0) {
     fprintf(stderr, "Failed to convert leaf key to DER (err %d)\n",
             leaf_key_der_size);
@@ -314,9 +376,11 @@ int main(int argc, char *argv[]) {
 
   // client certificate
   Cert client_cert;
+#if (CLIENT_KEY_TYPE == USE_ML_DSA_44)
   MlDsaKey client_key;
   int client_key_type = ML_DSA_LEVEL2_TYPE;
   int client_key_level = 2;
+#endif
   uint8_t client_cert_der[CERT_DER_MAX_SIZE],
       client_cert_pem[CERT_PEM_MAX_SIZE], client_key_der[KEY_DER_MAX_SIZE],
       client_key_pem[CERT_PEM_MAX_SIZE];
@@ -329,21 +393,28 @@ int main(int argc, char *argv[]) {
                LEAF_ORG, LEAF_COMMONNAME);
   set_before_date_utctime(&client_cert, NOT_BEFORE_DATE);
   set_after_date_utctime(&client_cert, NOT_AFTER_DATE);
+#if (CLIENT_KEY_TYPE == USE_ML_DSA_87 || CLIENT_KEY_TYPE == USE_ML_DSA_65 ||   \
+     CLIENT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_Init(&client_key, NULL, INVALID_DEVID);
+#endif
   if (wc_err != 0) {
     fprintf(stderr, "Failed to init client key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (CLIENT_KEY_TYPE == USE_ML_DSA_87 || CLIENT_KEY_TYPE == USE_ML_DSA_65 ||   \
+     CLIENT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_SetParams(&client_key, client_key_level);
+#endif
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to set client params (err %d)\n",
-            wc_err);
+    fprintf(stderr, "Failed to set client params (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
+#if (CLIENT_KEY_TYPE == USE_ML_DSA_87 || CLIENT_KEY_TYPE == USE_ML_DSA_65 ||   \
+     CLIENT_KEY_TYPE == USE_ML_DSA_44)
   wc_err = wc_MlDsaKey_MakeKey(&client_key, &rng);
+#endif
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate client keypair (err %d)\n",
-            wc_err);
+    fprintf(stderr, "Failed to generate client keypair (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   client_cert_der_size =
@@ -356,9 +427,9 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("client cert (unsigned) DER size %d\n", client_cert_der_size);
   }
-  client_cert_der_size = wc_SignCert_ex(
-      client_cert.bodySz, client_cert.sigType, client_cert_der,
-      sizeof(client_cert_der), root_key_type, &root_key, &rng);
+  client_cert_der_size =
+      wc_SignCert_ex(client_cert.bodySz, client_cert.sigType, client_cert_der,
+                     sizeof(client_cert_der), root_key_type, &root_key, &rng);
   if (client_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign client cert body (err %d)\n",
             client_cert_der_size);
@@ -366,8 +437,11 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("client cert (signed) DER size %d\n", client_cert_der_size);
   }
+#if (CLIENT_KEY_TYPE == USE_ML_DSA_87 || CLIENT_KEY_TYPE == USE_ML_DSA_65 ||   \
+     CLIENT_KEY_TYPE == USE_ML_DSA_44)
   client_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&client_key, client_key_der,
                                                     sizeof(client_key_der));
+#endif
   if (client_key_der_size < 0) {
     fprintf(stderr, "Failed to convert client key to DER (err %d)\n",
             client_key_der_size);
