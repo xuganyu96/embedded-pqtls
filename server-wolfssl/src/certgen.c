@@ -29,6 +29,9 @@
 #define ROOT_COMMONNAME "*.eng.uwaterloo.ca"
 #define NOT_BEFORE_DATE "250101000000Z"
 #define NOT_AFTER_DATE "350101000000Z"
+/* On MacOS, check stack size with command `ulimit -a`
+ * increase stack size with `ulimit -s <kilobytes>`, the hard limit is 65532
+ */
 #define CERT_DER_MAX_SIZE 100000
 #define KEY_DER_MAX_SIZE 100000
 #define CERT_PEM_MAX_SIZE 100000
