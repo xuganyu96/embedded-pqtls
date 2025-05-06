@@ -1,6 +1,7 @@
 /**
  * Generate a certificate chain: root, int, leaf, client
- * BUG: sometimes the output of certgen will cause client to reject server's certificates
+ * BUG: sometimes the output of certgen will cause client to reject server's
+ * certificates
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -16,8 +17,6 @@
 #define DEBUG_printf(...) ((void)0)
 #endif
 
-#define wc_MlDsa_KeyToDer wc_Dilithium_PrivateKeyToDer
-#define CERTS_DIR "certs"
 #define LEAF_COUNTRY "CA"
 #define LEAF_STATE "ON"
 #define LEAF_LOCALITY "Waterloo"
@@ -120,8 +119,8 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("root cert (signed) DER size %d\n", root_cert_der_size);
   }
-  root_key_der_size =
-      wc_MlDsa_KeyToDer(&root_key, root_key_der, sizeof(root_key_der));
+  root_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&root_key, root_key_der,
+                                                  sizeof(root_key_der));
   if (root_key_der_size < 0) {
     fprintf(stderr, "Failed to convert root key to DER (err %d)\n",
             root_key_der_size);
@@ -199,7 +198,7 @@ int main(int argc, char *argv[]) {
     DEBUG_printf("int cert (signed) DER size %d\n", int_cert_der_size);
   }
   int_key_der_size =
-      wc_MlDsa_KeyToDer(&int_key, int_key_der, sizeof(int_key_der));
+      wc_MlDsaKey_PrivateKeyToDer(&int_key, int_key_der, sizeof(int_key_der));
   if (int_key_der_size < 0) {
     fprintf(stderr, "Failed to convert int key to DER (err %d)\n",
             int_key_der_size);
@@ -276,8 +275,8 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("leaf cert (signed) DER size %d\n", leaf_cert_der_size);
   }
-  leaf_key_der_size =
-      wc_MlDsa_KeyToDer(&leaf_key, leaf_key_der, sizeof(leaf_key_der));
+  leaf_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&leaf_key, leaf_key_der,
+                                                  sizeof(leaf_key_der));
   if (leaf_key_der_size < 0) {
     fprintf(stderr, "Failed to convert leaf key to DER (err %d)\n",
             leaf_key_der_size);
@@ -357,8 +356,8 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("client cert (signed) DER size %d\n", client_cert_der_size);
   }
-  client_key_der_size =
-      wc_MlDsa_KeyToDer(&client_key, client_key_der, sizeof(client_key_der));
+  client_key_der_size = wc_MlDsaKey_PrivateKeyToDer(&client_key, client_key_der,
+                                                    sizeof(client_key_der));
   if (client_key_der_size < 0) {
     fprintf(stderr, "Failed to convert client key to DER (err %d)\n",
             client_key_der_size);
