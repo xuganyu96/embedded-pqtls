@@ -9,6 +9,7 @@
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/dilithium.h"
+#include "wolfssl/wolfcrypt/falcon.h"
 #include "wolfssl/wolfcrypt/sphincs.h"
 #include "wolfssl/wolfcrypt/types.h"
 
@@ -124,9 +125,9 @@ int main(int argc, char *argv[]) {
   // root_cert_der_size = wc_SignCert_ex(root_cert.bodySz, root_cert.sigType,
   //                                     root_cert_der, sizeof(root_cert_der),
   //                                     ML_DSA_LEVEL2_TYPE, &root_key, &rng);
-  root_cert_der_size = wc_SignCert_ex(
-      root_cert.bodySz, root_cert.sigType, root_cert_der, sizeof(root_cert_der),
-      root_key_type, &root_key, &rng);
+  root_cert_der_size =
+      wc_SignCert_ex(root_cert.bodySz, root_cert.sigType, root_cert_der,
+                     sizeof(root_cert_der), root_key_type, &root_key, &rng);
   if (root_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign root cert body (err %d)\n",
             root_cert_der_size);
@@ -167,8 +168,9 @@ int main(int argc, char *argv[]) {
 
   // intermediate
   Cert int_cert;
-  MlDsaKey int_key;
-  int int_key_type = ML_DSA_LEVEL2_TYPE;
+  falcon_key int_key;
+  int int_key_type = FALCON_LEVEL5_TYPE;
+  int int_sig_type = CTC_FALCON_LEVEL5;
   uint8_t int_cert_der[CERT_DER_MAX_SIZE], int_cert_pem[CERT_PEM_MAX_SIZE],
       int_key_der[KEY_DER_MAX_SIZE], int_key_pem[CERT_PEM_MAX_SIZE];
   int int_cert_der_size, int_cert_pem_size, int_key_der_size, int_key_pem_size;
@@ -180,24 +182,27 @@ int main(int argc, char *argv[]) {
                ROOT_ORG, ROOT_COMMONNAME);
   set_before_date_utctime(&int_cert, NOT_BEFORE_DATE);
   set_after_date_utctime(&int_cert, NOT_AFTER_DATE);
-  wc_err = wc_MlDsaKey_Init(&int_key, NULL, INVALID_DEVID);
+  wc_err = wc_falcon_init(&int_key);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to init ML-DSA key (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to init Falcon intermediate key (err %d)\n",
+            wc_err);
     exit(EXIT_FAILURE);
   }
-  wc_err = wc_MlDsaKey_SetParams(&int_key, 2);
+  wc_err = wc_falcon_set_level(&int_key, 5);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to set ML-DSA level to 2 (err %d)\n", wc_err);
+    fprintf(stderr,
+            "Failed to set intermediate key lvl to Falcon-1024 (err %d)\n",
+            wc_err);
     exit(EXIT_FAILURE);
   }
-  wc_err = wc_MlDsaKey_MakeKey(&int_key, &rng);
+  wc_err = wc_falcon_make_key(&int_key, &rng);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate ML-DSA-44 keypair (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to generate Falcon-1024 keypair (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   int_cert_der_size =
       wc_MakeCert_ex(&int_cert, int_cert_der, sizeof(int_cert_der),
-                     ML_DSA_LEVEL2_TYPE, &int_key, &rng);
+                     int_key_type, &int_key, &rng);
   if (int_cert_der_size < 0) {
     fprintf(stderr, "Failed to make unsigned int certificate (err %d)\n",
             int_cert_der_size);
@@ -216,7 +221,7 @@ int main(int argc, char *argv[]) {
     DEBUG_printf("int cert (signed) DER size %d\n", int_cert_der_size);
   }
   int_key_der_size =
-      wc_MlDsa_KeyToDer(&int_key, int_key_der, sizeof(int_key_der));
+      wc_Falcon_KeyToDer(&int_key, int_key_der, sizeof(int_key_der));
   if (int_key_der_size < 0) {
     fprintf(stderr, "Failed to convert int key to DER (err %d)\n",
             int_key_der_size);
@@ -246,12 +251,14 @@ int main(int argc, char *argv[]) {
   // leaf certificate
   Cert leaf_cert;
   MlDsaKey leaf_key;
+  int leaf_key_type = ML_DSA_LEVEL2_TYPE;
   uint8_t leaf_cert_der[CERT_DER_MAX_SIZE], leaf_cert_pem[CERT_PEM_MAX_SIZE],
       leaf_key_der[KEY_DER_MAX_SIZE], leaf_key_pem[CERT_PEM_MAX_SIZE];
   int leaf_cert_der_size, leaf_cert_pem_size, leaf_key_der_size,
       leaf_key_pem_size;
   wc_InitCert(&leaf_cert);
-  leaf_cert.sigType = CTC_ML_DSA_LEVEL2;
+  // leaf_cert.sigType = CTC_ML_DSA_LEVEL2;
+  leaf_cert.sigType = int_sig_type;
   wc_SetIssuerBuffer(&leaf_cert, int_cert_der, int_cert_der_size);
   set_certname(&leaf_cert.subject, LEAF_COUNTRY, LEAF_STATE, LEAF_LOCALITY,
                LEAF_ORG, LEAF_COMMONNAME);
@@ -275,7 +282,7 @@ int main(int argc, char *argv[]) {
   }
   leaf_cert_der_size =
       wc_MakeCert_ex(&leaf_cert, leaf_cert_der, sizeof(leaf_cert_der),
-                     ML_DSA_LEVEL2_TYPE, &leaf_key, &rng);
+                     leaf_key_type, &leaf_key, &rng);
   if (leaf_cert_der_size < 0) {
     fprintf(stderr, "Failed to make unsigned leaf certificate (err %d)\n",
             leaf_cert_der_size);
@@ -364,9 +371,9 @@ int main(int argc, char *argv[]) {
   } else {
     DEBUG_printf("client cert (unsigned) DER size %d\n", client_cert_der_size);
   }
-  client_cert_der_size = wc_SignCert_ex(
-      client_cert.bodySz, client_cert.sigType, client_cert_der,
-      sizeof(client_cert_der), root_key_type, &root_key, &rng);
+  client_cert_der_size =
+      wc_SignCert_ex(client_cert.bodySz, client_cert.sigType, client_cert_der,
+                     sizeof(client_cert_der), root_key_type, &root_key, &rng);
   if (client_cert_der_size < 0) {
     fprintf(stderr, "Failed to sign client cert body (err %d)\n",
             client_cert_der_size);
