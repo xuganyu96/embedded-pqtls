@@ -13,7 +13,7 @@
 #include "wolfssl/ssl.h"
 
 #define SLEEP_MS 100
-#define TEST_ROUNDS 100
+#define TEST_ROUNDS 5
 #define PATH_MAX_SIZE 1024
 #define HOSTNAME_MAX_SIZE 128
 #define HELP_DOC                                                               \

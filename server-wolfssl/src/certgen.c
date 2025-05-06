@@ -71,9 +71,9 @@ int main(int argc, char *argv[]) {
   // root certificate
   Cert root_cert;
   MlDsaKey root_key;
-  int root_key_sig_type = CTC_ML_DSA_LEVEL2;
-  int root_key_type = ML_DSA_LEVEL2_TYPE;
-  int root_key_level = 2;
+  int root_key_sig_type = CTC_ML_DSA_LEVEL5;
+  int root_key_type = ML_DSA_LEVEL5_TYPE;
+  int root_key_level = 5;
   uint8_t root_cert_der[CERT_DER_MAX_SIZE], root_cert_pem[CERT_PEM_MAX_SIZE],
       root_key_der[KEY_DER_MAX_SIZE], root_key_pem[CERT_PEM_MAX_SIZE];
   int root_cert_der_size, root_cert_pem_size, root_key_der_size,
@@ -89,17 +89,17 @@ int main(int argc, char *argv[]) {
   set_after_date_utctime(&root_cert, NOT_AFTER_DATE);
   wc_err = wc_MlDsaKey_Init(&root_key, NULL, INVALID_DEVID);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to init ML-DSA key (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to init root key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_SetParams(&root_key, root_key_level);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to set ML-DSA level to 2 (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to set root key params (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_MakeKey(&root_key, &rng);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate ML-DSA-44 keypair (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to generate root key pair (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   root_cert_der_size =
@@ -154,9 +154,9 @@ int main(int argc, char *argv[]) {
   // intermediate
   Cert int_cert;
   MlDsaKey int_key;
-  int int_key_sig_type = CTC_ML_DSA_LEVEL2;
-  int int_key_type = ML_DSA_LEVEL2_TYPE;
-  int int_key_level = 2;
+  int int_key_sig_type = CTC_ML_DSA_LEVEL3;
+  int int_key_type = ML_DSA_LEVEL3_TYPE;
+  int int_key_level = 3;
   uint8_t int_cert_der[CERT_DER_MAX_SIZE], int_cert_pem[CERT_PEM_MAX_SIZE],
       int_key_der[KEY_DER_MAX_SIZE], int_key_pem[CERT_PEM_MAX_SIZE];
   int int_cert_der_size, int_cert_pem_size, int_key_der_size, int_key_pem_size;
@@ -170,17 +170,17 @@ int main(int argc, char *argv[]) {
   set_after_date_utctime(&int_cert, NOT_AFTER_DATE);
   wc_err = wc_MlDsaKey_Init(&int_key, NULL, INVALID_DEVID);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to init ML-DSA key (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to init intermediate key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_SetParams(&int_key, int_key_level);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to set ML-DSA level to 2 (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to set intermediate key level (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_MakeKey(&int_key, &rng);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate ML-DSA-44 keypair (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to generate intermediate keypair (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   int_cert_der_size =
@@ -249,17 +249,17 @@ int main(int argc, char *argv[]) {
   set_after_date_utctime(&leaf_cert, NOT_AFTER_DATE);
   wc_err = wc_MlDsaKey_Init(&leaf_key, NULL, INVALID_DEVID);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to init leaf ML-DSA key (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to init leaf key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_SetParams(&leaf_key, leaf_key_level);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to set leaf ML-DSA level to 2 (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to set leaf key params (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_MakeKey(&leaf_key, &rng);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate leaf ML-DSA-44 keypair (err %d)\n",
+    fprintf(stderr, "Failed to generate leaf keypair (err %d)\n",
             wc_err);
     exit(EXIT_FAILURE);
   }
@@ -315,8 +315,8 @@ int main(int argc, char *argv[]) {
   // client certificate
   Cert client_cert;
   MlDsaKey client_key;
-  int client_key_level = 2;
   int client_key_type = ML_DSA_LEVEL2_TYPE;
+  int client_key_level = 2;
   uint8_t client_cert_der[CERT_DER_MAX_SIZE],
       client_cert_pem[CERT_PEM_MAX_SIZE], client_key_der[KEY_DER_MAX_SIZE],
       client_key_pem[CERT_PEM_MAX_SIZE];
@@ -331,18 +331,18 @@ int main(int argc, char *argv[]) {
   set_after_date_utctime(&client_cert, NOT_AFTER_DATE);
   wc_err = wc_MlDsaKey_Init(&client_key, NULL, INVALID_DEVID);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to init client ML-DSA key (err %d)\n", wc_err);
+    fprintf(stderr, "Failed to init client key (err %d)\n", wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_SetParams(&client_key, client_key_level);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to set client ML-DSA level to 2 (err %d)\n",
+    fprintf(stderr, "Failed to set client params (err %d)\n",
             wc_err);
     exit(EXIT_FAILURE);
   }
   wc_err = wc_MlDsaKey_MakeKey(&client_key, &rng);
   if (wc_err != 0) {
-    fprintf(stderr, "Failed to generate client ML-DSA-44 keypair (err %d)\n",
+    fprintf(stderr, "Failed to generate client keypair (err %d)\n",
             wc_err);
     exit(EXIT_FAILURE);
   }
