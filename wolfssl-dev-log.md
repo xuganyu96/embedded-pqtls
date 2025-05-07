@@ -10,7 +10,46 @@ For tomorrow I want to implement OT-ML-KEM, which should be a fork of ML-KEM fro
 - Added `ROOT_KEY_TYPE == USE_FALCON_512` in `certgen.c`, `./certgen certs` exits successfully. `falcon512-mldsa65-mldsa44-mldsa-44` chain passes server and mutual authentication test.
 - Added `ROOT_KEY_TYPE == USE_FALCON_1024`, `falcon1024-mldsa65-mldsa44-mldsa44` chain passes server/mutal authentication test.
 
-Wait so Falcon as CA just works?
+Wait so Falcon as CA just works? Apparently yes. Yesteryday's problem is that `sphincs192` fails to run.
+
+**Generate CA certificate with SPHINCS-192s**:
+In `certgen.c` set `ROOT_KEY_TYPE == USE_SPHINCS192S`, at runtime client reprots `"Failed to make unsigned root certificate (err -134)"`. [Error code](https://www.wolfssl.com/documentation/manuals/wolfssl/appendix06.html) -134 is "setting public key error".
+
+`PUBLIC_KEY_E` is returned by `wc_MakeCert_ex`. `wc_MakeCert_ex` calls `MakeAnyCert`. `MakeAnyCert` calls `EncodePublicKey`. `EncodePublicKey` calls `wc_Sphincs_PublicKeyToDer` in case `SPHINCS_SMALL_LEVEL3_KEY`. `wc_Sphincs_PublicKeyToDer` returned `-173 (BAD_FUNC_ARG)`.
+
+```
+lldb -- certgen certs
+breakpoint set --name wc_MakeCert_ex
+gui  # exit with escape
+```
+
+[`sphincs.c`](https://github.com/wolfSSL/wolfssl/blob/eae40058841f471e3b56da606d8d3ed8970b9bd4/wolfcrypt/src/sphincs.c#L327) has incorrect key level validation, hence why 128/256 works but not 192. After fixing that the `sphincs192s-mldsa65-mldsa44-mldsa44` chain works.
+
+`sphincs192f-mldsa65-mldsa44-mldsa44` certgen is successful, but client fails to load root certificate (-148 ASN_UNKNOWN_OID_E). I found [this cursed piece of code](https://github.com/wolfSSL/wolfssl/blob/eae40058841f471e3b56da606d8d3ed8970b9bd4/wolfcrypt/src/asn.c#L6873) that might be the root cause. It is indeed the cause! Here is the snippet:
+
+```c
+// wolfcrypt/src/asn.c
+#if defined(HAVE_SPHINCS)
+    /* Since we are summing it up, there could be collisions...and indeed there
+     * are: SPHINCS_FAST_LEVEL1 and SPHINCS_FAST_LEVEL3.
+     *
+     * We will look for the special case of SPHINCS_FAST_LEVEL3 and set *oid to
+     * 283 instead of 281; 282 is taken.
+     *
+     * These hacks will hopefully disappear when new standardized OIDs appear.
+     */
+    if (idx + (word32)sizeof(sigSphincsFast_Level3Oid) < (word32)length &&
+            XMEMCMP(&input[idx], sigSphincsFast_Level3Oid,
+               sizeof(sigSphincsFast_Level3Oid)) == 0) {
+        found_collision = SPHINCS_FAST_LEVEL3k;
+    }
+#endif /* HAVE_SPHINCS */
+```
+
+The culprit is the length check: `idx + (word32)sizeof(sigSphincsFast_Level3Oid) < (word32)length`. `idx` marks the beginning of the OID buffer, and `length` marks the length (not capacity!) of the OID buffer. This snippet intends to check if the input OID buffer's length is big enough to contain the OID buffer length of `sigSphincsFast_Level3Oid`, so the comparison should be `<=` instead of `<`. **An off-by-one error!**
+
+After fixing that the error went away, though the server chain is too large.
+
 
 # May 6, 2025
 Getting started with porting Falcon. First enable Falcon in the benchmarking by defining the macro `HAVE_FALCON` in `user_settings.h`. `benchmark_test(NULL)` will then include `bench_falconKeySign()`, which will print failure message if signing fails.

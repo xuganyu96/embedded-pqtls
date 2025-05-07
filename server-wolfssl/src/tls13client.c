@@ -176,10 +176,10 @@ int main(int argc, char *argv[]) {
     // if cafile is provided then verify peer
     if (strlen(args.cafile) > 0) {
       wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
-      if (wolfSSL_CTX_load_verify_locations(ctx, args.cafile, NULL) !=
-          SSL_SUCCESS) {
+      ssl_err = wolfSSL_CTX_load_verify_locations(ctx, args.cafile, NULL);
+      if (ssl_err != SSL_SUCCESS) {
         fprintf(stderr,
-                "Error loading root certificates please check the file.\n");
+                "Error loading root certificates (err %d).\n", ssl_err);
         wolfSSL_CTX_free(ctx);
         exit(EXIT_FAILURE);
       }
