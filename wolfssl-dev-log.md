@@ -48,7 +48,7 @@ gui  # exit with escape
 
 The culprit is the length check: `idx + (word32)sizeof(sigSphincsFast_Level3Oid) < (word32)length`. `idx` marks the beginning of the OID buffer, and `length` marks the length (not capacity!) of the OID buffer. This snippet intends to check if the input OID buffer's length is big enough to contain the OID buffer length of `sigSphincsFast_Level3Oid`, so the comparison should be `<=` instead of `<`. **An off-by-one error!**
 
-After fixing that the error went away, though the server chain is too large.
+After fixing that the error went away, though the server certificate chain is too large.
 
 
 # May 6, 2025
