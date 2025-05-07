@@ -8,6 +8,9 @@ For tomorrow I want to implement OT-ML-KEM, which should be a fork of ML-KEM fro
 
 **Generate CA certificate using Falcon-512**:
 - Added `ROOT_KEY_TYPE == USE_FALCON_512` in `certgen.c`, `./certgen certs` exits successfully. `falcon512-mldsa65-mldsa44-mldsa-44` chain passes server and mutual authentication test.
+- Added `ROOT_KEY_TYPE == USE_FALCON_1024`, `falcon1024-mldsa65-mldsa44-mldsa44` chain passes server/mutal authentication test.
+
+Wait so Falcon as CA just works?
 
 # May 6, 2025
 Getting started with porting Falcon. First enable Falcon in the benchmarking by defining the macro `HAVE_FALCON` in `user_settings.h`. `benchmark_test(NULL)` will then include `bench_falconKeySign()`, which will print failure message if signing fails.
