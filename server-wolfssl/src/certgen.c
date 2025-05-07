@@ -9,6 +9,7 @@
 #include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/asn_public.h>
 #include <wolfssl/wolfcrypt/dilithium.h>
+#include <wolfssl/wolfcrypt/falcon.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
 #include <wolfssl/wolfcrypt/types.h>
 
@@ -52,10 +53,10 @@
 #define USE_FALCON_512 10
 #define USE_FALCON_1024 11
 
-#define ROOT_KEY_TYPE USE_SPHINCS_256F
-#define INT_KEY_TYPE USE_SPHINCS_128F
-#define LEAF_KEY_TYPE USE_SPHINCS_128F
-#define CLIENT_KEY_TYPE USE_SPHINCS_128F
+#define ROOT_KEY_TYPE USE_FALCON_512
+#define INT_KEY_TYPE USE_ML_DSA_65
+#define LEAF_KEY_TYPE USE_ML_DSA_44
+#define CLIENT_KEY_TYPE USE_ML_DSA_44
 
 static void set_certname(CertName *cert_name, const char *country,
                          const char *state, const char *locality,
@@ -133,6 +134,16 @@ int main(int argc, char *argv[]) {
   int root_key_type = SPHINCS_SMALL_LEVEL5_TYPE;
   int root_key_level = 5;
   int root_key_optim = SPHINCS_SMALL_VARIANT;
+#elif (ROOT_KEY_TYPE == USE_FALCON_512)
+  falcon_key root_key;
+  int root_key_sig_type = CTC_FALCON_LEVEL1;
+  int root_key_type = FALCON_LEVEL1_TYPE;
+  int root_key_level = 1;
+#elif (ROOT_KEY_TYPE == USE_FALCON_1024)
+  falcon_key root_key;
+  int root_key_sig_type = CTC_FALCON_LEVEL5;
+  int root_key_type = FALCON_LEVEL5_TYPE;
+  int root_key_level = 5;
 #else
 #error "unsupported signature type"
 #endif
@@ -157,6 +168,8 @@ int main(int argc, char *argv[]) {
     ROOT_KEY_TYPE == USE_SPHINCS_192F || ROOT_KEY_TYPE == USE_SPHINCS_192S ||  \
     ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
   wc_err = wc_sphincs_init(&root_key);
+#elif (ROOT_KEY_TYPE == USE_FALCON_512 || ROOT_KEY_TYPE == USE_FALCON_1024)
+  wc_err = wc_falcon_init(&root_key);
 #else
 #error "unsupported signature type"
 #endif
@@ -173,6 +186,8 @@ int main(int argc, char *argv[]) {
     ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
   wc_err =
       wc_sphincs_set_level_and_optim(&root_key, root_key_level, root_key_optim);
+#elif (ROOT_KEY_TYPE == USE_FALCON_512 || ROOT_KEY_TYPE == USE_FALCON_1024)
+  wc_err = wc_falcon_set_level(&root_key, root_key_level);
 #else
 #error "unsupported signature type"
 #endif
@@ -188,6 +203,8 @@ int main(int argc, char *argv[]) {
     ROOT_KEY_TYPE == USE_SPHINCS_192F || ROOT_KEY_TYPE == USE_SPHINCS_192S ||  \
     ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
   wc_err = wc_sphincs_make_key(&root_key, &rng);
+#elif (ROOT_KEY_TYPE == USE_FALCON_512 || ROOT_KEY_TYPE == USE_FALCON_1024)
+  wc_err = wc_falcon_make_key(&root_key, &rng);
 #else
 #error "unsupported signature type"
 #endif
@@ -225,6 +242,9 @@ int main(int argc, char *argv[]) {
     ROOT_KEY_TYPE == USE_SPHINCS_256F || ROOT_KEY_TYPE == USE_SPHINCS_256S)
   root_key_der_size =
       wc_Sphincs_PrivateKeyToDer(&root_key, root_key_der, sizeof(root_key_der));
+#elif (ROOT_KEY_TYPE == USE_FALCON_512 || ROOT_KEY_TYPE == USE_FALCON_1024)
+  root_key_der_size =
+      wc_Falcon_PrivateKeyToDer(&root_key, root_key_der, sizeof(root_key_der));
 #else
 #error "unsupported signature type"
 #endif
@@ -257,7 +277,12 @@ int main(int argc, char *argv[]) {
 
   // intermediate
   Cert int_cert;
-#if (INT_KEY_TYPE == USE_ML_DSA_65)
+#if (INT_KEY_TYPE == USE_ML_DSA_44)
+  MlDsaKey int_key;
+  int int_key_sig_type = CTC_ML_DSA_LEVEL2;
+  int int_key_type = ML_DSA_LEVEL2_TYPE;
+  int int_key_level = 2;
+#elif (INT_KEY_TYPE == USE_ML_DSA_65)
   MlDsaKey int_key;
   int int_key_sig_type = CTC_ML_DSA_LEVEL3;
   int int_key_type = ML_DSA_LEVEL3_TYPE;

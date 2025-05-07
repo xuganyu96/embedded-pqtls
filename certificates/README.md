@@ -22,3 +22,6 @@ CERTDIR="/path/to/certificates"
 ```
 
 If sub-directories are named with a single scheme name then everything is that scheme; otherwise the subdirectory is named with schemes matching `root-int-leaf-client`.
+
+**notes**:
+- According to [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446#section-4.4.3), the maximal signature size in `CertificateVerify` allowed is `2**16 - 1` (65535). More importantly, the record layer limit of `encrypted_record` is `2**16 - 1`, and the `Certificate` message cannot be broken up in to multple records without [major modification](https://www.ietf.org/archive/id/draft-wagner-tls-keysharepqc-00.html).
