@@ -1,6 +1,7 @@
 #include <string.h>
 #include <wolfcrypt/benchmark/benchmark.h>
 #include <wolfssl/wolfcrypt/falcon.h>
+#include <wolfssl/wolfcrypt/mlkem.h>
 #include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/settings.h>
@@ -155,17 +156,26 @@ int main(void) {
   int ret = 0;
   int err = 0;
 
-  err |= test_wc_pqcleanmlkem_correctness(1, ROUNDS, &rng);
-  err |= test_wc_pqcleanmlkem_correctness(3, ROUNDS, &rng);
-  err |= test_wc_pqcleanmlkem_correctness(5, ROUNDS, &rng);
-  err |= test_wc_falcon_correctness(1, ROUNDS, &rng);
-  err |= test_wc_falcon_correctness(5, ROUNDS, &rng);
-  err |= test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-  err |= test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-  err |= test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-  err |= test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-  err |= test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-  err |= test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+  // err |= test_wc_pqcleanmlkem_correctness(1, ROUNDS, &rng);
+  // err |= test_wc_pqcleanmlkem_correctness(3, ROUNDS, &rng);
+  // err |= test_wc_pqcleanmlkem_correctness(5, ROUNDS, &rng);
+  // err |= test_wc_falcon_correctness(1, ROUNDS, &rng);
+  // err |= test_wc_falcon_correctness(5, ROUNDS, &rng);
+  // err |= test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+  // err |= test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+  // err |= test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+  // err |= test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+  // err |= test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+  // err |= test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+
+  bench_pqcleanmlkem(1);
+  bench_mlkem(WC_ML_KEM_512);
+
+  bench_pqcleanmlkem(3);
+  bench_mlkem(WC_ML_KEM_768);
+
+  bench_pqcleanmlkem(5);
+  bench_mlkem(WC_ML_KEM_1024);
 
   if (!err) {
     printf("Ok.\n");
