@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <string.h>
 #include <wolfcrypt/benchmark/benchmark.h>
 #include <wolfssl/wolfcrypt/falcon.h>
@@ -6,6 +7,10 @@
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
+
+/* SHA3 impl's */
+#include <wolfssl/wolfcrypt/pqclean/common/fips202.h>
+#include <wolfssl/wolfcrypt/sha3.h>
 
 #define ROUNDS 5
 
@@ -150,41 +155,94 @@ static int test_wc_pqcleanmlkem_correctness(int level, int rounds,
   return 0;
 }
 
+static void compare_sha3(void) {
+  uint8_t input[4096] = {
+      42,
+  };
+  uint8_t wc_output[512];
+  uint8_t pqc_output[512];
+
+  wc_Shake wc_shake;
+  shake256incctx pqc_shake256;
+  shake128incctx pqc_shake128;
+  wc_InitShake256(&wc_shake, NULL, INVALID_DEVID);
+  /* NOTE: absorb = update + finalize but no output */
+  wc_Shake256_Update(&wc_shake, input, sizeof(input));
+  wc_Shake256_Update(&wc_shake, input, sizeof(input));
+  wc_Shake256_Final(&wc_shake, wc_output, sizeof(wc_output));
+  // wc_Shake256_Free(&wc_shake);
+
+  shake256_inc_init(&pqc_shake256);
+  shake256_inc_absorb(&pqc_shake256, input, sizeof(input));
+  shake256_inc_absorb(&pqc_shake256, input, sizeof(input));
+  shake256_inc_finalize(&pqc_shake256);
+  shake256_inc_squeeze(pqc_output, sizeof(pqc_output), &pqc_shake256);
+  // shake256_inc_ctx_release(&pqc_shake);
+
+  if (memcmp(wc_output, pqc_output, sizeof(wc_output)) == 0) {
+    printf("Shake256 agree\n");
+  } else {
+    printf("Shake256 disagree\n");
+  }
+
+  wc_InitShake128(&wc_shake, NULL, INVALID_DEVID);
+  /* NOTE: absorb = update + finalize but no output */
+  wc_Shake128_Update(&wc_shake, input, sizeof(input));
+  wc_Shake128_Update(&wc_shake, input, sizeof(input));
+  wc_Shake128_Final(&wc_shake, wc_output, sizeof(wc_output));
+  // wc_Shake128_Free(&wc_shake);
+
+  shake128_inc_init(&pqc_shake128);
+  shake128_inc_absorb(&pqc_shake128, input, sizeof(input));
+  shake128_inc_absorb(&pqc_shake128, input, sizeof(input));
+  shake128_inc_finalize(&pqc_shake128);
+  shake128_inc_squeeze(pqc_output, sizeof(pqc_output), &pqc_shake128);
+  // shake128_inc_ctx_release(&pqc_shake);
+
+  if (memcmp(wc_output, pqc_output, sizeof(wc_output)) == 0) {
+    printf("Shake128 agree\n");
+  } else {
+    printf("Shake128 disagree\n");
+  }
+
+  /* Absorb some 100MB of data and squeeze */
+  struct timespec start, end;
+  uint64_t elapsed_us;
+
+  size_t large_input_len = 100 * 1000 * 1000; /* 100 million bytes */
+  uint8_t *large_input = malloc(large_input_len);
+
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  shake128_inc_init(&pqc_shake128);
+  shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
+  shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
+  shake128_inc_finalize(&pqc_shake128);
+  shake128_inc_squeeze(pqc_output, sizeof(pqc_output), &pqc_shake128);
+
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  elapsed_us = (end.tv_sec - start.tv_sec) * 1000000L +
+               (end.tv_nsec - start.tv_nsec) / 1000L;
+  printf("myfunc took %" PRIu64 " microseconds.\n", elapsed_us);
+  free(large_input);
+}
+
 int main(void) {
   WC_RNG rng;
   wc_InitRng(&rng);
   int ret = 0;
-  int err = 0;
 
-  // err |= test_wc_pqcleanmlkem_correctness(1, ROUNDS, &rng);
-  // err |= test_wc_pqcleanmlkem_correctness(3, ROUNDS, &rng);
-  // err |= test_wc_pqcleanmlkem_correctness(5, ROUNDS, &rng);
-  // err |= test_wc_falcon_correctness(1, ROUNDS, &rng);
-  // err |= test_wc_falcon_correctness(5, ROUNDS, &rng);
-  // err |= test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-  // err |= test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-  // err |= test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-  // err |= test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-  // err |= test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-  // err |= test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-
-  bench_pqcleanmlkem(1);
-  bench_mlkem(WC_ML_KEM_512);
-
-  bench_pqcleanmlkem(3);
-  bench_mlkem(WC_ML_KEM_768);
-
-  bench_pqcleanmlkem(5);
-  bench_mlkem(WC_ML_KEM_1024);
-
-  if (!err) {
-    printf("Ok.\n");
-  }
+#if 1
+  compare_sha3();
+#endif
 
 #if 0
   ret = benchmark_test(NULL);
+  bench_pqcleanmlkem(1);
+  bench_pqcleanmlkem(3);
+  bench_pqcleanmlkem(5);
   printf("Bench finished: %d\n", ret);
 #endif
 
+  // wc_rng_free(&rng);
   return ret;
 }

@@ -5,8 +5,99 @@
 Thom Wiggers [SPHINCS+ or Falcon for leaf certificate](https://github.com/thomwiggers/kemtls-experiment/blob/thesis/measuring/scripts/experiment.py)?
 
 ## Implement OT-ML-KEM
-Should I start with PQClean or WolfSSL? I will try porting PQClean's ML-KEM into WolfSSL and compare performance. If performance is comparable then I will modify PQClean's implementation into OT-ML-KEM.
+Should I start with PQClean or WolfSSL? I will try porting PQClean's ML-KEM into WolfSSL and compare performance. If performance is comparable then I will modify PQClean's implementation into OT-ML-KEM. After a naive port, using PQClean's `fips202` instead of WolfSSL's SHA3 impl's, performance of PQClean's ML-KEM is about half of WolfSSL's:
 
+```
+PQCLEAN-ML-KEM 512     keygen     12620.479 ops/sec
+ML-KEM 512             keygen     21144.999 ops/sec
+PQCLEAN-ML-KEM 512      encap     10414.187 ops/sec
+ML-KEM 512              encap     21359.225 ops/sec
+PQCLEAN-ML-KEM 512      decap     8071.862 ops/sec
+ML-KEM 512              decap     15074.601 ops/sec
+
+PQCLEAN-ML-KEM 768     keygen     7757.303 ops/sec
+ML-KEM 768             keygen     13309.165 ops/sec
+PQCLEAN-ML-KEM 768      encap     6496.187 ops/sec
+ML-KEM 768              encap     12791.839 ops/sec
+PQCLEAN-ML-KEM 768      decap     5234.568 ops/sec
+ML-KEM 768              decap     9496.753 ops/sec
+
+PQCLEAN-ML-KEM 768     keygen     4976.169 ops/sec
+ML-KEM 1024            keygen     8454.447 ops/sec
+PQCLEAN-ML-KEM 768      encap     4345.426 ops/sec
+ML-KEM 1024             encap     8108.103 ops/sec
+PQCLEAN-ML-KEM 768      decap     3605.661 ops/sec
+ML-KEM 1024             decap     6331.131 ops/sec
+```
+
+This is probably not acceptable. Without detailed profiling my blind guess is the SHA3 implementation, since at a quick glance WolfSSL's ML-KEM impl does not seem very sophisticated.
+
+Compared Shake256 outputs and can confirm that wolfcrypt and PQClean's Shake256 are both correct:
+
+```c
+static void compare_sha3(void) {
+  uint8_t input[4096] = {
+      42,
+  };
+  uint8_t wc_output[8192];
+  uint8_t pqc_output[8192];
+
+  printf("TEST: absorb continuous 4096 bytes, squeeze continuous 8192 bytes\n");
+  wc_Shake wc_shake;
+  wc_InitShake256(&wc_shake, NULL, INVALID_DEVID);
+  /* NOTE: absorb = update + finalize but no output */
+  wc_Shake256_Update(&wc_shake, input, sizeof(input));
+  wc_Shake256_Final(&wc_shake, wc_output, sizeof(wc_output));
+  // wc_Shake256_Free(&wc_shake);
+
+  shake256incctx pqc_shake;
+  shake256_inc_init(&pqc_shake);
+  shake256_inc_absorb(&pqc_shake, input, sizeof(input));
+  shake256_inc_finalize(&pqc_shake);
+  shake256_inc_squeeze(pqc_output, sizeof(pqc_output), &pqc_shake);
+  // shake256_inc_ctx_release(&pqc_shake);
+
+  if (memcmp(wc_output, pqc_output, sizeof(wc_output)) == 0) {
+    printf("wolfcrypt and pqclean outputs agree\n");
+  }
+}
+```
+ 
+From WolfCrypt benchmark:
+
+```
+SHA3-224                   135 MiB took 1.033 seconds,  130.659 MiB/s
+SHA3-256                   125 MiB took 1.000 seconds,  124.952 MiB/s
+SHA3-384                   100 MiB took 1.041 seconds,   96.028 MiB/s
+SHA3-512                    70 MiB took 1.047 seconds,   66.878 MiB/s
+SHAKE128                   155 MiB took 1.029 seconds,  150.595 MiB/s
+SHAKE256                   125 MiB took 1.007 seconds,  124.159 MiB/s
+```
+
+My crude 100MB test (below) took 1440411 microseconds, which is `66MiB/s`, less than half of WolfSSL's speed (150.595MiB/s). This might just be the culprit of bad performance!
+
+```c
+/* Absorb some 100MB of data and squeeze */
+struct timespec start, end;
+uint64_t elapsed_us;
+
+size_t large_input_len = 100 * 1000 * 1000; /* 100 million bytes */
+uint8_t *large_input = malloc(large_input_len);
+
+clock_gettime(CLOCK_MONOTONIC, &start);
+shake128_inc_init(&pqc_shake128);
+shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
+shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
+shake128_inc_finalize(&pqc_shake128);
+shake128_inc_squeeze(pqc_output, sizeof(pqc_output), &pqc_shake128);
+
+clock_gettime(CLOCK_MONOTONIC, &end);
+elapsed_us = (end.tv_sec - start.tv_sec) * 1000000L +
+            (end.tv_nsec - start.tv_nsec) / 1000L;
+printf("myfunc took %" PRIu64 " microseconds.\n", elapsed_us);
+free(large_input);
+```
+ 
 # May 7, 2025
 Today I want to solve three problems in decreasing priority:
 1. Cannot generate CA certificate using Falcon

@@ -245,6 +245,20 @@ extern "C" {
 #endif
 #endif
 
+/* Ed448 / Curve448 */
+#undef HAVE_CURVE448
+#undef HAVE_ED448
+#if 1
+#define HAVE_CURVE448
+#define HAVE_ED448 /* ED448 Requires SHA512 */
+
+/* Optionally use small math (less flash usage, but much slower) */
+#if 1
+#define CURVED448_SMALL
+#endif
+#endif
+
+
 /* ------------------------------------------------------------------------- */
 /* Hashing */
 /* ------------------------------------------------------------------------- */
@@ -332,7 +346,7 @@ extern "C" {
 
 #undef DEBUG_WOLFSSL
 #undef NO_ERROR_STRINGS
-#if 1
+#if 0
 #define DEBUG_WOLFSSL
 #else
 #if 0
