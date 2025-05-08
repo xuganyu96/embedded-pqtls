@@ -1,10 +1,12 @@
+#include <string.h>
 #include <wolfcrypt/benchmark/benchmark.h>
 #include <wolfssl/wolfcrypt/falcon.h>
-#include <wolfssl/wolfcrypt/sphincs.h>
+#include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/sphincs.h>
 
-#define TEST_ROUNDS 5
+#define ROUNDS 5
 
 static int test_wc_falcon_correctness(int level, int rounds, WC_RNG *rng) {
   int test_err = 0;
@@ -55,7 +57,8 @@ static int test_wc_falcon_correctness(int level, int rounds, WC_RNG *rng) {
   return 0;
 }
 
-static int test_wc_sphincs_correctness(int level, int optim, int rounds, WC_RNG *rng) {
+static int test_wc_sphincs_correctness(int level, int optim, int rounds,
+                                       WC_RNG *rng) {
   int test_err = 0;
 
   sphincs_key key;
@@ -86,12 +89,12 @@ static int test_wc_sphincs_correctness(int level, int optim, int rounds, WC_RNG 
       return test_err;
     }
     if ((test_err = wc_sphincs_sign_msg(msg, sizeof(msg), sig, &siglen, &key,
-                                       rng)) != 0) {
+                                        rng)) != 0) {
       fprintf(stderr, "Failed to sign (err %d)\n", test_err);
       return test_err;
     }
     if ((test_err = wc_sphincs_verify_msg(sig, siglen, msg, sizeof(msg),
-                                         &verified, &key)) != 0) {
+                                          &verified, &key)) != 0) {
       fprintf(stderr, "verification returned error (err %d)\n", test_err);
       return test_err;
     }
@@ -104,22 +107,67 @@ static int test_wc_sphincs_correctness(int level, int optim, int rounds, WC_RNG 
   return 0;
 }
 
+static int test_wc_pqcleanmlkem_correctness(int level, int rounds,
+                                            WC_RNG *rng) {
+  PQCleanMlKemKey key;
+  int wc_err;
+  word32 ctlen;
+  byte ct[PQCLEAN_MLKEM_MAX_CIPHERTEXT_SIZE], ss[PQCLEAN_MLKEM_SS_SIZE],
+      ss_cmp[PQCLEAN_MLKEM_SS_SIZE];
+  for (int round = 0; round < rounds; round++) {
+    memset(ct, 0, sizeof(ct));
+    memset(ss, 0, sizeof(ss));
+    memset(ss_cmp, 0, sizeof(ss_cmp));
+
+    wc_PQCleanMlKemKey_Init(&key);
+    wc_PQCleanMlKemKey_SetLevel(&key, level);
+    wc_PQCleanMlKemKey_CipherTextSize(&key, &ctlen);
+
+    if ((wc_err = wc_PQCleanMlKemKey_MakeKey(&key, rng)) != 0) {
+      fprintf(stderr, "Failed to generate <PQCleanMlKemKey lvl=%d>\n", level);
+      return wc_err;
+    }
+    if ((wc_err = wc_PQCleanMlKemKey_Encapsulate(&key, ct, ss, rng)) != 0) {
+      fprintf(stderr, "Failed to encapsulate <PQCleanMlKemKey lvl=%d>\n",
+              level);
+      return wc_err;
+    }
+    if ((wc_err = wc_PQCleanMlKemKey_Decapsulate(&key, ss_cmp, ct, ctlen)) !=
+        0) {
+      fprintf(stderr,
+              "Failed to decapsulate <PQCleanMlKemKey lvl=%d> (err %d)\n",
+              level, wc_err);
+      return wc_err;
+    }
+    if (memcmp(ss, ss_cmp, sizeof(ss)) != 0) {
+      fprintf(stderr, "<PQCleanMlKemKey lvl=%d> decapsulation is incorrect\n",
+              level);
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
 int main(void) {
   WC_RNG rng;
   wc_InitRng(&rng);
   int ret = 0;
-  int test_err = 0;
+  int err = 0;
 
-  test_err |= test_wc_falcon_correctness(1, TEST_ROUNDS, &rng);
-  test_err |= test_wc_falcon_correctness(5, TEST_ROUNDS, &rng);
-  test_err |= test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, TEST_ROUNDS, &rng);
-  test_err |= test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, TEST_ROUNDS, &rng);
-  test_err |= test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, TEST_ROUNDS, &rng);
-  test_err |= test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, TEST_ROUNDS, &rng);
-  test_err |= test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, TEST_ROUNDS, &rng);
-  test_err |= test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, TEST_ROUNDS, &rng);
+  err |= test_wc_pqcleanmlkem_correctness(1, ROUNDS, &rng);
+  err |= test_wc_pqcleanmlkem_correctness(3, ROUNDS, &rng);
+  err |= test_wc_pqcleanmlkem_correctness(5, ROUNDS, &rng);
+  err |= test_wc_falcon_correctness(1, ROUNDS, &rng);
+  err |= test_wc_falcon_correctness(5, ROUNDS, &rng);
+  err |= test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+  err |= test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+  err |= test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+  err |= test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+  err |= test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+  err |= test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
 
-  if (!test_err) {
+  if (!err) {
     printf("Ok.\n");
   }
 

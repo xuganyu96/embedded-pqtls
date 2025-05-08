@@ -1,3 +1,12 @@
+# May 8, 2025
+- Cannot use Falcon/SPHINCS as leaf or client key
+- Implement OT-ML-KEM
+
+Thom Wiggers [SPHINCS+ or Falcon for leaf certificate](https://github.com/thomwiggers/kemtls-experiment/blob/thesis/measuring/scripts/experiment.py)?
+
+## Implement OT-ML-KEM
+Should I start with PQClean or WolfSSL? I will try porting PQClean's ML-KEM into WolfSSL and compare performance. If performance is comparable then I will modify PQClean's implementation into OT-ML-KEM.
+
 # May 7, 2025
 Today I want to solve three problems in decreasing priority:
 1. Cannot generate CA certificate using Falcon
