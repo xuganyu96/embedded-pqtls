@@ -1,3 +1,9 @@
+# May 9, 2025
+- Incorporate PQClean's MLKEM into key exchange group and check if handshake works
+- Troubleshoot where PQClean's ML-KEM is slower than WolfSSL's ML-KEM
+
+`wolfSSL_CTX_set_groups` can be used to set the key exchange groups, one example is `WOLFSSL_ML_KEM_512`. I want to try adding `PQCLEAN_ML_KEM_512|768|1024`. This will be helpful for adding PQCLEAN_HQC and one-time ML-KEM later on.
+
 # May 8, 2025
 - Cannot use Falcon/SPHINCS as leaf or client key
 - Implement OT-ML-KEM
