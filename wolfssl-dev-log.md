@@ -9,7 +9,13 @@
 - Modify `isValidCurveGroup` in `ssl.c` so the new enum members are accepted
 - Modify `TLSX_KeyShare_IsSupported()` in `tls.c` so the new enum members are supported
 
-At this point the client can send ClientHello to the server, but this `ClientHello` is missing the `key_share` extension, which should contain the public key.
+At this point the client can send ClientHello to the server, but this `ClientHello` is missing the `key_share` extension, which should contain the public key. To be able to generate the correct key share I need to do the following:
+- Modify `TLSX_KeyShare_GenPqcKeyClient` so that it can handle more variety of PQC types
+- Implement `EncodePublicKey` for PQCLean's ML-KEM
+- Add PQClean ML-KEM to `preferredGroups` in `tls.c`
+- Add PQClean ML-KEM to `NamedGroupIsPqc` in `internal.c`
+
+These will be work for another session.
 
 # May 8, 2025
 - Cannot use Falcon/SPHINCS as leaf or client key

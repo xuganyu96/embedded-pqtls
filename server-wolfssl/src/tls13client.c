@@ -148,8 +148,8 @@ static int tcp_connect(const char *host, int port) {
 static void tcp_close(int sockfd) { close(sockfd); }
 
 static int kex_groups_pqonly[] = {
-    // WOLFSSL_ML_KEM_512,
-    PQCLEAN_ML_KEM_512,
+    WOLFSSL_ML_KEM_512,
+    // PQCLEAN_ML_KEM_512,
 };
 static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
 
