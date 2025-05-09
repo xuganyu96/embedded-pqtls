@@ -4,6 +4,13 @@
 
 `wolfSSL_CTX_set_groups` can be used to set the key exchange groups, one example is `WOLFSSL_ML_KEM_512`. I want to try adding `PQCLEAN_ML_KEM_512|768|1024`. This will be helpful for adding PQCLEAN_HQC and one-time ML-KEM later on.
 
+**Step 1: make `wolfSSL_CTX_set_groups` return `SSL_SUCCESS`**
+- Add enum members to `NamedGroups` in `ssl.h`
+- Modify `isValidCurveGroup` in `ssl.c` so the new enum members are accepted
+- Modify `TLSX_KeyShare_IsSupported()` in `tls.c` so the new enum members are supported
+
+At this point the client can send ClientHello to the server, but this `ClientHello` is missing the `key_share` extension, which should contain the public key.
+
 # May 8, 2025
 - Cannot use Falcon/SPHINCS as leaf or client key
 - Implement OT-ML-KEM

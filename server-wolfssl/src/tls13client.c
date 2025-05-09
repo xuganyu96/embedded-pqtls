@@ -148,9 +148,10 @@ static int tcp_connect(const char *host, int port) {
 static void tcp_close(int sockfd) { close(sockfd); }
 
 static int kex_groups_pqonly[] = {
-    WOLFSSL_ML_KEM_512,
+    // WOLFSSL_ML_KEM_512,
+    PQCLEAN_ML_KEM_512,
 };
-static int kex_groups_nelems = 1;
+static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
 
 int main(int argc, char *argv[]) {
   cli_args_t args;
@@ -178,8 +179,7 @@ int main(int argc, char *argv[]) {
       wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
       ssl_err = wolfSSL_CTX_load_verify_locations(ctx, args.cafile, NULL);
       if (ssl_err != SSL_SUCCESS) {
-        fprintf(stderr,
-                "Error loading root certificates (err %d).\n", ssl_err);
+        fprintf(stderr, "Error loading root certificates (err %d).\n", ssl_err);
         wolfSSL_CTX_free(ctx);
         exit(EXIT_FAILURE);
       }
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
     }
     ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
     if (ssl_err != WOLFSSL_SUCCESS) {
-      fprintf(stderr, "Failed to set key exchange groups\n");
+      fprintf(stderr, "Failed to set key exchange groups (err %d)\n", ssl_err);
       wolfSSL_CTX_free(ctx);
       exit(EXIT_FAILURE);
     }
