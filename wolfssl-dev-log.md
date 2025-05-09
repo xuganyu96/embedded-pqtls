@@ -74,7 +74,7 @@ SHAKE128                   155 MiB took 1.029 seconds,  150.595 MiB/s
 SHAKE256                   125 MiB took 1.007 seconds,  124.159 MiB/s
 ```
 
-My crude 100MB test (below) took 1440411 microseconds, which is `66MiB/s`, less than half of WolfSSL's speed (150.595MiB/s). This might just be the culprit of bad performance!
+My crude 100MB test (below) took 731980 microseconds, which is `131MiB/s`, roughly equal to WolfSSL's implementation.
 
 ```c
 /* Absorb some 100MB of data and squeeze */
@@ -87,7 +87,6 @@ uint8_t *large_input = malloc(large_input_len);
 clock_gettime(CLOCK_MONOTONIC, &start);
 shake128_inc_init(&pqc_shake128);
 shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
-shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
 shake128_inc_finalize(&pqc_shake128);
 shake128_inc_squeeze(pqc_output, sizeof(pqc_output), &pqc_shake128);
 
@@ -97,7 +96,7 @@ elapsed_us = (end.tv_sec - start.tv_sec) * 1000000L +
 printf("myfunc took %" PRIu64 " microseconds.\n", elapsed_us);
 free(large_input);
 ```
- 
+
 # May 7, 2025
 Today I want to solve three problems in decreasing priority:
 1. Cannot generate CA certificate using Falcon

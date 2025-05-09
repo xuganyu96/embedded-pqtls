@@ -207,7 +207,7 @@ static void compare_sha3(void) {
 
   /* Absorb some 100MB of data and squeeze */
   struct timespec start, end;
-  uint64_t elapsed_us;
+  uint64_t pqclean_usec, wc_usec;
 
   size_t large_input_len = 100 * 1000 * 1000; /* 100 million bytes */
   uint8_t *large_input = malloc(large_input_len);
@@ -215,14 +215,22 @@ static void compare_sha3(void) {
   clock_gettime(CLOCK_MONOTONIC, &start);
   shake128_inc_init(&pqc_shake128);
   shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
-  shake128_inc_absorb(&pqc_shake128, large_input, large_input_len);
   shake128_inc_finalize(&pqc_shake128);
   shake128_inc_squeeze(pqc_output, sizeof(pqc_output), &pqc_shake128);
-
   clock_gettime(CLOCK_MONOTONIC, &end);
-  elapsed_us = (end.tv_sec - start.tv_sec) * 1000000L +
-               (end.tv_nsec - start.tv_nsec) / 1000L;
-  printf("myfunc took %" PRIu64 " microseconds.\n", elapsed_us);
+  pqclean_usec = (end.tv_sec - start.tv_sec) * 1000000L +
+                 (end.tv_nsec - start.tv_nsec) / 1000L;
+  printf("fips202 took %" PRIu64 " microseconds.\n", pqclean_usec);
+
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  wc_InitShake128(&wc_shake, NULL, INVALID_DEVID);
+  wc_Shake128_Update(&wc_shake, large_input, large_input_len);
+  wc_Shake128_Final(&wc_shake, wc_output, sizeof(wc_output));
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  wc_usec = (end.tv_sec - start.tv_sec) * 1000000L +
+            (end.tv_nsec - start.tv_nsec) / 1000L;
+  printf("wolfssl took %" PRIu64 " microseconds.\n", wc_usec);
+
   free(large_input);
 }
 
@@ -233,6 +241,11 @@ int main(void) {
 
 #if 1
   compare_sha3();
+#endif
+
+#if 0
+  bench_pqcleanmlkem(1);
+  bench_mlkem(WC_ML_KEM_512);
 #endif
 
 #if 0
