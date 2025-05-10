@@ -1,3 +1,13 @@
+# May 10, 2025
+There is `wolfSSL_UseKeyShare(ssl, namedgroup)`, maybe it was the same abstraction for generating the `key_share` extension:
+- Add NamedGroup enum member to NamedGroupIsPqc in internal.c. This is not critical
+- `wolfSSL_UseKeyShare` calls `TLSX_KeyShare_Use`, but when client runs it did not call `wolfSSL_UseKeyShare`, it did not call `TLSX_KeyShareNew` either
+
+Call chain: `SendTls13ClientHello -> TLSX_PopulateExtensions -> TLSX_KeyShare_Use not called`. There is a `preferredGroup` if `set_group` does not contain a named group that in the preferred named groups, then ClientHello will be sent without `key_share`.
+
+Next step:
+- need to add new enum member to preferredGroup, need to modify `TLSX_KeyShare_Use -> KeyShare_GenKey -> KeyShare_GenPqcKeyClient`. The last function is where `KyberKey_XXX` methods are caslled. Also need to call `EncodePublicKey`.
+
 # May 9, 2025
 - Incorporate PQClean's MLKEM into key exchange group and check if handshake works
 - Troubleshoot where PQClean's ML-KEM is slower than WolfSSL's ML-KEM
