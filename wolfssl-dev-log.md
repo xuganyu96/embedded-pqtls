@@ -1,3 +1,19 @@
+# May 11, 2025
+From RFC 8446 section 4.2.8: Clients MAY send an empty client_shares vector in order to request group selection from the server, at the cost of an additional round trip (see Section 4.1.4 "Hello Retry Request").
+
+Added `PQCLEAN_ML_KEM_XXX` to `NamedGroupIsPqc` and `preferredGroup`. The next error is from the client: "Invalid Kyber algorithm specified", which comes from `TLSX_KeyShare_GenPqcKeyClient (tls.c)`.
+
+Assume that `WOLFSSL_TLSX_PQC_MLKEM_STORE_OBJ` is not defined (otherwise the entire `KyberKey` object will be stored in memory instead of just the private key).
+- `KeyShareEntry *kse` is the input; `kse->group` is the named group.
+- `KyberKey kem` is allocated on the stack.
+- `byte *privKey` will be allocated on the heap
+- public key will also be allocated from the heap, but it will be owned by `kse->pubKey`
+- When generating keypair, RNG comes from `ssl->rng`, heap comes from `ssl->heap`, and dev ID comes from `ssl->devId`
+- `EncodePublicKey` writes the public key to `kse->pubKey`
+- `EncodePrivateKey` writes the private key to the heap-allocated private key
+- If anything goes wrong, `kem` needs to be zero'd, `kse->pubKey` and `privKey` both need to be freed
+- If all goes right, the ownership of `privKey` moves to `kse->privKey`
+
 # May 10, 2025
 There is `wolfSSL_UseKeyShare(ssl, namedgroup)`, maybe it was the same abstraction for generating the `key_share` extension:
 - Add NamedGroup enum member to NamedGroupIsPqc in internal.c. This is not critical
