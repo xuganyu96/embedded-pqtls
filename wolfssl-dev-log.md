@@ -1,3 +1,27 @@
+# May 12, 2025
+Goal: can perform key exchange using `PQCLEAN_ML_KEM_512`.
+
+**need to figure out how to incorporate heap and devId in `wc_PQCleanMlKemKey_InitEx`**
+
+Finished draft implementation of `KeyShare_GenPQCleanMlKemKeyClient`, but there are a few issues:
+- There are conflicting macros in PQClean's ML-KEM port (e.g. `KYBER_K`; they cannot be compiled together at the same time without overwriting each other.
+- Need to implement a number of missing functions such as `PubKeySize`, `PrivKeySize`, and `EncodePublicKey/EncodePrivateKey`.
+
+The macro re-definition is definitely problematic, somehow `PQCLEAN_MLKEM512_CLEAN_CRYPTO_SECRETKEYBYTES` evaluates to 2400 instead of what is should be (1632).
+
+```
+TLSX_KeyShare_GenPQCleanMlKemKeyClient: level set to 1
+TLSX_KeyShare_GenPQCleanMlKemKeyClient: priv key size 2400
+                                                      ^^^^ ------> this is wrong
+```
+
+It might be a good idea to **amalgamate** all source files of a single implementation into a single source file:
+- `KYBER_K`, `KYBER_ETA1`, `KYBER_ETA2`, `KYBER_POLYCOMPRESSEDBYTES`, `KYBER_POLYVECCOMPRESSEDBYTES`
+- structs like `poly` and `polyvec` should not be defined in the header files
+- then maybe the best way to amalgamate is to hide all non-public API in the source file and leave only the things in `api.h`
+
+Ok there is no need to amalgamate; instead I should pay attention to only use `api.h` instead of any of the internals of PQClean's implementations.
+
 # May 11, 2025
 From RFC 8446 section 4.2.8: Clients MAY send an empty client_shares vector in order to request group selection from the server, at the cost of an additional round trip (see Section 4.1.4 "Hello Retry Request").
 
@@ -107,7 +131,7 @@ static void compare_sha3(void) {
   }
 }
 ```
- 
+
 From WolfCrypt benchmark:
 
 ```

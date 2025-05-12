@@ -239,13 +239,13 @@ int main(void) {
   wc_InitRng(&rng);
   int ret = 0;
 
-#if 1
+#if 0
   compare_sha3();
 #endif
 
-#if 0
-  bench_pqcleanmlkem(1);
-  bench_mlkem(WC_ML_KEM_512);
+#if 1
+  bench_pqcleanmlkem(3);
+  bench_mlkem(WC_ML_KEM_768);
 #endif
 
 #if 0

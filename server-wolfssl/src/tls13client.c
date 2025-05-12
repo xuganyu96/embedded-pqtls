@@ -147,9 +147,14 @@ static int tcp_connect(const char *host, int port) {
 
 static void tcp_close(int sockfd) { close(sockfd); }
 
+#define USE_PQCLEAN 1
+
 static int kex_groups_pqonly[] = {
+#if USE_PQCLEAN
+    PQCLEAN_ML_KEM_512,
+#else
     WOLFSSL_ML_KEM_512,
-    // PQCLEAN_ML_KEM_512,
+#endif
 };
 static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
 
