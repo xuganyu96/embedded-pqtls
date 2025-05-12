@@ -22,6 +22,22 @@ It might be a good idea to **amalgamate** all source files of a single implement
 
 Ok there is no need to amalgamate; instead I should pay attention to only use `api.h` instead of any of the internals of PQClean's implementations.
 
+After implementing public key size, private key size, public key encode, and private key encode, ClientHello can correctly send `key_share`. Now the server needs to process the key share:
+
+> TLSX_KeyShare_HandlePqcKeyServer: Invalid PQC algorithm specified.
+
+Call stack:
+```
+TLSX_KeyShare_HandlePqcKeyServer
+- TLSX_KeyShare_Use
+- TLSX_KeyShareEntry_Parse
+- TLSX_KeyShare_Parse_ClientHello
+- TLSX_Parse
+- DoTls13ClientHello
+```
+
+Similar to `GenPqcKeyClient`, `HandlePqcKeyServer` will be refactored to call other KEM specific subroutines.
+
 # May 11, 2025
 From RFC 8446 section 4.2.8: Clients MAY send an empty client_shares vector in order to request group selection from the server, at the cost of an additional round trip (see Section 4.1.4 "Hello Retry Request").
 
