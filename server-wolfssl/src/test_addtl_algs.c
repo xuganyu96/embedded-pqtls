@@ -12,7 +12,12 @@
 #include <wolfssl/wolfcrypt/pqclean/common/fips202.h>
 #include <wolfssl/wolfcrypt/sha3.h>
 
-#define ROUNDS 3
+/* one-time ML-KEM */
+#include <wolfssl/wolfcrypt/pqclean/crypto_kem/ot-ml-kem-1024/clean/api.h>
+#include <wolfssl/wolfcrypt/pqclean/crypto_kem/ot-ml-kem-512/clean/api.h>
+#include <wolfssl/wolfcrypt/pqclean/crypto_kem/ot-ml-kem-768/clean/api.h>
+
+#define ROUNDS 100
 
 static int test_wc_falcon_correctness(int level, int rounds, WC_RNG *rng) {
   int test_err = 0;
@@ -155,6 +160,117 @@ static int test_wc_pqcleanmlkem_correctness(int level, int rounds,
   return 0;
 }
 
+static int test_wc_otmlkem512_correctness(int rounds, WC_RNG *rng) {
+  uint8_t pk[OTMLKEM512_CLEAN_CRYPTO_PUBLICKEYBYTES];
+  uint8_t sk[OTMLKEM512_CLEAN_CRYPTO_SECRETKEYBYTES];
+  uint8_t ct[OTMLKEM512_CLEAN_CRYPTO_CIPHERTEXTBYTES];
+  uint8_t ss[OTMLKEM512_CLEAN_CRYPTO_BYTES];
+  uint8_t ss_cmp[OTMLKEM512_CLEAN_CRYPTO_BYTES];
+  int ret = 0;
+
+  for (int round = 0; round < rounds; round++) {
+    ret = OTMLKEM512_CLEAN_crypto_kem_keypair(pk, sk, rng);
+    if (ret != 0) {
+      printf("one-time ml-kem-512 failed to keygen\n");
+      return ret;
+    }
+
+    ret = OTMLKEM512_CLEAN_crypto_kem_enc(ct, ss, pk, rng);
+    if (ret != 0) {
+      printf("one-time ml-kem-512 failed to encap\n");
+      return ret;
+    }
+
+    ret = OTMLKEM512_CLEAN_crypto_kem_dec(ss_cmp, ct, sk);
+    if (ret != 0) {
+      printf("one-time ml-kem-512 failed to decap\n");
+      return ret;
+    }
+
+    if (memcmp(ss, ss_cmp, OTMLKEM512_CLEAN_CRYPTO_BYTES) != 0) {
+      ret = -1;
+      printf("one-time ml-kem-512 decap is incorrect\n");
+      return ret;
+    }
+  }
+
+  return ret;
+}
+
+static int test_wc_otmlkem768_correctness(int rounds, WC_RNG *rng) {
+  uint8_t pk[OTMLKEM768_CLEAN_CRYPTO_PUBLICKEYBYTES];
+  uint8_t sk[OTMLKEM768_CLEAN_CRYPTO_SECRETKEYBYTES];
+  uint8_t ct[OTMLKEM768_CLEAN_CRYPTO_CIPHERTEXTBYTES];
+  uint8_t ss[OTMLKEM768_CLEAN_CRYPTO_BYTES];
+  uint8_t ss_cmp[OTMLKEM768_CLEAN_CRYPTO_BYTES];
+  int ret = 0;
+
+  for (int round = 0; round < rounds; round++) {
+    ret = OTMLKEM768_CLEAN_crypto_kem_keypair(pk, sk, rng);
+    if (ret != 0) {
+      printf("one-time ml-kem-768 failed to keygen\n");
+      return ret;
+    }
+
+    ret = OTMLKEM768_CLEAN_crypto_kem_enc(ct, ss, pk, rng);
+    if (ret != 0) {
+      printf("one-time ml-kem-768 failed to encap\n");
+      return ret;
+    }
+
+    ret = OTMLKEM768_CLEAN_crypto_kem_dec(ss_cmp, ct, sk);
+    if (ret != 0) {
+      printf("one-time ml-kem-768 failed to decap\n");
+      return ret;
+    }
+
+    if (memcmp(ss, ss_cmp, OTMLKEM768_CLEAN_CRYPTO_BYTES) != 0) {
+      ret = -1;
+      printf("one-time ml-kem-768 decap is incorrect\n");
+      return ret;
+    }
+  }
+
+  return ret;
+}
+
+static int test_wc_otmlkem1024_correctness(int rounds, WC_RNG *rng) {
+  uint8_t pk[OTMLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES];
+  uint8_t sk[OTMLKEM1024_CLEAN_CRYPTO_SECRETKEYBYTES];
+  uint8_t ct[OTMLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES];
+  uint8_t ss[OTMLKEM1024_CLEAN_CRYPTO_BYTES];
+  uint8_t ss_cmp[OTMLKEM1024_CLEAN_CRYPTO_BYTES];
+  int ret = 0;
+
+  for (int round = 0; round < rounds; round++) {
+    ret = OTMLKEM1024_CLEAN_crypto_kem_keypair(pk, sk, rng);
+    if (ret != 0) {
+      printf("one-time ml-kem-1024 failed to keygen\n");
+      return ret;
+    }
+
+    ret = OTMLKEM1024_CLEAN_crypto_kem_enc(ct, ss, pk, rng);
+    if (ret != 0) {
+      printf("one-time ml-kem-1024 failed to encap\n");
+      return ret;
+    }
+
+    ret = OTMLKEM1024_CLEAN_crypto_kem_dec(ss_cmp, ct, sk);
+    if (ret != 0) {
+      printf("one-time ml-kem-1024 failed to decap\n");
+      return ret;
+    }
+
+    if (memcmp(ss, ss_cmp, OTMLKEM1024_CLEAN_CRYPTO_BYTES) != 0) {
+      ret = -1;
+      printf("one-time ml-kem-1024 decap is incorrect\n");
+      return ret;
+    }
+  }
+
+  return ret;
+}
+
 static void compare_sha3(void) {
   uint8_t input[4096] = {
       42,
@@ -244,17 +360,35 @@ int main(void) {
   }
 
   if (1) {
-    test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-    test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-    test_wc_pqcleanmlkem_correctness(1, ROUNDS, &rng);
-    test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-    test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-    test_wc_pqcleanmlkem_correctness(3, ROUNDS, &rng);
-    test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
-    test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
-    test_wc_pqcleanmlkem_correctness(5, ROUNDS, &rng);
-    test_wc_falcon_correctness(1, ROUNDS, &rng);
-    test_wc_falcon_correctness(5, ROUNDS, &rng);
+    ret = 0;
+    ret |= test_wc_otmlkem512_correctness(ROUNDS, &rng);
+    ret |= test_wc_otmlkem768_correctness(ROUNDS, &rng);
+    ret |= test_wc_otmlkem1024_correctness(ROUNDS, &rng);
+    if (ret == 0) {
+      printf("one-time ml-kem correctness: Ok.\n");
+    } else {
+      printf("one-time ml-kem correctness: err %d.\n", ret);
+      return ret;
+    }
+  }
+
+  if (0) {
+    ret = 0;
+    ret |= test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+    ret |= test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+    ret |= test_wc_pqcleanmlkem_correctness(1, ROUNDS, &rng);
+    ret |= test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+    ret |= test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+    ret |= test_wc_pqcleanmlkem_correctness(3, ROUNDS, &rng);
+    ret |= test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+    ret |= test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+    ret |= test_wc_pqcleanmlkem_correctness(5, ROUNDS, &rng);
+    ret |= test_wc_falcon_correctness(1, ROUNDS, &rng);
+    ret |= test_wc_falcon_correctness(5, ROUNDS, &rng);
+    if (ret != 0) {
+      printf("Something failed\n");
+      return ret;
+    }
   }
 
   if (0) {

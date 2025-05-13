@@ -12,6 +12,8 @@ Again similar to `GenPqcKeyClient` and `HandlePqcKeyServer`, the first step is s
 
 Ok so this discrepancy ends up not being an issue. The implementation worked and can perform handshake.
 
+I am not sure what optimization WolfSSL used such that wolfcrypt's ML-KEM is twice as fast as the PQClean port, and I don't want to spend time troubleshooting it. Instead, I will use the PQClean ML-KEM as the default ML-KEM implementation, then make a copy to modify into one-time ML-KEM.
+
 # May 12, 2025
 
 Goal: can perform key exchange using `PQCLEAN_ML_KEM_512`.
