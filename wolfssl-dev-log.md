@@ -8,7 +8,9 @@ Again similar to `GenPqcKeyClient` and `HandlePqcKeyServer`, the first step is s
 - called by `TLSX_KeyShare_ProcessPqcClient`
 - called by `TLSX_KeyShare_Process(ssl, kse)` if `NamedGroupIsPqc(kse->group)`. Hence `NamedGroupIsPqc` should be correctly implemented.
 
-> here is a discrepancy I noticed, which might become problematic: in `TLSX_KeyShare_ProcessPqcClient_ex`, `kse->ke` is treated as the ciphertext based on the function call `wc_KyberKey_Decapsulate(kem, ssOutput, keyShareEntry->ke, ctSz)`, but in `HandlePqcKeyServer` the ciphertext is moved into `kse->pubKey`.
+> here is a discrepancy I noticed, which might become problematic: in `TLSX_KeyShare_ProcessPqcClient_ex`, `kse->ke` is treated as the ciphertext based on the function call `wc_KyberKey_Decapsulate(kem, ssOutput, keyShareEntry->ke, ctSz)`, but in `HandlePqcKeyServer` the ciphertext is moved into `kse->pubKey`. `HandlePqcKeyServer` takes the encapsulation key (aka pubKey).
+
+Ok so this discrepancy ends up not being an issue. The implementation worked and can perform handshake.
 
 # May 12, 2025
 

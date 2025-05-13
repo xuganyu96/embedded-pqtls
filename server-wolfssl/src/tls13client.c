@@ -21,7 +21,7 @@
   "[--key client.key] <hostname> <port>"
 
 static int kex_groups_pqonly[] = {
-#if 0
+#if 1
     PQCLEAN_ML_KEM_512,
 #else
     WOLFSSL_ML_KEM_512,
