@@ -22,7 +22,7 @@
 
 static int kex_groups_pqonly[] = {
 #if 1
-    PQCLEAN_ML_KEM_512,
+    PQCLEAN_ML_KEM_1024,
 #else
     WOLFSSL_ML_KEM_512,
 #endif
