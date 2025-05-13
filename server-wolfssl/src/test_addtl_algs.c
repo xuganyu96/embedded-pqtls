@@ -12,7 +12,7 @@
 #include <wolfssl/wolfcrypt/pqclean/common/fips202.h>
 #include <wolfssl/wolfcrypt/sha3.h>
 
-#define ROUNDS 5
+#define ROUNDS 3
 
 static int test_wc_falcon_correctness(int level, int rounds, WC_RNG *rng) {
   int test_err = 0;
@@ -239,23 +239,34 @@ int main(void) {
   wc_InitRng(&rng);
   int ret = 0;
 
-#if 0
-  compare_sha3();
-#endif
+  if (0) {
+    compare_sha3();
+  }
 
-#if 1
-  bench_pqcleanmlkem(3);
-  bench_mlkem(WC_ML_KEM_768);
-#endif
+  if (1) {
+    test_wc_sphincs_correctness(1, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+    test_wc_sphincs_correctness(1, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+    test_wc_pqcleanmlkem_correctness(1, ROUNDS, &rng);
+    test_wc_sphincs_correctness(3, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+    test_wc_sphincs_correctness(3, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+    test_wc_pqcleanmlkem_correctness(3, ROUNDS, &rng);
+    test_wc_sphincs_correctness(5, SPHINCS_FAST_VARIANT, ROUNDS, &rng);
+    test_wc_sphincs_correctness(5, SPHINCS_SMALL_VARIANT, ROUNDS, &rng);
+    test_wc_pqcleanmlkem_correctness(5, ROUNDS, &rng);
+    test_wc_falcon_correctness(1, ROUNDS, &rng);
+    test_wc_falcon_correctness(5, ROUNDS, &rng);
+  }
 
-#if 0
-  ret = benchmark_test(NULL);
-  bench_pqcleanmlkem(1);
-  bench_pqcleanmlkem(3);
-  bench_pqcleanmlkem(5);
-  printf("Bench finished: %d\n", ret);
-#endif
+  if (0) {
+    ret = benchmark_test(NULL);
+    bench_pqcleanmlkem(1);
+    bench_mlkem(WC_ML_KEM_512);
+    bench_pqcleanmlkem(3);
+    bench_mlkem(WC_ML_KEM_768);
+    bench_pqcleanmlkem(5);
+    bench_mlkem(WC_ML_KEM_1024);
+    printf("Bench finished: %d\n", ret);
+  }
 
-  // wc_rng_free(&rng);
   return ret;
 }
