@@ -20,6 +20,15 @@
   "Usage: tls13client [--cafile root.crt] [--certs client-chain.crt] "         \
   "[--key client.key] <hostname> <port>"
 
+static int kex_groups_pqonly[] = {
+#if 1
+    PQCLEAN_ML_KEM_512,
+#else
+    WOLFSSL_ML_KEM_512,
+#endif
+};
+static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
+
 typedef struct cli_args {
   // if --help is provided then print help string
   bool help;
@@ -146,15 +155,6 @@ static int tcp_connect(const char *host, int port) {
 }
 
 static void tcp_close(int sockfd) { close(sockfd); }
-
-static int kex_groups_pqonly[] = {
-#if 1
-    PQCLEAN_ML_KEM_512,
-#else
-    WOLFSSL_ML_KEM_512,
-#endif
-};
-static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
 
 int main(int argc, char *argv[]) {
   cli_args_t args;
