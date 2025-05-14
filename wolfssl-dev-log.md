@@ -5,20 +5,31 @@ Finished porting PQClean's clean ML-KEM and HQC, as well as modifying ML-KEM int
 
 **Benchmark (units in avg ops/sec)**
 
-|KEM|level|keygen|enc|dec|
-|:--------------------|:--|----------:|----------:|----------:|
-|PQCLEAN-ML-KEM-512   | 1 | 13022.143 | 10426.658 |  7797.403 |
-|WC-ML-KEM-512        | 1 | 21104.418 | 21284.509 | 15008.687 |
-|OT-ML-KEM-512        | 1 | 12504.825 | 10448.955 | 30138.398 |
-|PQCLEAN-HQC-128      | 1 |   241.912 |   122.965 |    74.999 |
-|PQCLEAN-ML-KEM-768   | 3 |  7710.161 |  6430.264 |  5171.593 |
-|WC-ML-KEM-768        | 3 | 13171.116 | 12690.672 |  9464.318 |
-|OT-ML-KEM-768        | 3 |  7748.179 |  6379.356 | 21648.839 |
-|PQCLEAN-HQC-192      | 3 |    82.166 |    40.709 |    26.037 |
-|PQCLEAN-ML-KEM-1024  | 5 |  4941.532 |  4309.488 |  3599.637 |
-|WC-ML-KEM-1024       | 5 |  8326.687 |  7987.836 |  6218.592 |
-|OT-ML-KEM-1024       | 5 |  4927.716 |  4279.910 | 17677.426 |
-|PQCLEAN-HQC-256      | 5 |    45.094 |    22.125 |    13.898 |
+|KEM                  |level|keygen     |enc        |dec        |
+|:--------------------|:----|----------:|----------:|----------:|
+|PQCLEAN-ML-KEM-512   | 1   | 13022.143 | 10426.658 |  7797.403 |
+|WC-ML-KEM-512        | 1   | 21104.418 | 21284.509 | 15008.687 |
+|OT-ML-KEM-512        | 1   | 12504.825 | 10448.955 | 30138.398 |
+|PQCLEAN-HQC-128      | 1   |   241.912 |   122.965 |    74.999 |
+|PQCLEAN-ML-KEM-768   | 3   |  7710.161 |  6430.264 |  5171.593 |
+|WC-ML-KEM-768        | 3   | 13171.116 | 12690.672 |  9464.318 |
+|OT-ML-KEM-768        | 3   |  7748.179 |  6379.356 | 21648.839 |
+|PQCLEAN-HQC-192      | 3   |    82.166 |    40.709 |    26.037 |
+|PQCLEAN-ML-KEM-1024  | 5   |  4941.532 |  4309.488 |  3599.637 |
+|WC-ML-KEM-1024       | 5   |  8326.687 |  7987.836 |  6218.592 |
+|OT-ML-KEM-1024       | 5   |  4927.716 |  4279.910 | 17677.426 |
+|PQCLEAN-HQC-256      | 5   |    45.094 |    22.125 |    13.898 |
+
+Is the one-time ML-KEM too fast???
+
+Now, the definitive guide to add a new KEM, assuming that the wolfcrypt API has already been implemented.
+1. Add enum to named groups in `ssl.h`, then modify `isValidCurveGroup`, `TLSX_KeyShare_IsSupported`, and `WOLFSSL_NAMED_GROUP_IS_PQC`
+1. Client needs to be able to instantiate `key_share` extension in `ClientHello`. The relevant call stack starts with `SendTls13ClientHello`, then `TLSX_PopulateExtensions`. Within `TLSX_PopulateExtensions`, the user-supplied set of key exchange groups will be matched against WolfSSL's `preferredGroup`, and if there is no match, then `ClientHello` will be sent without a `key_share` extension. **add the new named group enums to preferredGroup[]**
+1. Modify `TLSX_KeyShare_IsSupported` so the added named groups are accepted; modify `WOLFSSL_NAMED_GROUP_IS_PQC` (i.e. `NamedGroupIsPqc` in `internal.c`) so the group is recognized as a PQC (more importantly that it is recognized as a KEM instead of DH)
+1. Modify `TLSX_KeyShare_Use`. `TLSX_KeyShare_Use` is used in both the client and the server: the client calls it to populate `key_share` entry in ClientHello, and the server calls it to populate `key_share` entry in ServerHello. We should make all the modifications:
+  - `TLSX_KeyShare_HandlePqcKeyServer`: add downstream `TLSX_KeyShare_Handle<Alg>KeyServer`
+  - `TLSX_KeyShare_GenPqcKeyClient`: add downstream `TLSX_KeyShare_Gen<Alg>KeyClient`
+1. After modifying `TLSX_KeyShare_Use` we should have covered both "sending ClientHello" and "sending ServerHello", now we need to cover client processing ServerHello, which is done within `TLSX_KeyShare_ProcessPqcClient`: add `TLSX_KeyShare_Process<Alg>Client`
 
 # May 13, 2025
 

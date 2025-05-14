@@ -21,11 +21,9 @@
   "[--key client.key] <hostname> <port>"
 
 static int kex_groups_pqonly[] = {
-#if 1
-    PQCLEAN_ML_KEM_1024,
-#else
-    WOLFSSL_ML_KEM_512,
-#endif
+    PQCLEAN_ML_KEM_512, PQCLEAN_ML_KEM_768, PQCLEAN_ML_KEM_1024,
+    PQCLEAN_HQC_128,    PQCLEAN_HQC_192,    PQCLEAN_HQC_256,
+    OT_ML_KEM_512,      OT_ML_KEM_768,      OT_ML_KEM_1024,
 };
 static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
 
