@@ -1,3 +1,25 @@
+# May 14, 2025
+Goal: finish implementing `ot_mlkem.c` and `hqc.c` usin wolfcrypt's API, then make handshake.
+
+Finished porting PQClean's clean ML-KEM and HQC, as well as modifying ML-KEM into one-time ML-KEM.
+
+**Benchmark (units in avg ops/sec)**
+
+|KEM|level|keygen|enc|dec|
+|:--------------------|:--|----------:|----------:|----------:|
+|PQCLEAN-ML-KEM-512   | 1 | 13022.143 | 10426.658 |  7797.403 |
+|WC-ML-KEM-512        | 1 | 21104.418 | 21284.509 | 15008.687 |
+|OT-ML-KEM-512        | 1 | 12504.825 | 10448.955 | 30138.398 |
+|PQCLEAN-HQC-128      | 1 |   241.912 |   122.965 |    74.999 |
+|PQCLEAN-ML-KEM-768   | 3 |  7710.161 |  6430.264 |  5171.593 |
+|WC-ML-KEM-768        | 3 | 13171.116 | 12690.672 |  9464.318 |
+|OT-ML-KEM-768        | 3 |  7748.179 |  6379.356 | 21648.839 |
+|PQCLEAN-HQC-192      | 3 |    82.166 |    40.709 |    26.037 |
+|PQCLEAN-ML-KEM-1024  | 5 |  4941.532 |  4309.488 |  3599.637 |
+|WC-ML-KEM-1024       | 5 |  8326.687 |  7987.836 |  6218.592 |
+|OT-ML-KEM-1024       | 5 |  4927.716 |  4279.910 | 17677.426 |
+|PQCLEAN-HQC-256      | 5 |    45.094 |    22.125 |    13.898 |
+
 # May 13, 2025
 
 Goal: modify `TLSX_KeyShare_ProcessPqcClient_ex` so client can handle custom KEM in ServerHello. Start adding more KEM: HQC and OT-ML-KEM.
@@ -13,6 +35,8 @@ Again similar to `GenPqcKeyClient` and `HandlePqcKeyServer`, the first step is s
 Ok so this discrepancy ends up not being an issue. The implementation worked and can perform handshake.
 
 I am not sure what optimization WolfSSL used such that wolfcrypt's ML-KEM is twice as fast as the PQClean port, and I don't want to spend time troubleshooting it. Instead, I will use the PQClean ML-KEM as the default ML-KEM implementation, then make a copy to modify into one-time ML-KEM.
+
+The $T_H$ transformation described in Figure 7 of [IACR 2021/844](https://eprint.iacr.org/2021/844.pdf) does not include "hashing public key to mitigate multitarget attack and/or making the KEM contributory, so I will not do that either". Losing contributory KEM is a meaningful loss, but losing multi-target attack mitigation is probably not a big issue since keypairs are never reused. Let's also port PQClean's HQC, this time, anything not `api.h` will be put into the source directory, and only `api.h` is put into the include directory.
 
 # May 12, 2025
 

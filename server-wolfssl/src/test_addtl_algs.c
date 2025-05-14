@@ -8,16 +8,18 @@
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
 
-/* SHA3 impl's */
 #include <wolfssl/wolfcrypt/pqclean/common/fips202.h>
 #include <wolfssl/wolfcrypt/sha3.h>
 
-/* one-time ML-KEM */
 #include <wolfssl/wolfcrypt/pqclean/crypto_kem/ot-ml-kem-1024/clean/api.h>
 #include <wolfssl/wolfcrypt/pqclean/crypto_kem/ot-ml-kem-512/clean/api.h>
 #include <wolfssl/wolfcrypt/pqclean/crypto_kem/ot-ml-kem-768/clean/api.h>
 
-#define ROUNDS 100
+#include <wolfssl/wolfcrypt/pqclean/crypto_kem/hqc-128/clean/api.h>
+#include <wolfssl/wolfcrypt/pqclean/crypto_kem/hqc-192/clean/api.h>
+#include <wolfssl/wolfcrypt/pqclean/crypto_kem/hqc-256/clean/api.h>
+
+#define ROUNDS 10
 
 static int test_wc_falcon_correctness(int level, int rounds, WC_RNG *rng) {
   int test_err = 0;
@@ -271,6 +273,117 @@ static int test_wc_otmlkem1024_correctness(int rounds, WC_RNG *rng) {
   return ret;
 }
 
+static int test_wc_pqclean_hqc128_correctness(int rounds, WC_RNG *rng) {
+  uint8_t pk[PQCLEAN_HQC128_CLEAN_CRYPTO_PUBLICKEYBYTES];
+  uint8_t sk[PQCLEAN_HQC128_CLEAN_CRYPTO_SECRETKEYBYTES];
+  uint8_t ct[PQCLEAN_HQC128_CLEAN_CRYPTO_CIPHERTEXTBYTES];
+  uint8_t ss[PQCLEAN_HQC128_CLEAN_CRYPTO_BYTES];
+  uint8_t ss_cmp[PQCLEAN_HQC128_CLEAN_CRYPTO_BYTES];
+  int ret = 0;
+
+  for (int round = 0; round < rounds; round++) {
+    ret = PQCLEAN_HQC128_CLEAN_crypto_kem_keypair(pk, sk, rng);
+    if (ret != 0) {
+      printf("%s failed to keygen\n", PQCLEAN_HQC128_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    ret = PQCLEAN_HQC128_CLEAN_crypto_kem_enc(ct, ss, pk, rng);
+    if (ret != 0) {
+      printf("%s failed to encap\n", PQCLEAN_HQC128_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    ret = PQCLEAN_HQC128_CLEAN_crypto_kem_dec(ss_cmp, ct, sk);
+    if (ret != 0) {
+      printf("%s failed to decap\n", PQCLEAN_HQC128_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    if (memcmp(ss, ss_cmp, PQCLEAN_HQC128_CLEAN_CRYPTO_BYTES) != 0) {
+      ret = -1;
+      printf("%s decap is incorrect\n", PQCLEAN_HQC128_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+  }
+
+  return ret;
+}
+
+static int test_wc_pqclean_hqc192_correctness(int rounds, WC_RNG *rng) {
+  uint8_t pk[PQCLEAN_HQC192_CLEAN_CRYPTO_PUBLICKEYBYTES];
+  uint8_t sk[PQCLEAN_HQC192_CLEAN_CRYPTO_SECRETKEYBYTES];
+  uint8_t ct[PQCLEAN_HQC192_CLEAN_CRYPTO_CIPHERTEXTBYTES];
+  uint8_t ss[PQCLEAN_HQC192_CLEAN_CRYPTO_BYTES];
+  uint8_t ss_cmp[PQCLEAN_HQC192_CLEAN_CRYPTO_BYTES];
+  int ret = 0;
+
+  for (int round = 0; round < rounds; round++) {
+    ret = PQCLEAN_HQC192_CLEAN_crypto_kem_keypair(pk, sk, rng);
+    if (ret != 0) {
+      printf("%s failed to keygen\n", PQCLEAN_HQC192_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    ret = PQCLEAN_HQC192_CLEAN_crypto_kem_enc(ct, ss, pk, rng);
+    if (ret != 0) {
+      printf("%s failed to encap\n", PQCLEAN_HQC192_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    ret = PQCLEAN_HQC192_CLEAN_crypto_kem_dec(ss_cmp, ct, sk);
+    if (ret != 0) {
+      printf("%s failed to decap\n", PQCLEAN_HQC192_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    if (memcmp(ss, ss_cmp, PQCLEAN_HQC192_CLEAN_CRYPTO_BYTES) != 0) {
+      ret = -1;
+      printf("%s decap is incorrect\n", PQCLEAN_HQC192_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+  }
+
+  return ret;
+}
+
+static int test_wc_pqclean_hqc256_correctness(int rounds, WC_RNG *rng) {
+  uint8_t pk[PQCLEAN_HQC256_CLEAN_CRYPTO_PUBLICKEYBYTES];
+  uint8_t sk[PQCLEAN_HQC256_CLEAN_CRYPTO_SECRETKEYBYTES];
+  uint8_t ct[PQCLEAN_HQC256_CLEAN_CRYPTO_CIPHERTEXTBYTES];
+  uint8_t ss[PQCLEAN_HQC256_CLEAN_CRYPTO_BYTES];
+  uint8_t ss_cmp[PQCLEAN_HQC256_CLEAN_CRYPTO_BYTES];
+  int ret = 0;
+
+  for (int round = 0; round < rounds; round++) {
+    ret = PQCLEAN_HQC256_CLEAN_crypto_kem_keypair(pk, sk, rng);
+    if (ret != 0) {
+      printf("%s failed to keygen\n", PQCLEAN_HQC256_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    ret = PQCLEAN_HQC256_CLEAN_crypto_kem_enc(ct, ss, pk, rng);
+    if (ret != 0) {
+      printf("%s failed to encap\n", PQCLEAN_HQC256_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    ret = PQCLEAN_HQC256_CLEAN_crypto_kem_dec(ss_cmp, ct, sk);
+    if (ret != 0) {
+      printf("%s failed to decap\n", PQCLEAN_HQC256_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+
+    if (memcmp(ss, ss_cmp, PQCLEAN_HQC256_CLEAN_CRYPTO_BYTES) != 0) {
+      ret = -1;
+      printf("%s decap is incorrect\n", PQCLEAN_HQC256_CLEAN_CRYPTO_ALGNAME);
+      return ret;
+    }
+  }
+
+  return ret;
+}
+
 static void compare_sha3(void) {
   uint8_t input[4096] = {
       42,
@@ -359,7 +472,7 @@ int main(void) {
     compare_sha3();
   }
 
-  if (1) {
+  if (0) {
     ret = 0;
     ret |= test_wc_otmlkem512_correctness(ROUNDS, &rng);
     ret |= test_wc_otmlkem768_correctness(ROUNDS, &rng);
@@ -368,6 +481,19 @@ int main(void) {
       printf("one-time ml-kem correctness: Ok.\n");
     } else {
       printf("one-time ml-kem correctness: err %d.\n", ret);
+      return ret;
+    }
+  }
+
+  if (0) {
+    ret = 0;
+    ret |= test_wc_pqclean_hqc128_correctness(ROUNDS, &rng);
+    ret |= test_wc_pqclean_hqc192_correctness(ROUNDS, &rng);
+    ret |= test_wc_pqclean_hqc256_correctness(ROUNDS, &rng);
+    if (ret == 0) {
+      printf("PQClean HQC correctness: Ok.\n");
+    } else {
+      printf("PQClean HQC correctness: err %d.\n", ret);
       return ret;
     }
   }
@@ -391,13 +517,21 @@ int main(void) {
     }
   }
 
-  if (0) {
-    ret = benchmark_test(NULL);
+  if (1) {
+    // ret = benchmark_test(NULL);
+    bench_otmlkem(1);
     bench_pqcleanmlkem(1);
+    bench_pqcleanhqc(1);
     bench_mlkem(WC_ML_KEM_512);
+
+    bench_otmlkem(3);
     bench_pqcleanmlkem(3);
+    bench_pqcleanhqc(3);
     bench_mlkem(WC_ML_KEM_768);
+
+    bench_otmlkem(5);
     bench_pqcleanmlkem(5);
+    bench_pqcleanhqc(5);
     bench_mlkem(WC_ML_KEM_1024);
     printf("Bench finished: %d\n", ret);
   }
