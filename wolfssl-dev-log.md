@@ -1,3 +1,6 @@
+# May 15, 2025
+I am now quite familiar with how to [plug another KEM into WolfSSL](#how-to-add-custom-key-exchange-group)
+
 # May 14, 2025
 Goal: finish implementing `ot_mlkem.c` and `hqc.c` usin wolfcrypt's API, then make handshake.
 
@@ -22,6 +25,7 @@ Finished porting PQClean's clean ML-KEM and HQC, as well as modifying ML-KEM int
 
 Is the one-time ML-KEM too fast???
 
+## How to add custom key exchange group
 Now, the definitive guide to add a new KEM, assuming that the wolfcrypt API has already been implemented.
 1. Add enum to named groups in `ssl.h`, then modify `isValidCurveGroup`, `TLSX_KeyShare_IsSupported`, and `WOLFSSL_NAMED_GROUP_IS_PQC`
 1. Client needs to be able to instantiate `key_share` extension in `ClientHello`. The relevant call stack starts with `SendTls13ClientHello`, then `TLSX_PopulateExtensions`. Within `TLSX_PopulateExtensions`, the user-supplied set of key exchange groups will be matched against WolfSSL's `preferredGroup`, and if there is no match, then `ClientHello` will be sent without a `key_share` extension. **add the new named group enums to preferredGroup[]**
