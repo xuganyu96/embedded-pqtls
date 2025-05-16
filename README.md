@@ -1,28 +1,9 @@
-- [ ] Networking stack on Pico
-    - [x] DNS: resolve hostname to IPv4 address. IPv6 is a non-goal for now
-    - [x] NTP: obtain time from network and sync local clock
-    - [x] TCP: can connect
-    - [ ] TCP: can listen
-- [ ] Expand cryptographic primitive selections
-    - [ ] Compare ML-KEM/ML-DSA across WolfSSL, PQClean, pqm4, and OQS
-    - [ ] Add implementation for McEliece, HQC ([security note](https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/Wiu4ZQo3fP8)), Falcon, and SPHINCS
-- [ ] Certificate and key management: CLI application for generating certificate chain and keys
-- [ ] FIPS compliant TLS 1.3 handshakes
-    - [ ] ECDHE + RSA/ECDSA/EdDSA
-    - [ ] ML-KEM/HQC + RSA/ECDSA/EdDSA
-    - [ ] ML-KEM/HQC + ML-DSA/SLH-DSA/FN-DSA
-    - [ ] Mutual authentication, but without secret key protection
-- [ ] Further improvements
-    - [ ] Protect secret key in client: OTP memory in Pico, generate signing key from seed
-    - [ ] Cache leaf certificates (RFC 7924): client sends some id in `ClientHello` so the server does not need to send `Certificate`
-    - [ ] KEM-based authentication
-- [ ] **DTLS** seems to also be a good fit for secure embedded communication
-
 # KEMTLS and PQ-TLS on Raspberry Pi Pico
 Content of this repository:
 - **pico**: C project for running TLS client on Raspberry Pi Pico 2 W
 - **server-wolfssl**: TLS client, server, and certificate generator on desktop environment
 - **server-rustls**: some wrapper scripts around Thom Wiggers' original repository
+- **wolfssl**: a fork of WolfSSL that contains the modifications
 
 ```bibtex
 @InProceedings{CCS:SchSteWig20,

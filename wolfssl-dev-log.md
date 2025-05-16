@@ -1,3 +1,6 @@
+# May 16, 2025
+The next big goal is to be able to generate x509 certificate that contains a KEM key.
+
 # May 15, 2025
 I am now quite familiar with how to [plug another KEM into WolfSSL](#how-to-add-custom-key-exchange-group). Now I want to move onto KEMTLS. [This paper](https://eprint.iacr.org/2022/1111.pdf) already formally verified the security goals of KEMTLS using 1CCA-secure KEM
 
