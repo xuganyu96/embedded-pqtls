@@ -1,5 +1,98 @@
 # May 15, 2025
-I am now quite familiar with how to [plug another KEM into WolfSSL](#how-to-add-custom-key-exchange-group)
+I am now quite familiar with how to [plug another KEM into WolfSSL](#how-to-add-custom-key-exchange-group). Now I want to move onto KEMTLS. [This paper](https://eprint.iacr.org/2022/1111.pdf) already formally verified the security goals of KEMTLS using 1CCA-secure KEM
+
+## Understanding ASN.1 and DER
+ASN.1 is a language for describing data structures. DER (distinguished encoding rules) is one out of many set of rules for encoding data that follow structures described by ASN.1. DER differs from other encoding rules in two ways:
+- DER is a binary format, unlike XER, which uses XML
+- DER is canonical: every piece of data has exactly one encoding, unlike BER, where the same piece of data can be encoded in many different ways
+
+PEM is derived from encoding the binary DER format using base64 encoding, then adding header/footer for specifying the type of content (e.g. private key, or public key, or certificate)
+
+ASN.1 and BER/DER encoding rules are officially documented [here](https://www.itu.int/rec/T-REC-X.690-202102-I/en). Here are some key components:
+
+- Most data structures follow the tag-length-value format. Tag is usually a single byte. Length is encoded according to either the short format or long format (see point below). The length field encodes the number of bytes of the value.
+- **Short format** length uses exactly one byte. The most-significant bit must be zero, and the remaining bits encode an unsigned integer. For example, length 38 can be encoded as `0b00100110`. **Long format** length uses at least two bytes. The first byte encodes the length of the "length value". The most significant bit must be 1, but the byte must not be `0xFFFF`. The remaining bytes encode the length. For example, length 201 is encoded as `0b10000001 0b11001001`
+
+**Example**, a x509 certificate:
+
+```pem
+-----BEGIN CERTIFICATE-----
+MIIB9TCCAaegAwIBAgIUfnAIHfyACNsT3qMEjkCxaE+YSTowBQYDK2VwMHcxCzAJ
+BgNVBAYTAkNBMQswCQYDVQQIDAJPTjERMA8GA1UEBwwIV2F0ZXJsb28xHzAdBgNV
+BAoMFlVuaXZlcnNpdHkgb2YgV2F0ZXJsb28xJzAlBgNVBAMMHlVuaXZlcnNpdHkg
+b2YgV2F0ZXJsb28gUm9vdCBDQTAeFw0yNTA1MTUxNTIwNThaFw0zNTA1MTMxNTIw
+NThaMHcxCzAJBgNVBAYTAkNBMQswCQYDVQQIDAJPTjERMA8GA1UEBwwIV2F0ZXJs
+b28xHzAdBgNVBAoMFlVuaXZlcnNpdHkgb2YgV2F0ZXJsb28xJzAlBgNVBAMMHlVu
+aXZlcnNpdHkgb2YgV2F0ZXJsb28gUm9vdCBDQTAqMAUGAytlcAMhAGqW0UV7atwD
+8xpPqgy9sxQUkxdAq6hE8sauR2wFWVCeo0UwQzASBgNVHRMBAf8ECDAGAQH/AgEB
+MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUmiIqB2dSbgLbV18F421SlbqUWXEw
+BQYDK2VwA0EA5KxaHgzzGHXRieD0i0RpSy192c82Up99clRkk6YFO9jQjWNccnjl
+BgdMkY4YLqYPTmYzfAZaOfwwqf3CHneQAQ==
+-----END CERTIFICATE-----
+```
+
+The data in hexadecimal format:
+
+```
+30 82 01 f5 30 82 01 a7 a0 03 02 01 02 02 14 7e 70 08 1d fc 80 08 db 13 de a3 
+04 8e 40 b1 68 4f 98 49 3a 30 05 06 03 2b 65 70 30 77 31 0b 30 09 06 03 55 04 
+06 13 02 43 41 31 0b 30 09 06 03 55 04 08 0c 02 4f 4e 31 11 30 0f 06 03 55 04 
+07 0c 08 57 61 74 65 72 6c 6f 6f 31 1f 30 1d 06 03 55 04 0a 0c 16 55 6e 69 76 
+65 72 73 69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 31 27 30 25 06 03 55 04 
+03 0c 1e 55 6e 69 76 65 72 73 69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 20 
+52 6f 6f 74 20 43 41 30 1e 17 0d 32 35 30 35 31 35 31 35 32 30 35 38 5a 17 0d 
+33 35 30 35 31 33 31 35 32 30 35 38 5a 30 77 31 0b 30 09 06 03 55 04 06 13 02 
+43 41 31 0b 30 09 06 03 55 04 08 0c 02 4f 4e 31 11 30 0f 06 03 55 04 07 0c 08 
+57 61 74 65 72 6c 6f 6f 31 1f 30 1d 06 03 55 04 0a 0c 16 55 6e 69 76 65 72 73 
+69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 31 27 30 25 06 03 55 04 03 0c 1e 
+55 6e 69 76 65 72 73 69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 20 52 6f 6f 
+74 20 43 41 30 2a 30 05 06 03 2b 65 70 03 21 00 6a 96 d1 45 7b 6a dc 03 f3 1a 
+4f aa 0c bd b3 14 14 93 17 40 ab a8 44 f2 c6 ae 47 6c 05 59 50 9e a3 45 30 43 
+30 12 06 03 55 1d 13 01 01 ff 04 08 30 06 01 01 ff 02 01 01 30 0e 06 03 55 1d 
+0f 01 01 ff 04 04 03 02 01 06 30 1d 06 03 55 1d 0e 04 16 04 14 9a 22 2a 07 67 
+52 6e 02 db 57 5f 05 e3 6d 52 95 ba 94 59 71 30 05 06 03 2b 65 70 03 41 00 e4 
+ac 5a 1e 0c f3 18 75 d1 89 e0 f4 8b 44 69 4b 2d 7d d9 cf 36 52 9f 7d 72 54 64 
+93 a6 05 3b d8 d0 8d 63 5c 72 78 e5 06 07 4c 91 8e 18 2e a6 0f 4e 66 33 7c 06 
+5a 39 fc 30 a9 fd c2 1e 77 90 01
+```
+
+How to parse it:
+
+- `30 82 01 f5` encodes a `SEQUENCE` whose content has 501 (0x01f5) bytes (length is encoded in long form)
+    - `30 82 01 a7` encodes a `SEQUENCE` whose content has 423 (0x01a7) bytes; we can now jump ahead by 423 bytes to get to the next element
+        - `a0 03 02 01 02` encodes the version of the certificate: `a0` is a context-specific (bit 8 and 7), constructed (bit 6) tag; `03` encodes the length of the value; `02` is the tag for `INTEGER`; `01` encodes the length of the integer value; `02` is the actual value. The `INTEGER 2` encodes `Version 3`
+        - `02 14 7e .. 3a` encodes an integer spanning 20 (0x14) bytes. In a certificate this is the serial number
+        - `03 05 06 03 2b 65 70` encodes a sequence spanning 5 bytes
+            - `06` is the tag for `OBJECT IDENTIFIER` (OID) `03` encodes the length of the OID, and `2b 65 70` encodes the OID. How an OID is encoded is beyond the scope of this document, but know it identifies the Signature Algorithm `ED25519`
+        - `30 77 31 ... 41` encodes a sequence spanning 119 bytes. This sequence contains the issuer information (country, state, locality, etc.)
+        - `30 1e 17 ... 5a` encodes a sequence that contains the "Not Before" and "Not After" dates, both encoded as `UTCTime`
+        - `30 77 31 ... 41` encodes another sequence spanning 119 bytes. This sequence contains the subject information
+        - `30 2a 30 .. 9e` encodes "Subject Public Key Information"
+            - `30 05 .. 70` encodes the OID indicating that the public key in this certificate is an ED25519 key
+            - `03 21 .. 9e` encodes an integer that is the ED25519 public key itself
+        - `a3 45 30 .. 71` uses a context-specific tag `a3` "x509 v3 extensions"
+    - `30 05` encodes a `SEQUENCE` whose content has 5 bytes. This is the OID for the signature below. Everything before this sequence is the "body" of the certificate, and what the issuer signs.
+    - `03 41` encodes a `BIT STRING` that spans 65 (0x41) bytes; the first content byte encodes the number of unused **bits** at the end of the value, here it is `00` which means that the value is octet-aligned. This is the signature.
+
+```
+30 82 01 f5 (SEQUENCE 501 bytes)
+    30 82 01 a7 (SEQUENCE 423 bytes)
+        a0 03 (VERSION 3 bytes)
+            02 01 02 (INTEGER 2)
+        02 14 7e 70 08 1d fc 80 08 db 13 de a3 04 8e 40 b1 68 4f 98 49 3a (Serial Number)
+        30 05 06 03 2b 65 70 (Signature Algorithm)
+        30 77 31 0b 30 09 06 03 55 04 06 13 02 43 41 31 0b 30 09 06 03 55 04 08 0c 02 4f 4e 31 11 30 0f 06 03 55 04 07 0c 08 57 61 74 65 72 6c 6f 6f 31 1f 30 1d 06 03 55 04 0a 0c 16 55 6e 69 76 65 72 73 69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 31 27 30 25 06 03 55 04 03 0c 1e 55 6e 69 76 65 72 73 69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 20 52 6f 6f 74 20 43 41 (Issuer)
+        30 1e 
+            17 0d 32 35 30 35 31 35 31 35 32 30 35 38 5a 
+            17 0d 33 35 30 35 31 33 31 35 32 30 35 38 5a 
+        30 77 31 0b 30 09 06 03 55 04 06 13 02 43 41 31 0b 30 09 06 03 55 04 08 0c 02 4f 4e 31 11 30 0f 06 03 55 04 07 0c 08 57 61 74 65 72 6c 6f 6f 31 1f 30 1d 06 03 55 04 0a 0c 16 55 6e 69 76 65 72 73 69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 31 27 30 25 06 03 55 04 03 0c 1e 55 6e 69 76 65 72 73 69 74 79 20 6f 66 20 57 61 74 65 72 6c 6f 6f 20 52 6f 6f 74 20 43 41 
+        30 2a (Subject Public Key Info)
+            30 05 06 03 2b 65 70 (OID: ED25519)
+            03 21 00 6a 96 d1 45 7b 6a dc 03 f3 1a 4f aa 0c bd b3 14 14 93 17 40 ab a8 44 f2 c6 ae 47 6c 05 59 50 9e (the public key)
+        a3 45 30 43 30 12 06 03 55 1d 13 01 01 ff 04 08 30 06 01 01 ff 02 01 01 30 0e 06 03 55 1d 0f 01 01 ff 04 04 03 02 01 06 30 1d 06 03 55 1d 0e 04 16 04 14 9a 22 2a 07 67 52 6e 02 db 57 5f 05 e3 6d 52 95 ba 94 59 71 
+    30 05 (SEQUENCE 5 bytes) 06 03 2b 65 70 
+    03 41 (BIT STRING 65 bytes) 00 e4 ac 5a 1e 0c f3 18 75 d1 89 e0 f4 8b 44 69 4b 2d 7d d9 cf 36 52 9f 7d 72 54 64 93 a6 05 3b d8 d0 8d 63 5c 72 78 e5 06 07 4c 91 8e 18 2e a6 0f 4e 66 33 7c 06 5a 39 fc 30 a9 fd c2 1e 77 90 01
+```
 
 # May 14, 2025
 Goal: finish implementing `ot_mlkem.c` and `hqc.c` usin wolfcrypt's API, then make handshake.
@@ -8,20 +101,20 @@ Finished porting PQClean's clean ML-KEM and HQC, as well as modifying ML-KEM int
 
 **Benchmark (units in avg ops/sec)**
 
-|KEM                  |level|keygen     |enc        |dec        |
+|KEM                  | lvl |keygen     |enc        |dec        |
 |:--------------------|:----|----------:|----------:|----------:|
-|PQCLEAN-ML-KEM-512   | 1   | 13022.143 | 10426.658 |  7797.403 |
-|WC-ML-KEM-512        | 1   | 21104.418 | 21284.509 | 15008.687 |
-|OT-ML-KEM-512        | 1   | 12504.825 | 10448.955 | 30138.398 |
-|PQCLEAN-HQC-128      | 1   |   241.912 |   122.965 |    74.999 |
-|PQCLEAN-ML-KEM-768   | 3   |  7710.161 |  6430.264 |  5171.593 |
-|WC-ML-KEM-768        | 3   | 13171.116 | 12690.672 |  9464.318 |
-|OT-ML-KEM-768        | 3   |  7748.179 |  6379.356 | 21648.839 |
-|PQCLEAN-HQC-192      | 3   |    82.166 |    40.709 |    26.037 |
-|PQCLEAN-ML-KEM-1024  | 5   |  4941.532 |  4309.488 |  3599.637 |
-|WC-ML-KEM-1024       | 5   |  8326.687 |  7987.836 |  6218.592 |
-|OT-ML-KEM-1024       | 5   |  4927.716 |  4279.910 | 17677.426 |
-|PQCLEAN-HQC-256      | 5   |    45.094 |    22.125 |    13.898 |
+|PQCLEAN-ML-KEM-512   |  1  | 13022.143 | 10426.658 |  7797.403 |
+|WC-ML-KEM-512        |  1  | 21104.418 | 21284.509 | 15008.687 |
+|OT-ML-KEM-512        |  1  | 12504.825 | 10448.955 | 30138.398 |
+|PQCLEAN-HQC-128      |  1  |   241.912 |   122.965 |    74.999 |
+|PQCLEAN-ML-KEM-768   |  3  |  7710.161 |  6430.264 |  5171.593 |
+|WC-ML-KEM-768        |  3  | 13171.116 | 12690.672 |  9464.318 |
+|OT-ML-KEM-768        |  3  |  7748.179 |  6379.356 | 21648.839 |
+|PQCLEAN-HQC-192      |  3  |    82.166 |    40.709 |    26.037 |
+|PQCLEAN-ML-KEM-1024  |  5  |  4941.532 |  4309.488 |  3599.637 |
+|WC-ML-KEM-1024       |  5  |  8326.687 |  7987.836 |  6218.592 |
+|OT-ML-KEM-1024       |  5  |  4927.716 |  4279.910 | 17677.426 |
+|PQCLEAN-HQC-256      |  5  |    45.094 |    22.125 |    13.898 |
 
 Is the one-time ML-KEM too fast???
 
