@@ -1,6 +1,14 @@
 # May 16, 2025
 The next big goal is to be able to generate x509 certificate that contains a KEM key.
 
+Need to modify `wc_MakeCert_ex` to accept more key types; `wc_SignCert_ex` can stay as it is. Need to implement `PrivateKeyToDer`, `PublicKeyToDer` for the KEMs, which differs from encoding/decoding public/secret key in that they need to contain OID information. `DerToPem` can remain as it is.
+
+`wc_MakeCert_ex` (asn.c) calls `MakeAnyCert`, which calls 
+- `EncodePublicKey`, which takes `cert->KeyType`; `EncodePublicKey` is actually called twice, first to "calculate public key encoding size", then second time to actually write the public key to some data buffer.
+    - `EncodePublicKey` calls `PublicKeyToDer`. `PublicKeyToDer` should set the length field even if the output buffer is `NULL`; this is how `EncodePublicKey` is used to indicate length without actually writing any data.
+- `SetASN_OID`, which takes `cert->sigType`. I don't think I need to worry about signing the leaf key as it should just be the same thing.
+- `MakeAnyCert` will set `cert->bodySz` at the end, which is how `wc_SignCert_ex` knows the length of the input
+
 # May 15, 2025
 I am now quite familiar with how to [plug another KEM into WolfSSL](#how-to-add-custom-key-exchange-group). Now I want to move onto KEMTLS. [This paper](https://eprint.iacr.org/2022/1111.pdf) already formally verified the security goals of KEMTLS using 1CCA-secure KEM
 
