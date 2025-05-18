@@ -1,3 +1,53 @@
+# May 18, 2025
+Goal: modify `EncodePublicKey`, possibly also implement `PublicKeyToDer` and its various complements.
+
+`EncodePublicKey`'s function signature [currently](https://github.com/wolfSSL/wolfssl/blob/05bc7e0d2faf494bfe5b9fb0dd1806290a116559/wolfcrypt/src/asn.c#L29995) takes 11 arguments; if I add `PQCleanMlKemKey`, `OneTimeMlKemKey`, and `PQCleanHqcKey` the number of argument will bloat to 14, which is a bad design choice. I want to refactor it into the following kind of function signature:
+
+```c
+static int EncodePublicKey(int keyType, byte *key, byte *output, int OutLen);
+```
+
+There is a curious annoyance where the indenting in `asn.c` is all messed up where I am editing (EncodePublicKey is at line 29897)
+- Under the function `PemToDer`, the opening bracket does not have a matching closing bracket; the closing racket according to the indent level seems to match a for loop within the function
+- This block is cursed:
+
+```c
+#if defined(HAVE_ED25519) || defined(HAVE_ED448)
+    #ifdef HAVE_ECC
+            else if (header == BEGIN_DSA_PRIV) {
+    #else
+            else if (header == BEGIN_ENC_PRIV_KEY) {
+    #endif
+                header = BEGIN_EDDSA_PRIV;
+                footer = END_EDDSA_PRIV;
+            }
+#endif
+```
+
+The LSP must have gotten confused because there are two opening brackets but only one closing racket. However, after refactoring to a way that has matching brackets (see below) the indent problem still persists. At this point I think the efforts are simply not worth it.
+
+```c
+#if defined(HAVE_ED25519) || defined(HAVE_ED448)
+    #ifdef HAVE_ECC
+            else if (header == BEGIN_DSA_PRIV) {
+                header = BEGIN_EDDSA_PRIV;
+                footer = END_EDDSA_PRIV;
+            }
+    #else
+            else if (header == BEGIN_ENC_PRIV_KEY) {
+                header = BEGIN_EDDSA_PRIV;
+                footer = END_EDDSA_PRIV;
+            }
+    #endif
+#endif
+```
+
+My workaround now is to simply accept the two additional indents (8 spaces), add a color column with `set colorcolumn=79,87` and indent it back if needed.
+
+There are two places where `EncodePublicKey` is called: `MakeAnyCert` and `MakeCertReq`. The latter is never used in my program since I will always generate and sign certificate from scratch (WolfSSL currently does not support signing a certificate request anyways), hence I will not refactor the calls in `MakeCertReq`, only `MakeAnyCert`.
+
+`MakeAnyCert` also calls `EncodeCert`, which takes the keys as input; what are they used for?
+
 # May 16, 2025
 The next big goal is to be able to generate x509 certificate that contains a KEM key.
 
