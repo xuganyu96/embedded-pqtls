@@ -3,6 +3,8 @@ Today's goal: refactor `certgen`, also figure out a way to validate certificate 
 
 Once the keypair is generated it is ready to be exported to PEM format, so `gen_keypair` should take a pointer to a buffer.
 
+Testing a certificate chain is probably best done using a shell script `run_local_handshake.sh <certdir>` which outputs `server.log` and `client.log`.
+
 # May 19, 2025
 Today I want to first build a test program that generates a KEM-based certificate and signs it with some digital signature. This will serve as a goal post for the "generate KEM certificate" milestone.
 
