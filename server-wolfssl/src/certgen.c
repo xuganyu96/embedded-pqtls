@@ -10,6 +10,7 @@
 #include <wolfssl/wolfcrypt/asn_public.h>
 #include <wolfssl/wolfcrypt/dilithium.h>
 #include <wolfssl/wolfcrypt/falcon.h>
+#include <wolfssl/wolfcrypt/rsa.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
 #include <wolfssl/wolfcrypt/types.h>
 
@@ -86,7 +87,7 @@ static void set_after_date_utctime(Cert *cert, const char *datestr) {
   cert->afterDateSz = 2 + strlen(datestr);
 }
 
-int main(int argc, char *argv[]) {
+int old_main(int argc, char *argv[]) {
   int wc_err;
   RNG rng;
   wc_InitRng(&rng);
@@ -872,4 +873,158 @@ int main(int argc, char *argv[]) {
   fclose(file);
 
   return 0;
+}
+
+/* A collection of keyType values (i.e. CertType enum in `asn_public.h`)
+ */
+typedef struct certchain_suite {
+  enum CertType root_key_type;
+  enum CertType int_key_type;
+  enum CertType leaf_key_type;
+  enum CertType client_key_type;
+} certchain_suite_t;
+
+/* A collection of buffers containing the output of certificat chain generation:
+ * root certificate, server chain, server key, client chain, and client key.
+ *
+ * PEM is a human readable format (despite the base-64 encoding), hence PEM
+ * buffers are strings (char[])
+ */
+typedef struct certchain_out {
+  /* contains root certificate, used for --cafile */
+  char root_cert_pem[CERT_PEM_MAX_SIZE];
+  size_t root_cert_len;
+  /* server chain contains leaf-int-root certs in this order */
+  char server_chain_pem[CERT_PEM_MAX_SIZE * 3];
+  size_t server_chain_len;
+  /* server's private key */
+  char leaf_key_pem[KEY_PEM_MAX_SIZE];
+  size_t leaf_key_len;
+  /* client chain contains client-root certs in this order */
+  char client_chain_pem[CERT_PEM_MAX_SIZE * 2];
+  size_t client_chain_len;
+  /* client's private key */
+  char client_key_pem[KEY_PEM_MAX_SIZE];
+  size_t client_key_len;
+} certchain_out_t;
+
+int is_ml_dsa(enum CertType key_type) {
+  return ((key_type == ML_DSA_LEVEL2_TYPE) ||
+          (key_type == ML_DSA_LEVEL3_TYPE) || (key_type == ML_DSA_LEVEL5_TYPE));
+}
+
+int is_sphincs(enum CertType key_type) {
+  return ((key_type == SPHINCS_FAST_LEVEL1_TYPE) ||
+          (key_type == SPHINCS_SMALL_LEVEL1_TYPE) ||
+          (key_type == SPHINCS_FAST_LEVEL3_TYPE) ||
+          (key_type == SPHINCS_SMALL_LEVEL3_TYPE) ||
+          (key_type == SPHINCS_FAST_LEVEL5_TYPE) ||
+          (key_type == SPHINCS_SMALL_LEVEL5_TYPE));
+}
+
+int is_falcon(enum CertType key_type) {
+  return ((key_type == FALCON_LEVEL1_TYPE) || (key_type == FALCON_LEVEL5_TYPE));
+}
+
+/* Allocate memory for key types and assign it to `key`
+ *
+ * Return 0 upon success
+ */
+static int malloc_key(void **key, enum CertType key_type) {
+  if (is_ml_dsa(key_type)) {
+    *key = malloc(sizeof(MlDsaKey));
+  } else if (is_sphincs(key_type)) {
+    *key = malloc(sizeof(sphincs_key));
+  } else if (is_falcon(key_type)) {
+    *key = malloc(sizeof(falcon_key));
+  } else if (key_type == RSA_TYPE) {
+    *key = malloc(sizeof(RsaKey));
+  } else if (key_type == ECC_TYPE) {
+    *key = malloc(sizeof(ecc_key));
+  } else if (key_type == ED25519_TYPE) {
+    *key = malloc(sizeof(ed25519_key));
+  } else if (key_type == ED448_TYPE) {
+    *key = malloc(sizeof(ed448_key));
+  } else { /* CertType not supported */
+    return BAD_FUNC_ARG;
+  }
+
+  if (*key == NULL) {
+    return MEMORY_E;
+  }
+
+  return 0;
+}
+
+/* A wrapper around the function calls needed to generate an RSA-2048 keypair
+ */
+static int gen_rsa2048(RsaKey *key, WC_RNG *rng) {
+  int ret = 0;
+  ret = wc_InitRsaKey_ex(key, NULL, INVALID_DEVID);
+  if (ret == 0) {
+    ret = wc_MakeRsaKey(key, 2048, WC_RSA_EXPONENT, rng);
+  }
+  return ret;
+}
+
+/* Given appropriate key type, generate a keypair with matching primitive
+ * (ML-DSA or SPHINCS or Falcon etc.) and assign it to `key`
+ *
+ * The keypair will be allocated from the heap, so it will need to be freed
+ * later.
+ */
+static int gen_keypair(void **key, enum CertType key_type, WC_RNG *rng) {
+  int ret = 0;
+
+  if ((key == NULL) || (rng == NULL))
+    return BAD_FUNC_ARG;
+  if ((ret = malloc_key(key, key_type)) != 0) {
+    fprintf(stderr, "Failed to allocate space for key (err %d)\n", ret);
+    return ret;
+  }
+
+  /* inelegant, giant switch case block; can we do better? */
+  switch (key_type) {
+  case RSA_TYPE:
+    ret = gen_rsa2048(*key, rng);
+    break;
+  default:
+    fprintf(stderr, "enum CertType %d not supported\n", key_type);
+    return BAD_FUNC_ARG;
+  }
+
+  return ret;
+}
+
+/* Generate a certificate chain according to the suite and write the output to
+ * `out`.
+ *
+ * Return 0 upon success, or non-zero error code upon failure.
+ */
+static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out) {
+  int ret = NOT_COMPILED_IN;
+
+  return ret;
+}
+
+int main(int argc, char *argv[]) {
+  int ret = 0;
+
+  // ret = old_main(argc, argv);
+
+  void *key;
+  WC_RNG rng;
+  wc_InitRng(&rng);
+
+  /* check if gen_keypair works */
+  ret = gen_keypair(&key, RSA_TYPE, &rng);
+  if (ret != 0) {
+    printf("gen_keypair returned %d\n", ret);
+  }
+  ret = wc_CheckRsaKey(key);
+  if (ret != 0) {
+    printf("wc_CheckRsaKey returned %d\n", ret);
+  }
+
+  return ret;
 }

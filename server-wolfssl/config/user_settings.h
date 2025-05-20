@@ -490,7 +490,8 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define HAVE_SUPPORTED_CURVES
 #define WOLFSSL_BASE64_ENCODE
 
-// #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
+#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
+#define WOLFSSL_RSA_KEY_CHECK
 // #define KEEP_PEER_CERT
 // #define HAVE_COMP_KEY
 
