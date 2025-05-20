@@ -881,32 +881,36 @@ int old_main(int argc, char *argv[]) {
  */
 typedef struct certchain_suite {
   enum CertType root_key_type;
+  enum Ctc_SigType root_sig_type;
   enum CertType int_key_type;
+  enum Ctc_SigType int_sig_type;
   enum CertType leaf_key_type;
+  enum Ctc_SigType leaf_sig_type;
   enum CertType client_key_type;
+  enum Ctc_SigType client_sig_type;
 } certchain_suite_t;
 
-/* A collection of buffers containing the output of certificat chain generation:
- * root certificate, server chain, server key, client chain, and client key.
+/* A collection of buffers containing the output of certificat chain generation
  *
  * PEM is a human readable format (despite the base-64 encoding), hence PEM
  * buffers are strings (char[])
  */
 typedef struct certchain_out {
-  /* contains root certificate, used for --cafile */
-  char root_cert_pem[CERT_PEM_MAX_SIZE];
+  byte root_cert_pem[CERT_PEM_MAX_SIZE];
   size_t root_cert_len;
-  /* server chain contains leaf-int-root certs in this order */
-  char server_chain_pem[CERT_PEM_MAX_SIZE * 3];
-  size_t server_chain_len;
-  /* server's private key */
-  char leaf_key_pem[KEY_PEM_MAX_SIZE];
+  byte root_key_pem[KEY_PEM_MAX_SIZE];
+  size_t root_key_len;
+  byte int_cert_pem[CERT_PEM_MAX_SIZE];
+  size_t int_cert_len;
+  byte int_key_pem[KEY_PEM_MAX_SIZE];
+  size_t int_key_len;
+  byte leaf_cert_pem[CERT_PEM_MAX_SIZE];
+  size_t leaf_cert_len;
+  byte leaf_key_pem[KEY_PEM_MAX_SIZE];
   size_t leaf_key_len;
-  /* client chain contains client-root certs in this order */
-  char client_chain_pem[CERT_PEM_MAX_SIZE * 2];
-  size_t client_chain_len;
-  /* client's private key */
-  char client_key_pem[KEY_PEM_MAX_SIZE];
+  byte client_cert_pem[CERT_PEM_MAX_SIZE];
+  size_t client_cert_len;
+  byte client_key_pem[KEY_PEM_MAX_SIZE];
   size_t client_key_len;
 } certchain_out_t;
 
@@ -1179,12 +1183,219 @@ static int gen_keypair(void **key, enum CertType key_type, size_t *key_size,
 /* Generate a certificate chain according to the suite and write the output to
  * `out`.
  *
+ * The chain contains a root certificate, an intermediate certificate, a leaf
+ * certificate for server authentication, and a client certificate for client
+ * authentication. For the purpose of this project, it is sufficient to output
+ * the root certificate, the server certificate chain, the client certificate
+ * chain, the server authentication key, and the client authentication key.
+ * Things like the root key and the intermediate key are single-use and
+ * discarded.
+ *
  * Return 0 upon success, or non-zero error code upon failure.
  */
-static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out) {
-  int ret = NOT_COMPILED_IN;
+static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
+                          WC_RNG *rng) {
+  int err;
 
-  return ret;
+  void *root_key = NULL, *int_key = NULL, *leaf_key = NULL, *client_key = NULL;
+  size_t root_key_sz = 0, int_key_sz = 0, leaf_key_sz = 0, client_key_sz = 0;
+  int root_cert_der_sz, root_cert_pem_sz, int_cert_der_sz, int_cert_pem_sz,
+      leaf_cert_der_sz, leaf_cert_pem_sz, client_cert_der_sz,
+      client_cert_pem_sz;
+  uint8_t root_cert_der[CERT_DER_MAX_SIZE], int_cert_der[CERT_DER_MAX_SIZE],
+      leaf_cert_der[CERT_DER_MAX_SIZE], client_cert_der[CERT_DER_MAX_SIZE];
+  Cert root_cert, int_cert, leaf_cert, client_cert;
+
+  /* root certificate */
+  if ((err = gen_keypair(&root_key, suite.root_key_type, &root_key_sz,
+                         suite.root_sig_type, rng)) != 0) {
+    fprintf(stderr, "Failed to generate root key pair (err %d)\n", err);
+    goto cleanup;
+  }
+  wc_InitCert(&root_cert);
+  root_cert.sigType = suite.root_sig_type;
+  root_cert.isCA = 1;
+  set_certname(&root_cert.subject, ROOT_COUNTRY, ROOT_STATE, ROOT_LOCALITY,
+               ROOT_ORG, ROOT_COMMONNAME);
+  set_certname(&root_cert.issuer, ROOT_COUNTRY, ROOT_STATE, ROOT_LOCALITY,
+               ROOT_ORG, ROOT_COMMONNAME);
+  set_before_date_utctime(&root_cert, NOT_BEFORE_DATE);
+  set_after_date_utctime(&root_cert, NOT_AFTER_DATE);
+  if ((root_cert_der_sz =
+           wc_MakeCert_ex(&root_cert, root_cert_der, sizeof(root_cert_der),
+                          suite.root_key_type, root_key, rng)) <= 0) {
+    err = root_cert_der_sz;
+    fprintf(stderr, "Failed to make root cert body (err %d)\n", err);
+    goto cleanup;
+  } else {
+    printf("root cert (unsigned) DER size %d\n", root_cert_der_sz);
+  }
+  root_cert_der_sz =
+      wc_SignCert_ex(root_cert.bodySz, root_cert.sigType, root_cert_der,
+                     sizeof(root_cert_der), suite.root_key_type, root_key, rng);
+  if (root_cert_der_sz <= 0) {
+    err = root_cert_der_sz;
+    fprintf(stderr, "Failed to sign root cert (err %d)\n", err);
+    goto cleanup;
+  } else {
+    printf("root cert (signed) DER size %d\n", root_cert_der_sz);
+  }
+  root_cert_pem_sz =
+      wc_DerToPem(root_cert_der, root_cert_der_sz, out->root_cert_pem,
+                  sizeof(out->root_cert_pem), CERT_TYPE);
+  if (root_cert_pem_sz <= 0) {
+    err = root_cert_pem_sz;
+    fprintf(stderr, "Failed to export root cert PEM (err %d)\n", err);
+    goto cleanup;
+  } else {
+    out->root_cert_len = (size_t)root_cert_pem_sz;
+    printf("root cert PEM size %zu\n", out->root_cert_len);
+  }
+
+  /* intermediate certificate */
+  if ((err = gen_keypair(&int_key, suite.int_key_type, &int_key_sz,
+                         suite.int_sig_type, rng)) != 0) {
+    fprintf(stderr, "Failed to generate intermediate key (err %d)\n", err);
+    goto cleanup;
+  }
+  wc_InitCert(&int_cert);
+  int_cert.sigType = suite.root_sig_type;
+  int_cert.isCA = 1;
+  wc_SetIssuerBuffer(&int_cert, root_cert_der, root_cert_der_sz);
+  set_certname(&int_cert.subject, ROOT_COUNTRY, ROOT_STATE, ROOT_LOCALITY,
+               ROOT_ORG, ROOT_COMMONNAME);
+  set_before_date_utctime(&int_cert, NOT_BEFORE_DATE);
+  set_after_date_utctime(&int_cert, NOT_AFTER_DATE);
+  if ((int_cert_der_sz =
+           wc_MakeCert_ex(&int_cert, int_cert_der, sizeof(int_cert_der),
+                          suite.int_key_type, int_key, rng)) <= 0) {
+    err = int_cert_der_sz;
+    fprintf(stderr, "Failed to make unsigned int certificate (err %d)\n", err);
+    goto cleanup;
+  } else {
+    printf("int cert (unsigned) DER size %d\n", int_cert_der_sz);
+  }
+  if ((int_cert_der_sz = wc_SignCert_ex(
+           int_cert.bodySz, int_cert.sigType, int_cert_der,
+           sizeof(int_cert_der), suite.root_key_type, root_key, rng)) <= 0) {
+    err = int_cert_der_sz;
+    fprintf(stderr, "Failed to sign int certificate (err %d)\n", err);
+    goto cleanup;
+  } else {
+    printf("int cert (signed) DER size %d\n", int_cert_der_sz);
+  }
+  if ((int_cert_pem_sz =
+           wc_DerToPem(int_cert_der, int_cert_der_sz, out->int_cert_pem,
+                       sizeof(out->int_cert_pem), CERT_TYPE)) <= 0) {
+    err = int_cert_pem_sz;
+    fprintf(stderr, "Failed to export int cert PEM (err %d)\n", err);
+    goto cleanup;
+  } else {
+    out->int_cert_len = (size_t)int_cert_pem_sz;
+    printf("int cert PEM size %zu\n", out->int_cert_len);
+  }
+
+  /* leaf certificate */
+  if ((err = gen_keypair(&leaf_key, suite.leaf_key_type, &leaf_key_sz,
+                         suite.leaf_sig_type, rng)) != 0) {
+    fprintf(stderr, "Failed to generate leaf key (err %d)\n", err);
+    goto cleanup;
+  }
+  wc_InitCert(&leaf_cert);
+  leaf_cert.sigType = suite.int_sig_type;
+  wc_SetIssuerBuffer(&leaf_cert, int_cert_der, int_cert_der_sz);
+  set_certname(&leaf_cert.subject, LEAF_COUNTRY, LEAF_STATE, LEAF_LOCALITY,
+               LEAF_ORG, LEAF_COMMONNAME);
+  set_before_date_utctime(&leaf_cert, NOT_BEFORE_DATE);
+  set_after_date_utctime(&leaf_cert, NOT_AFTER_DATE);
+  if ((leaf_cert_der_sz =
+           wc_MakeCert_ex(&leaf_cert, leaf_cert_der, sizeof(leaf_cert_der),
+                          suite.leaf_key_type, leaf_key, rng)) <= 0) {
+    err = leaf_cert_der_sz;
+    fprintf(stderr, "Failed to make unsigned leaf certificate (err %d)\n", err);
+    goto cleanup;
+  } else {
+    printf("leaf cert (unsigned) DER size %d\n", leaf_cert_der_sz);
+  }
+  if ((leaf_cert_der_sz = wc_SignCert_ex(
+           leaf_cert.bodySz, leaf_cert.sigType, leaf_cert_der,
+           sizeof(leaf_cert_der), suite.int_key_type, int_key, rng)) <= 0) {
+    err = leaf_cert_der_sz;
+    fprintf(stderr, "Failed to sign leaf certificate (err %d)\n", err);
+    goto cleanup;
+  } else {
+    printf("leaf cert (signed) DER size %d\n", leaf_cert_der_sz);
+  }
+  if ((leaf_cert_pem_sz =
+           wc_DerToPem(leaf_cert_der, leaf_cert_der_sz, out->leaf_cert_pem,
+                       sizeof(out->leaf_cert_pem), CERT_TYPE)) <= 0) {
+    err = leaf_cert_pem_sz;
+    fprintf(stderr, "Failed to export leaf cert PEM (err %d)\n", err);
+    goto cleanup;
+  } else {
+    out->leaf_cert_len = (size_t)leaf_cert_pem_sz;
+    printf("leaf cert PEM size %zu\n", out->leaf_cert_len);
+  }
+
+  /* client certificate */
+  if ((err = gen_keypair(&client_key, suite.client_key_type, &client_key_sz,
+                         suite.client_sig_type, rng)) != 0) {
+    fprintf(stderr, "Failed to generate client key (err %d)\n", err);
+    goto cleanup;
+  }
+  wc_InitCert(&client_cert);
+  client_cert.sigType = suite.root_sig_type;
+  wc_SetIssuerBuffer(&client_cert, root_cert_der, root_cert_der_sz);
+  set_certname(&client_cert.subject, LEAF_COUNTRY, LEAF_STATE, LEAF_LOCALITY,
+               LEAF_ORG, LEAF_COMMONNAME);
+  set_before_date_utctime(&client_cert, NOT_BEFORE_DATE);
+  set_after_date_utctime(&client_cert, NOT_AFTER_DATE);
+  if ((client_cert_der_sz = wc_MakeCert_ex(
+           &client_cert, client_cert_der, sizeof(client_cert_der),
+           suite.client_key_type, client_key, rng)) <= 0) {
+    err = client_cert_der_sz;
+    fprintf(stderr, "Failed to make unsigned client certificate (err %d)\n",
+            err);
+    goto cleanup;
+  } else {
+    printf("client cert (unsigned) DER size %d\n", client_cert_der_sz);
+  }
+  if ((client_cert_der_sz = wc_SignCert_ex(
+           client_cert.bodySz, client_cert.sigType, client_cert_der,
+           sizeof(client_cert_der), suite.root_key_type, root_key, rng)) <= 0) {
+    err = client_cert_der_sz;
+    fprintf(stderr, "Failed to sign client certificate (err %d)\n", err);
+    goto cleanup;
+  } else {
+    printf("client cert (signed) DER size %d\n", client_cert_der_sz);
+  }
+  if ((client_cert_pem_sz = wc_DerToPem(client_cert_der, client_cert_der_sz, out->client_cert_pem, sizeof(out->leaf_cert_pem), CERT_TYPE)) <= 0) {
+    err = client_cert_pem_sz;
+    fprintf(stderr, "Failed to export leaf cert PEM (err %d)\n", err);
+    goto cleanup;
+  } else {
+    out->client_cert_len = (size_t) client_cert_pem_sz;
+    printf("client cert PEM size %zu\n", out->client_cert_len);
+  }
+
+cleanup:
+  if (root_key) {
+    memset(root_key, 0, root_key_sz);
+    free(root_key);
+  }
+  if (int_key) {
+    memset(int_key, 0, int_key_sz);
+    free(int_key);
+  }
+  if (leaf_key) {
+    memset(leaf_key, 0, leaf_key_sz);
+    free(leaf_key);
+  }
+  if (client_key) {
+    memset(client_key, 0, client_key_sz);
+    free(client_key);
+  }
+  return err;
 }
 
 int main(int argc, char *argv[]) {
@@ -1192,63 +1403,15 @@ int main(int argc, char *argv[]) {
 
   // ret = old_main(argc, argv);
 
-  void *key;
-  size_t keysize = 0;
   WC_RNG rng;
   wc_InitRng(&rng);
 
-  {
-    /* check RSA key works */
-    ret = gen_keypair(&key, RSA_TYPE, &keysize, CTC_SHA256wRSA, &rng);
-    if (ret != 0) {
-      printf("gen_keypair returned %d\n", ret);
-    }
-    ret = wc_CheckRsaKey(key);
-    if (ret != 0) {
-      printf("wc_CheckRsaKey returned %d\n", ret);
-    }
-    if (key) {
-      memset(key, 0, keysize);
-      free(key);
-    }
-
-    /* check ECDSA key */
-    keysize = 0;
-    ret = gen_keypair(&key, ECC_TYPE, &keysize, CTC_SHA512wECDSA, &rng);
-    if (ret != 0) {
-      printf("gen_keypair returned %d\n", ret);
-    }
-    if (key) {
-      memset(key, 0, keysize);
-      free(key);
-    }
-
-    /* check EdDSA key */
-    keysize = 0;
-    ret = gen_keypair(&key, ED25519_TYPE, &keysize, CTC_ED25519, &rng);
-    if (ret != 0) {
-      printf("gen_keypair returned %d\n", ret);
-    }
-    ret = wc_ed25519_check_key(key);
-    if (ret != 0) {
-      printf("wc_ed25519_check_key returned %d\n", ret);
-    }
-    if (key) {
-      memset(key, 0, keysize);
-      free(key);
-    }
-
-    printf("Ok.\n");
-  }
-
-  certchain_suite_t suite = {
-      ML_DSA_LEVEL3_TYPE, /* root */
-      ML_DSA_LEVEL3_TYPE, /* int */
-      ML_DSA_LEVEL2_TYPE, /* leaf */
-      ML_DSA_LEVEL2_TYPE  /* client */
-  };
+  certchain_suite_t suite = {SPHINCS_SMALL_LEVEL3_TYPE, CTC_SPHINCS_SMALL_LEVEL3,
+                             ML_DSA_LEVEL3_TYPE, CTC_ML_DSA_LEVEL3,
+                             ECC_TYPE, CTC_SHA256wECDSA,
+                             ED25519_TYPE, CTC_ED25519};
   certchain_out_t out;
-  ret = gen_cert_chain(suite, &out);
+  ret = gen_cert_chain(suite, &out, &rng);
 
   return ret;
 }
