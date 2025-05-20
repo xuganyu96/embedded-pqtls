@@ -3,12 +3,14 @@
  * BUG: sometimes the output of certgen will cause client to reject server's
  * certificates
  */
+#include "wolfssl/wolfcrypt/ed25519.h"
 #include <stdint.h>
 #include <stdio.h>
 
 #include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/asn_public.h>
 #include <wolfssl/wolfcrypt/dilithium.h>
+#include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/falcon.h>
 #include <wolfssl/wolfcrypt/rsa.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
@@ -960,6 +962,9 @@ static int malloc_key(void **key, enum CertType key_type, size_t *key_size) {
 }
 
 /* A wrapper around the function calls needed to generate an RSA-2048 keypair
+ *
+ * TODO: there is exactly one RsaKey type, but there might be multiple RSA
+ *       signature types, which is the case for ECDSA and EdDSA as well
  */
 static int gen_rsa2048(RsaKey *key, WC_RNG *rng) {
   int ret = 0;
@@ -970,13 +975,160 @@ static int gen_rsa2048(RsaKey *key, WC_RNG *rng) {
   return ret;
 }
 
+/* Init and make ECDSA key
+ *
+ * Return 0 upon success
+ */
+static int gen_ecdsa(ecc_key *key, enum Ctc_SigType sig_type, WC_RNG *rng) {
+  int ret = 0;
+  int curve_id;
+
+  switch (sig_type) {
+  case CTC_SHA256wECDSA:
+    curve_id = ECC_SECP256R1;
+    break;
+  case CTC_SHA384wECDSA:
+    curve_id = ECC_SECP384R1;
+    break;
+  case CTC_SHA512wECDSA:
+    curve_id = ECC_SECP521R1;
+    break;
+  default:
+    return BAD_FUNC_ARG;
+  }
+  int keysize = wc_ecc_get_curve_size_from_id(curve_id);
+
+  ret = wc_ecc_init_ex(key, NULL, INVALID_DEVID);
+  if (ret == 0) {
+    ret = wc_ecc_make_key_ex(rng, keysize, key, curve_id);
+  }
+  if (ret == 0) {
+    ret = wc_ecc_check_key(key);
+  }
+
+  return ret;
+}
+
+static int gen_ed25519(ed25519_key *key, WC_RNG *rng) {
+  int ret = 0;
+  ret = wc_ed25519_init(key);
+  if (ret == 0) {
+    ret = wc_ed25519_make_key(rng, 32, key); /* TODO: remove magic number */
+  }
+  return ret;
+}
+
+static int gen_ed448(ed448_key *key, WC_RNG *rng) {
+  int ret = 0;
+  ret = wc_ed448_init(key);
+  if (ret == 0) {
+    ret = wc_ed448_make_key(rng, 57, key); /* TODO: remove magic number */
+  }
+  return ret;
+}
+
+static int gen_mldsa(MlDsaKey *key, enum CertType key_type, WC_RNG *rng) {
+  int level;
+  switch (key_type) {
+  case ML_DSA_LEVEL2_TYPE:
+    level = WC_ML_DSA_44;
+    break;
+  case ML_DSA_LEVEL3_TYPE:
+    level = WC_ML_DSA_65;
+    break;
+  case ML_DSA_LEVEL5_TYPE:
+    level = WC_ML_DSA_87;
+    break;
+  default:
+    return BAD_FUNC_ARG;
+  }
+
+  int ret = wc_MlDsaKey_Init(key, NULL, INVALID_DEVID);
+  if (ret == 0) {
+    ret = wc_MlDsaKey_SetParams(key, level);
+  }
+  if (ret == 0) {
+    ret = wc_MlDsaKey_MakeKey(key, rng);
+  }
+  return ret;
+}
+
+static int gen_sphincs(sphincs_key *key, enum CertType key_type, WC_RNG *rng) {
+  byte level, optim;
+  switch (key_type) {
+  case SPHINCS_FAST_LEVEL1_TYPE:
+    level = 1;
+    optim = SPHINCS_FAST_VARIANT;
+    break;
+  case SPHINCS_SMALL_LEVEL1_TYPE:
+    level = 1;
+    optim = SPHINCS_SMALL_VARIANT;
+    break;
+  case SPHINCS_FAST_LEVEL3_TYPE:
+    level = 3;
+    optim = SPHINCS_FAST_VARIANT;
+    break;
+  case SPHINCS_SMALL_LEVEL3_TYPE:
+    level = 3;
+    optim = SPHINCS_SMALL_VARIANT;
+    break;
+  case SPHINCS_FAST_LEVEL5_TYPE:
+    level = 5;
+    optim = SPHINCS_FAST_VARIANT;
+    break;
+  case SPHINCS_SMALL_LEVEL5_TYPE:
+    level = 5;
+    optim = SPHINCS_SMALL_VARIANT;
+    break;
+  default:
+    return BAD_FUNC_ARG;
+  }
+
+  int ret = wc_sphincs_init(key);
+  if (ret == 0) {
+    ret = wc_sphincs_set_level_and_optim(key, level, optim);
+  }
+  if (ret == 0) {
+    ret = wc_sphincs_make_key(key, rng);
+  }
+  return ret;
+}
+
+static int gen_falcon(falcon_key *key, enum CertType key_type, WC_RNG *rng) {
+  byte level;
+  switch (key_type) {
+  case FALCON_LEVEL1_TYPE:
+    level = 1;
+    break;
+  case FALCON_LEVEL5_TYPE:
+    level = 5;
+    break;
+  default:
+    return BAD_FUNC_ARG;
+  }
+
+  int ret = wc_falcon_init(key);
+  if (ret == 0) {
+    ret = wc_falcon_set_level(key, level);
+  }
+  if (ret == 0) {
+    ret = wc_falcon_make_key(key, rng);
+  }
+  return ret;
+}
+
 /* Given appropriate key type, generate a keypair with matching primitive
  * (ML-DSA or SPHINCS or Falcon etc.) and assign it to `key`
  *
  * The keypair will be allocated from the heap, so it will need to be freed
  * later.
+ *
+ * sig_type is specifically used for generating ECDSA keypair, supported values
+ * are CTC_SHA256wECDSA (using P-256), CTC_SHA3844wECDSA (using P-384), and
+ * CTC_SHA512wECDSA (using P-521). In all other cases sig_type is ignored.
  */
-static int gen_keypair(void **key, enum CertType key_type, size_t *key_size, WC_RNG *rng) {
+static int gen_keypair(void **key, enum CertType key_type, size_t *key_size,
+                       enum Ctc_SigType sig_type, WC_RNG *rng) {
   int ret = 0;
 
   if ((key == NULL) || (rng == NULL))
@@ -991,6 +1143,31 @@ static int gen_keypair(void **key, enum CertType key_type, size_t *key_size, WC_
   case RSA_TYPE:
     ret = gen_rsa2048(*key, rng);
     break;
+  case ECC_TYPE:
+    ret = gen_ecdsa(*key, sig_type, rng);
+    break;
+  case ED25519_TYPE:
+    ret = gen_ed25519(*key, rng);
+    break;
+  case ED448_TYPE:
+    ret = gen_ed448(*key, rng);
+    break;
+  case ML_DSA_LEVEL2_TYPE:
+  case ML_DSA_LEVEL3_TYPE:
+  case ML_DSA_LEVEL5_TYPE:
+    ret = gen_mldsa(*key, key_type, rng);
+    break;
+  case SPHINCS_FAST_LEVEL1_TYPE:
+  case SPHINCS_SMALL_LEVEL1_TYPE:
+  case SPHINCS_FAST_LEVEL3_TYPE:
+  case SPHINCS_SMALL_LEVEL3_TYPE:
+  case SPHINCS_FAST_LEVEL5_TYPE:
+  case SPHINCS_SMALL_LEVEL5_TYPE:
+    ret = gen_sphincs(*key, key_type, rng);
+    break;
+  case FALCON_LEVEL1_TYPE:
+  case FALCON_LEVEL5_TYPE:
+    ret = gen_falcon(*key, key_type, rng);
   default:
     fprintf(stderr, "enum CertType %d not supported\n", key_type);
     return BAD_FUNC_ARG;
@@ -1016,25 +1193,62 @@ int main(int argc, char *argv[]) {
   // ret = old_main(argc, argv);
 
   void *key;
-  size_t key_size = 0;
+  size_t keysize = 0;
   WC_RNG rng;
   wc_InitRng(&rng);
 
-  /* check if gen_keypair works */
-  ret = gen_keypair(&key, RSA_TYPE, &key_size, &rng);
-  if (ret != 0) {
-    printf("gen_keypair returned %d\n", ret);
-  } else {
-    printf("allocated %zu bytes to RSA keypair\n", key_size);
-  }
-  ret = wc_CheckRsaKey(key);
-  if (ret != 0) {
-    printf("wc_CheckRsaKey returned %d\n", ret);
+  {
+    /* check RSA key works */
+    ret = gen_keypair(&key, RSA_TYPE, &keysize, CTC_SHA256wRSA, &rng);
+    if (ret != 0) {
+      printf("gen_keypair returned %d\n", ret);
+    }
+    ret = wc_CheckRsaKey(key);
+    if (ret != 0) {
+      printf("wc_CheckRsaKey returned %d\n", ret);
+    }
+    if (key) {
+      memset(key, 0, keysize);
+      free(key);
+    }
+
+    /* check ECDSA key */
+    keysize = 0;
+    ret = gen_keypair(&key, ECC_TYPE, &keysize, CTC_SHA512wECDSA, &rng);
+    if (ret != 0) {
+      printf("gen_keypair returned %d\n", ret);
+    }
+    if (key) {
+      memset(key, 0, keysize);
+      free(key);
+    }
+
+    /* check EdDSA key */
+    keysize = 0;
+    ret = gen_keypair(&key, ED25519_TYPE, &keysize, CTC_ED25519, &rng);
+    if (ret != 0) {
+      printf("gen_keypair returned %d\n", ret);
+    }
+    ret = wc_ed25519_check_key(key);
+    if (ret != 0) {
+      printf("wc_ed25519_check_key returned %d\n", ret);
+    }
+    if (key) {
+      memset(key, 0, keysize);
+      free(key);
+    }
+
+    printf("Ok.\n");
   }
 
-  if (key) {
-    memset(key, 0, key_size);
-    free(key);
-  }
+  certchain_suite_t suite = {
+      ML_DSA_LEVEL3_TYPE, /* root */
+      ML_DSA_LEVEL3_TYPE, /* int */
+      ML_DSA_LEVEL2_TYPE, /* leaf */
+      ML_DSA_LEVEL2_TYPE  /* client */
+  };
+  certchain_out_t out;
+  ret = gen_cert_chain(suite, &out);
+
   return ret;
 }

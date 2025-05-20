@@ -48,6 +48,8 @@ There is `wc_CheckRsaKey` in `rsa.h` but it is not documented in the manual or i
 
 Need to change `gen_keypair` to also output the number of bytes allocated to `*key`, which is needed at cleanup for `memset`.
 
+`gen_keypair` also needs to know the expected signature type, specifically for ECDSA, since the `key_type` is insufficient to determine which of P-256/384/521 will be used.
+
 # May 18, 2025
 Goal: modify `EncodePublicKey`, possibly also implement `PublicKeyToDer` and its various complements.
 
