@@ -1,3 +1,53 @@
+# May 19, 2025
+Today I want to first build a test program that generates a KEM-based certificate and signs it with some digital signature. This will serve as a goal post for the "generate KEM certificate" milestone.
+
+`kem-certgen` first generates a root certificate-key pair, then generates a leaf certificate-key pair, and finally signs the leaf certificate with the root key. The certificate and the key will be exported as PEM files and to be inspected using the `asn1` program.
+
+After some draft implementation I've changed my mind. Instead of `kem-certgen`, I want to simply re-factor `certgen` into this:
+
+```c
+int generate_chain(int root_key_type, int int_key_type, int leaf_key_type, int client_key_type,
+                   uint8_t *root_cert_pem, size_t *root_cert_len,
+                   uint8_t *server_chain_pem, size_t *server_chain_len,
+                   uint8_t *leaf_key_pem, size_t *leaf_key_len,
+                   uint8_t *client_chain_pem, size_t *client_chain_len,
+                   uint8_t *client_key_pem, size_t *client_key_len);
+```
+
+This is too many arguments. Let's group the inputs into a struct and the outputs into a struct.
+
+```c
+struct certchain_suite {
+    int root_key_type;
+    int int_key_type;
+    int leaf_key_type;
+    int client_key_type;
+};
+struct certchain_out {
+    uint8_t *root_cert_pem;
+    size_t root_cert_len;
+    uint8_t *server_chain_pem;
+    size_t server_chain_len;
+    uint8_t *server_key_pem;
+    size_t server_key_len;
+    uint8_t *client_chain_pem;
+    size_t client_chain_len;
+    uint8_t *client_key_pem;
+    size_t client_key_len;
+};
+int generate_chain(struct certchain_suite suite, struct certchain_out *out);
+```
+
+`xxx_key_type` is sufficient for all keypair generation routines; it might be a concern that `key_type`'s type is actually `CertType` which contains other enum members that are not "key types" (e.g. `CERT_TYPE`).
+
+```c
+int gen_keypair(void **key, enum CertType key_type);
+```
+
+There is `wc_CheckRsaKey` in `rsa.h` but it is not documented in the manual or in the source code. I will use it and trust it for now, but who knows what.
+
+Need to change `gen_keypair` to also output the number of bytes allocated to `*key`, which is needed at cleanup for `memset`.
+
 # May 18, 2025
 Goal: modify `EncodePublicKey`, possibly also implement `PublicKeyToDer` and its various complements.
 

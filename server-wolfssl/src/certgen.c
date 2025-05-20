@@ -930,27 +930,30 @@ int is_falcon(enum CertType key_type) {
  *
  * Return 0 upon success
  */
-static int malloc_key(void **key, enum CertType key_type) {
+static int malloc_key(void **key, enum CertType key_type, size_t *key_size) {
+  size_t capacity = 0;
   if (is_ml_dsa(key_type)) {
-    *key = malloc(sizeof(MlDsaKey));
+    capacity = sizeof(MlDsaKey);
   } else if (is_sphincs(key_type)) {
-    *key = malloc(sizeof(sphincs_key));
+    capacity = sizeof(sphincs_key);
   } else if (is_falcon(key_type)) {
-    *key = malloc(sizeof(falcon_key));
+    capacity = sizeof(falcon_key);
   } else if (key_type == RSA_TYPE) {
-    *key = malloc(sizeof(RsaKey));
+    capacity = sizeof(RsaKey);
   } else if (key_type == ECC_TYPE) {
-    *key = malloc(sizeof(ecc_key));
+    capacity = sizeof(ecc_key);
   } else if (key_type == ED25519_TYPE) {
-    *key = malloc(sizeof(ed25519_key));
+    capacity = sizeof(ed25519_key);
   } else if (key_type == ED448_TYPE) {
-    *key = malloc(sizeof(ed448_key));
+    capacity = sizeof(ed448_key);
   } else { /* CertType not supported */
     return BAD_FUNC_ARG;
   }
 
-  if (*key == NULL) {
+  if ((*key = malloc(capacity)) == NULL) {
     return MEMORY_E;
+  } else {
+    *key_size = capacity;
   }
 
   return 0;
@@ -973,12 +976,12 @@ static int gen_rsa2048(RsaKey *key, WC_RNG *rng) {
  * The keypair will be allocated from the heap, so it will need to be freed
  * later.
  */
-static int gen_keypair(void **key, enum CertType key_type, WC_RNG *rng) {
+static int gen_keypair(void **key, enum CertType key_type, size_t *key_size, WC_RNG *rng) {
   int ret = 0;
 
   if ((key == NULL) || (rng == NULL))
     return BAD_FUNC_ARG;
-  if ((ret = malloc_key(key, key_type)) != 0) {
+  if ((ret = malloc_key(key, key_type, key_size)) != 0) {
     fprintf(stderr, "Failed to allocate space for key (err %d)\n", ret);
     return ret;
   }
@@ -1013,18 +1016,25 @@ int main(int argc, char *argv[]) {
   // ret = old_main(argc, argv);
 
   void *key;
+  size_t key_size = 0;
   WC_RNG rng;
   wc_InitRng(&rng);
 
   /* check if gen_keypair works */
-  ret = gen_keypair(&key, RSA_TYPE, &rng);
+  ret = gen_keypair(&key, RSA_TYPE, &key_size, &rng);
   if (ret != 0) {
     printf("gen_keypair returned %d\n", ret);
+  } else {
+    printf("allocated %zu bytes to RSA keypair\n", key_size);
   }
   ret = wc_CheckRsaKey(key);
   if (ret != 0) {
     printf("wc_CheckRsaKey returned %d\n", ret);
   }
 
+  if (key) {
+    memset(key, 0, key_size);
+    free(key);
+  }
   return ret;
 }
