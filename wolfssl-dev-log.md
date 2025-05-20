@@ -1,3 +1,8 @@
+# May 20, 2025
+Today's goal: refactor `certgen`, also figure out a way to validate certificate chain.
+
+Once the keypair is generated it is ready to be exported to PEM format, so `gen_keypair` should take a pointer to a buffer.
+
 # May 19, 2025
 Today I want to first build a test program that generates a KEM-based certificate and signs it with some digital signature. This will serve as a goal post for the "generate KEM certificate" milestone.
 

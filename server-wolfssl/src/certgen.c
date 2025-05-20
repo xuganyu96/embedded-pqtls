@@ -970,12 +970,27 @@ static int malloc_key(void **key, enum CertType key_type, size_t *key_size) {
  * TODO: there is exactly one RsaKey type, but there might be multiple RSA
  *       signature types, which is the case for ECDSA and EdDSA as well
  */
-static int gen_rsa2048(RsaKey *key, WC_RNG *rng) {
+static int gen_rsa2048(RsaKey *key, uint8_t *pem, size_t *pem_len,
+                       WC_RNG *rng) {
   int ret = 0;
-  ret = wc_InitRsaKey_ex(key, NULL, INVALID_DEVID);
-  if (ret == 0) {
-    ret = wc_MakeRsaKey(key, 2048, WC_RSA_EXPONENT, rng);
+  uint8_t der[KEY_DER_MAX_SIZE];
+  int der_sz, pem_sz;
+  if ((ret = wc_InitRsaKey_ex(key, NULL, INVALID_DEVID)) < 0) {
+    return ret;
   }
+  if ((ret = wc_MakeRsaKey(key, 2048, WC_RSA_EXPONENT, rng)) < 0) {
+    return ret;
+  }
+  der_sz = wc_RsaKeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, RSA_TYPE);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
+
   return ret;
 }
 
@@ -983,9 +998,12 @@ static int gen_rsa2048(RsaKey *key, WC_RNG *rng) {
  *
  * Return 0 upon success
  */
-static int gen_ecdsa(ecc_key *key, enum Ctc_SigType sig_type, WC_RNG *rng) {
+static int gen_ecdsa(ecc_key *key, enum Ctc_SigType sig_type, uint8_t *pem,
+                     size_t *pem_len, WC_RNG *rng) {
   int ret = 0;
   int curve_id;
+  uint8_t der[KEY_DER_MAX_SIZE];
+  int der_sz, pem_sz;
 
   switch (sig_type) {
   case CTC_SHA256wECDSA:
@@ -1002,37 +1020,80 @@ static int gen_ecdsa(ecc_key *key, enum Ctc_SigType sig_type, WC_RNG *rng) {
   }
   int keysize = wc_ecc_get_curve_size_from_id(curve_id);
 
-  ret = wc_ecc_init_ex(key, NULL, INVALID_DEVID);
-  if (ret == 0) {
-    ret = wc_ecc_make_key_ex(rng, keysize, key, curve_id);
+  if ((ret = wc_ecc_init_ex(key, NULL, INVALID_DEVID)) < 0) {
+    return ret;
   }
-  if (ret == 0) {
-    ret = wc_ecc_check_key(key);
+  if ((ret = wc_ecc_make_key_ex(rng, keysize, key, curve_id)) < 0) {
+    return ret;
   }
+  if ((ret = wc_ecc_check_key(key)) < 0) {
+    return ret;
+  }
+  der_sz = wc_EccKeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, ECC_TYPE);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
 
   return ret;
 }
 
-static int gen_ed25519(ed25519_key *key, WC_RNG *rng) {
+static int gen_ed25519(ed25519_key *key, uint8_t *pem, size_t *pem_len,
+                       WC_RNG *rng) {
   int ret = 0;
-  ret = wc_ed25519_init(key);
-  if (ret == 0) {
-    ret = wc_ed25519_make_key(rng, 32, key); /* TODO: remove magic number */
+  uint8_t der[KEY_DER_MAX_SIZE];
+  int der_sz, pem_sz;
+  if ((ret = wc_ed25519_init(key)) < 0) {
+    return ret;
   }
+  if ((ret = wc_ed25519_make_key(rng, 32, key)) < 0) {
+    return ret;
+  }
+  der_sz = wc_Ed25519KeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, ED25519_TYPE);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
+
   return ret;
 }
 
-static int gen_ed448(ed448_key *key, WC_RNG *rng) {
+static int gen_ed448(ed448_key *key, uint8_t *pem, size_t *pem_len,
+                     WC_RNG *rng) {
   int ret = 0;
-  ret = wc_ed448_init(key);
-  if (ret == 0) {
-    ret = wc_ed448_make_key(rng, 57, key); /* TODO: remove magic number */
+  uint8_t der[KEY_DER_MAX_SIZE];
+  int der_sz, pem_sz;
+  if ((ret = wc_ed448_init(key)) < 0) {
+    return ret;
   }
+  if ((ret = wc_ed448_make_key(rng, 57, key)) < 0) {
+    return ret;
+  }
+  der_sz = wc_Ed448KeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, ED448_TYPE);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
   return ret;
 }
 
-static int gen_mldsa(MlDsaKey *key, enum CertType key_type, WC_RNG *rng) {
-  int level;
+static int gen_mldsa(MlDsaKey *key, enum CertType key_type, uint8_t *pem,
+                     size_t *pem_len, WC_RNG *rng) {
+  int level, ret, der_sz, pem_sz;
+  uint8_t der[KEY_DER_MAX_SIZE];
+
   switch (key_type) {
   case ML_DSA_LEVEL2_TYPE:
     level = WC_ML_DSA_44;
@@ -1047,17 +1108,32 @@ static int gen_mldsa(MlDsaKey *key, enum CertType key_type, WC_RNG *rng) {
     return BAD_FUNC_ARG;
   }
 
-  int ret = wc_MlDsaKey_Init(key, NULL, INVALID_DEVID);
-  if (ret == 0) {
-    ret = wc_MlDsaKey_SetParams(key, level);
+  if ((ret = wc_MlDsaKey_Init(key, NULL, INVALID_DEVID)) < 0) {
+    return ret;
   }
-  if (ret == 0) {
-    ret = wc_MlDsaKey_MakeKey(key, rng);
+  if ((ret = wc_MlDsaKey_SetParams(key, level)) < 0) {
+    return ret;
   }
+  if ((ret = wc_MlDsaKey_MakeKey(key, rng)) < 0) {
+    return ret;
+  }
+  der_sz = wc_MlDsaKey_PrivateKeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, key_type);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
+
   return ret;
 }
 
-static int gen_sphincs(sphincs_key *key, enum CertType key_type, WC_RNG *rng) {
+static int gen_sphincs(sphincs_key *key, enum CertType key_type, uint8_t *pem,
+                       size_t *pem_len, WC_RNG *rng) {
+  int ret, der_sz, pem_sz;
+  uint8_t der[KEY_DER_MAX_SIZE];
   byte level, optim;
   switch (key_type) {
   case SPHINCS_FAST_LEVEL1_TYPE:
@@ -1088,18 +1164,34 @@ static int gen_sphincs(sphincs_key *key, enum CertType key_type, WC_RNG *rng) {
     return BAD_FUNC_ARG;
   }
 
-  int ret = wc_sphincs_init(key);
-  if (ret == 0) {
-    ret = wc_sphincs_set_level_and_optim(key, level, optim);
+  if ((ret = wc_sphincs_init(key)) < 0) {
+    return ret;
   }
-  if (ret == 0) {
-    ret = wc_sphincs_make_key(key, rng);
+  if ((ret = wc_sphincs_set_level_and_optim(key, level, optim)) < 0) {
+    return ret;
   }
+  if ((ret = wc_sphincs_make_key(key, rng)) < 0) {
+    return ret;
+  }
+  der_sz = wc_Sphincs_PrivateKeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, key_type);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
+
   return ret;
 }
 
-static int gen_falcon(falcon_key *key, enum CertType key_type, WC_RNG *rng) {
+static int gen_falcon(falcon_key *key, enum CertType key_type, uint8_t *pem,
+                      size_t *pem_len, WC_RNG *rng) {
   byte level;
+  int ret, der_sz, pem_sz;
+  uint8_t der[KEY_DER_MAX_SIZE];
+
   switch (key_type) {
   case FALCON_LEVEL1_TYPE:
     level = 1;
@@ -1111,18 +1203,31 @@ static int gen_falcon(falcon_key *key, enum CertType key_type, WC_RNG *rng) {
     return BAD_FUNC_ARG;
   }
 
-  int ret = wc_falcon_init(key);
-  if (ret == 0) {
-    ret = wc_falcon_set_level(key, level);
+  if ((ret = wc_falcon_init(key)) < 0) {
+    return ret;
   }
-  if (ret == 0) {
-    ret = wc_falcon_make_key(key, rng);
+  if ((ret = wc_falcon_set_level(key, level)) < 0) {
+    return ret;
   }
+  if ((ret = wc_falcon_make_key(key, rng)) < 0) {
+    return ret;
+  }
+  der_sz = wc_Falcon_PrivateKeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, key_type);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
+
   return ret;
 }
 
 /* Given appropriate key type, generate a keypair with matching primitive
- * (ML-DSA or SPHINCS or Falcon etc.) and assign it to `key`
+ * (ML-DSA or SPHINCS or Falcon etc.) and assign it to `key`, then export the
+ * private key to `pem`
  *
  * The keypair will be allocated from the heap, so it will need to be freed
  * later.
@@ -1130,9 +1235,13 @@ static int gen_falcon(falcon_key *key, enum CertType key_type, WC_RNG *rng) {
  * sig_type is specifically used for generating ECDSA keypair, supported values
  * are CTC_SHA256wECDSA (using P-256), CTC_SHA3844wECDSA (using P-384), and
  * CTC_SHA512wECDSA (using P-521). In all other cases sig_type is ignored.
+ *
+ * pem_len contains the capacity of the pem buffer at input, and will contain
+ * the length of data after return
  */
 static int gen_keypair(void **key, enum CertType key_type, size_t *key_size,
-                       enum Ctc_SigType sig_type, WC_RNG *rng) {
+                       enum Ctc_SigType sig_type, uint8_t *pem, size_t *pem_len,
+                       WC_RNG *rng) {
   int ret = 0;
 
   if ((key == NULL) || (rng == NULL))
@@ -1145,21 +1254,21 @@ static int gen_keypair(void **key, enum CertType key_type, size_t *key_size,
   /* inelegant, giant switch case block; can we do better? */
   switch (key_type) {
   case RSA_TYPE:
-    ret = gen_rsa2048(*key, rng);
+    ret = gen_rsa2048(*key, pem, pem_len, rng);
     break;
   case ECC_TYPE:
-    ret = gen_ecdsa(*key, sig_type, rng);
+    ret = gen_ecdsa(*key, sig_type, pem, pem_len, rng);
     break;
   case ED25519_TYPE:
-    ret = gen_ed25519(*key, rng);
+    ret = gen_ed25519(*key, pem, pem_len, rng);
     break;
   case ED448_TYPE:
-    ret = gen_ed448(*key, rng);
+    ret = gen_ed448(*key, pem, pem_len, rng);
     break;
   case ML_DSA_LEVEL2_TYPE:
   case ML_DSA_LEVEL3_TYPE:
   case ML_DSA_LEVEL5_TYPE:
-    ret = gen_mldsa(*key, key_type, rng);
+    ret = gen_mldsa(*key, key_type, pem, pem_len, rng);
     break;
   case SPHINCS_FAST_LEVEL1_TYPE:
   case SPHINCS_SMALL_LEVEL1_TYPE:
@@ -1167,11 +1276,12 @@ static int gen_keypair(void **key, enum CertType key_type, size_t *key_size,
   case SPHINCS_SMALL_LEVEL3_TYPE:
   case SPHINCS_FAST_LEVEL5_TYPE:
   case SPHINCS_SMALL_LEVEL5_TYPE:
-    ret = gen_sphincs(*key, key_type, rng);
+    ret = gen_sphincs(*key, key_type, pem, pem_len, rng);
     break;
   case FALCON_LEVEL1_TYPE:
   case FALCON_LEVEL5_TYPE:
-    ret = gen_falcon(*key, key_type, rng);
+    ret = gen_falcon(*key, key_type, pem, pem_len, rng);
+    break;
   default:
     fprintf(stderr, "enum CertType %d not supported\n", key_type);
     return BAD_FUNC_ARG;
@@ -1198,7 +1308,8 @@ static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
   int err;
 
   void *root_key = NULL, *int_key = NULL, *leaf_key = NULL, *client_key = NULL;
-  size_t root_key_sz = 0, int_key_sz = 0, leaf_key_sz = 0, client_key_sz = 0;
+  size_t root_key_sz = 0, int_key_sz = 0, leaf_key_sz = 0, client_key_sz = 0,
+         key_pem_sz;
   int root_cert_der_sz, root_cert_pem_sz, int_cert_der_sz, int_cert_pem_sz,
       leaf_cert_der_sz, leaf_cert_pem_sz, client_cert_der_sz,
       client_cert_pem_sz;
@@ -1207,10 +1318,15 @@ static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
   Cert root_cert, int_cert, leaf_cert, client_cert;
 
   /* root certificate */
+  key_pem_sz = sizeof(out->root_key_pem);
   if ((err = gen_keypair(&root_key, suite.root_key_type, &root_key_sz,
-                         suite.root_sig_type, rng)) != 0) {
+                         suite.root_sig_type, out->root_key_pem, &key_pem_sz,
+                         rng)) != 0) {
     fprintf(stderr, "Failed to generate root key pair (err %d)\n", err);
     goto cleanup;
+  } else {
+    out->root_key_len = key_pem_sz;
+    printf("root key PEM size %zu\n", out->root_key_len);
   }
   wc_InitCert(&root_cert);
   root_cert.sigType = suite.root_sig_type;
@@ -1253,10 +1369,15 @@ static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
   }
 
   /* intermediate certificate */
+  key_pem_sz = sizeof(out->int_key_pem);
   if ((err = gen_keypair(&int_key, suite.int_key_type, &int_key_sz,
-                         suite.int_sig_type, rng)) != 0) {
+                         suite.int_sig_type, out->int_key_pem, &key_pem_sz,
+                         rng)) != 0) {
     fprintf(stderr, "Failed to generate intermediate key (err %d)\n", err);
     goto cleanup;
+  } else {
+    out->int_key_len = key_pem_sz;
+    printf("key PEM size %zu\n", out->int_key_len);
   }
   wc_InitCert(&int_cert);
   int_cert.sigType = suite.root_sig_type;
@@ -1296,10 +1417,15 @@ static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
   }
 
   /* leaf certificate */
+  key_pem_sz = sizeof(out->leaf_key_pem);
   if ((err = gen_keypair(&leaf_key, suite.leaf_key_type, &leaf_key_sz,
-                         suite.leaf_sig_type, rng)) != 0) {
+                         suite.leaf_sig_type, out->leaf_key_pem, &key_pem_sz,
+                         rng)) != 0) {
     fprintf(stderr, "Failed to generate leaf key (err %d)\n", err);
     goto cleanup;
+  } else {
+    out->leaf_key_len = key_pem_sz;
+    printf("leaf key PEM size %zu\n", out->leaf_key_len);
   }
   wc_InitCert(&leaf_cert);
   leaf_cert.sigType = suite.int_sig_type;
@@ -1338,10 +1464,15 @@ static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
   }
 
   /* client certificate */
+  key_pem_sz = sizeof(out->client_key_pem);
   if ((err = gen_keypair(&client_key, suite.client_key_type, &client_key_sz,
-                         suite.client_sig_type, rng)) != 0) {
+                         suite.client_sig_type, out->client_key_pem,
+                         &key_pem_sz, rng)) != 0) {
     fprintf(stderr, "Failed to generate client key (err %d)\n", err);
     goto cleanup;
+  } else {
+    out->client_key_len = key_pem_sz;
+    printf("client key PEM size %zu\n", out->client_key_len);
   }
   wc_InitCert(&client_cert);
   client_cert.sigType = suite.root_sig_type;
@@ -1369,12 +1500,14 @@ static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
   } else {
     printf("client cert (signed) DER size %d\n", client_cert_der_sz);
   }
-  if ((client_cert_pem_sz = wc_DerToPem(client_cert_der, client_cert_der_sz, out->client_cert_pem, sizeof(out->leaf_cert_pem), CERT_TYPE)) <= 0) {
+  if ((client_cert_pem_sz = wc_DerToPem(
+           client_cert_der, client_cert_der_sz, out->client_cert_pem,
+           sizeof(out->leaf_cert_pem), CERT_TYPE)) <= 0) {
     err = client_cert_pem_sz;
     fprintf(stderr, "Failed to export leaf cert PEM (err %d)\n", err);
     goto cleanup;
   } else {
-    out->client_cert_len = (size_t) client_cert_pem_sz;
+    out->client_cert_len = (size_t)client_cert_pem_sz;
     printf("client cert PEM size %zu\n", out->client_cert_len);
   }
 
@@ -1406,10 +1539,14 @@ int main(int argc, char *argv[]) {
   WC_RNG rng;
   wc_InitRng(&rng);
 
-  certchain_suite_t suite = {SPHINCS_SMALL_LEVEL3_TYPE, CTC_SPHINCS_SMALL_LEVEL3,
-                             ML_DSA_LEVEL3_TYPE, CTC_ML_DSA_LEVEL3,
-                             ECC_TYPE, CTC_SHA256wECDSA,
-                             ED25519_TYPE, CTC_ED25519};
+  certchain_suite_t suite = {SPHINCS_SMALL_LEVEL3_TYPE,
+                             CTC_SPHINCS_SMALL_LEVEL3,
+                             ML_DSA_LEVEL3_TYPE,
+                             CTC_ML_DSA_LEVEL3,
+                             ECC_TYPE,
+                             CTC_SHA256wECDSA,
+                             ED25519_TYPE,
+                             CTC_ED25519};
   certchain_out_t out;
   ret = gen_cert_chain(suite, &out, &rng);
 
