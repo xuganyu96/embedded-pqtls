@@ -834,14 +834,17 @@ int main(int argc, char *argv[]) {
     return ret;
 
   /* TODO: cli args --root-key, --int-key, --leaf-key, and --client-key */
-  certchain_suite_t suite = {SPHINCS_SMALL_LEVEL3_TYPE,
-                             CTC_SPHINCS_SMALL_LEVEL3,
-                             ML_DSA_LEVEL3_TYPE,
-                             CTC_ML_DSA_LEVEL3,
-                             ECC_TYPE,
-                             CTC_SHA256wECDSA,
-                             ED25519_TYPE,
-                             CTC_ED25519};
+  enum CertType root_key_type = ED448_TYPE;
+  enum Ctc_SigType root_sig_type = CTC_ED448;
+  enum CertType int_key_type = ECC_TYPE;
+  enum Ctc_SigType int_sig_type = CTC_SHA384wECDSA;
+  enum CertType leaf_key_type = ED25519_TYPE;
+  enum Ctc_SigType leaf_sig_type = CTC_ED25519;
+  enum CertType client_key_type = RSA_TYPE;
+  enum Ctc_SigType client_sig_type = CTC_SHA256wRSA;
+  certchain_suite_t suite = {root_key_type,   root_sig_type,  int_key_type,
+                             int_sig_type,    leaf_key_type,  leaf_sig_type,
+                             client_key_type, client_sig_type};
   ret = gen_cert_chain(suite, &out, &rng);
   if (ret != 0)
     return ret;
