@@ -105,8 +105,9 @@ typedef struct certchain_suite {
 
 /* A collection of buffers containing the output of certificat chain generation
  *
- * PEM is a human readable format (despite the base-64 encoding), hence PEM
- * buffers are strings (char[])
+ * TODO: statically allocating almost a mebabyte of stack memory is not deal,
+ * but since this runs on a desktop (MacOS stack size can be increased to 65MB)
+ * this is okay.
  */
 typedef struct certchain_out {
   byte root_cert_pem[CERT_PEM_MAX_SIZE];

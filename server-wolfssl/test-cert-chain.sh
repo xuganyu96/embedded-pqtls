@@ -32,7 +32,7 @@ echo "[INFO] Starting server..."
   8000 &
 
 SERVER_PID=$!
-echo "[INFO] Server PID: $SERVER_PID"
+echo "[INFO] Server PID: $SERVER_PID" && sleep 1
 
 # Step 4: Run the client in the foreground
 echo "[INFO] Starting client..."
