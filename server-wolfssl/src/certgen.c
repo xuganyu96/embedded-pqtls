@@ -3,11 +3,12 @@
  * BUG: sometimes the output of certgen will cause client to reject server's
  * certificates
  */
-#include "wolfssl/wolfcrypt/ed25519.h"
 #include <stdint.h>
 #include <stdio.h>
-
 #include <string.h>
+
+#include <wolfssl/wolfcrypt/settings.h>
+
 #include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/asn_public.h>
 #include <wolfssl/wolfcrypt/dilithium.h>
@@ -35,6 +36,7 @@
 #define ROOT_COMMONNAME "*.eng.uwaterloo.ca"
 #define NOT_BEFORE_DATE "250101000000Z"
 #define NOT_AFTER_DATE "350101000000Z"
+
 /* On MacOS, check stack size with command `ulimit -a`
  * increase stack size with `ulimit -s <kilobytes>`, the hard limit is 65532
  */
@@ -43,24 +45,6 @@
 #define CERT_PEM_MAX_SIZE 100000
 #define KEY_PEM_MAX_SIZE 100000
 #define PATH_MAX_SIZE 1024
-
-/* TODO: will enum type work? */
-#define USE_ML_DSA_44 1
-#define USE_ML_DSA_65 2
-#define USE_ML_DSA_87 3
-#define USE_SPHINCS_128F 4
-#define USE_SPHINCS_128S 5
-#define USE_SPHINCS_192F 6
-#define USE_SPHINCS_192S 7
-#define USE_SPHINCS_256F 8
-#define USE_SPHINCS_256S 9
-#define USE_FALCON_512 10
-#define USE_FALCON_1024 11
-
-#define ROOT_KEY_TYPE USE_SPHINCS_128S
-#define INT_KEY_TYPE USE_ML_DSA_65
-#define LEAF_KEY_TYPE USE_ML_DSA_44
-#define CLIENT_KEY_TYPE USE_ML_DSA_44
 
 static void set_certname(CertName *cert_name, const char *country,
                          const char *state, const char *locality,
