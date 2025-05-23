@@ -1,5 +1,7 @@
 # May 23, 2025
-- [ ] Implement and verify `PublicKeyToDer` for PQClean ML-KEM
+- [x] Refactor `MakeAnyCert` to accept `void *key` and `enum CertType key_type` instead of a hard coded set of arguments
+- [x] Modify `EncodePublicKey_ex` to accept key type for PQClean ML-KEM, one-time ML-KEM, and HQC
+- [x] Implement `PublicKeyToDer` for PQClean ML-KEM
 
 What would a ML-KEM-512 public key's DER look like? Here are the components:
 - The last component is a `BIT STRING`. A ml-kem-512 public key contains 800 bytes. Bit string values need one more byte to encode the offset (how many unused bits at the end of the last octet), so the value of the bit string takes 801 bytes. The length `801 = 0x0321` needs long-form encoding: `0x82 0x03 0x21`. The tag of a bit string is `0x03`. **Hence the entire bit string takes 805 bytes**.

@@ -14,6 +14,8 @@
 #include <wolfssl/wolfcrypt/dilithium.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/falcon.h>
+#include <wolfssl/wolfcrypt/pqclean_hqc.h>
+#include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #include <wolfssl/wolfcrypt/rsa.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
 #include <wolfssl/wolfcrypt/types.h>
@@ -156,6 +158,16 @@ int is_falcon(enum CertType key_type) {
   return ((key_type == FALCON_LEVEL1_TYPE) || (key_type == FALCON_LEVEL5_TYPE));
 }
 
+int is_mlkem(enum CertType key_type) {
+  return ((key_type == ML_KEM_LEVEL1_TYPE) ||
+          (key_type == ML_KEM_LEVEL3_TYPE) || (key_type == ML_KEM_LEVEL5_TYPE));
+}
+
+int is_hqc(enum CertType key_type) {
+  return ((key_type == HQC_LEVEL1_TYPE) || (key_type == HQC_LEVEL3_TYPE) ||
+          (key_type == HQC_LEVEL5_TYPE));
+}
+
 /* Allocate memory for key types and assign it to `key`
  *
  * Return 0 upon success
@@ -168,6 +180,10 @@ static int malloc_key(void **key, enum CertType key_type, size_t *key_size) {
     capacity = sizeof(sphincs_key);
   } else if (is_falcon(key_type)) {
     capacity = sizeof(falcon_key);
+  } else if (is_mlkem(key_type)) {
+    capacity = sizeof(PQCleanMlKemKey);
+  } else if (is_hqc(key_type)) {
+    capacity = sizeof(PQCleanHqcKey);
   } else if (key_type == RSA_TYPE) {
     capacity = sizeof(RsaKey);
   } else if (key_type == ECC_TYPE) {
@@ -449,6 +465,86 @@ static int gen_falcon(falcon_key *key, enum CertType key_type, uint8_t *pem,
   return ret;
 }
 
+static int gen_mlkem(PQCleanMlKemKey *key, enum CertType key_type, uint8_t *pem,
+                     size_t *pem_len, WC_RNG *rng) {
+  int level, ret, der_sz, pem_sz;
+  uint8_t der[KEY_DER_MAX_SIZE];
+
+  switch (key_type) {
+  case ML_KEM_LEVEL1_TYPE:
+    level = 1;
+    break;
+  case ML_KEM_LEVEL3_TYPE:
+    level = 3;
+    break;
+  case ML_KEM_LEVEL5_TYPE:
+    level = 5;
+    break;
+  default:
+    return BAD_FUNC_ARG;
+  }
+
+  if ((ret = wc_PQCleanMlKemKey_Init(key)) < 0) {
+    return ret;
+  }
+  if ((ret = wc_PQCleanMlKemKey_SetLevel(key, level)) < 0) {
+    return ret;
+  }
+  if ((ret = wc_PQCleanMlKemKey_MakeKey(key, rng)) < 0) {
+    return ret;
+  }
+  der_sz = wc_PQCleanMlKemKey_PrivateKeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, key_type);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
+  return ret;
+}
+
+static int gen_hqc(PQCleanHqcKey *key, enum CertType key_type, uint8_t *pem,
+                   size_t *pem_len, WC_RNG *rng) {
+  int level, ret, der_sz, pem_sz;
+  uint8_t der[KEY_DER_MAX_SIZE];
+
+  switch (key_type) {
+  case ML_KEM_LEVEL1_TYPE:
+    level = 1;
+    break;
+  case ML_KEM_LEVEL3_TYPE:
+    level = 3;
+    break;
+  case ML_KEM_LEVEL5_TYPE:
+    level = 5;
+    break;
+  default:
+    return BAD_FUNC_ARG;
+  }
+
+  if ((ret = wc_PQCleanHqcKey_Init(key)) < 0) {
+    return ret;
+  }
+  if ((ret = wc_PQCleanHqcKey_SetLevel(key, level)) < 0) {
+    return ret;
+  }
+  if ((ret = wc_PQCleanHqcKey_MakeKey(key, rng)) < 0) {
+    return ret;
+  }
+  der_sz = wc_PQCleanHqcKey_PrivateKeyToDer(key, der, sizeof(der));
+  if (der_sz <= 0) {
+    return der_sz;
+  }
+  pem_sz = wc_DerToPem(der, der_sz, pem, *pem_len, key_type);
+  if (pem_sz <= 0) {
+    return pem_sz;
+  }
+  *pem_len = pem_sz;
+  return ret;
+}
+
 /* Given appropriate key type, generate a keypair with matching primitive
  * (ML-DSA or SPHINCS or Falcon etc.) and assign it to `key`, then export the
  * private key to `pem`
@@ -505,6 +601,16 @@ static int gen_keypair(void **key, enum CertType key_type, size_t *key_size,
   case FALCON_LEVEL1_TYPE:
   case FALCON_LEVEL5_TYPE:
     ret = gen_falcon(*key, key_type, pem, pem_len, rng);
+    break;
+  case ML_KEM_LEVEL1_TYPE:
+  case ML_KEM_LEVEL3_TYPE:
+  case ML_KEM_LEVEL5_TYPE:
+    ret = gen_mlkem(*key, key_type, pem, pem_len, rng);
+    break;
+  case HQC_LEVEL1_TYPE:
+  case HQC_LEVEL3_TYPE:
+  case HQC_LEVEL5_TYPE:
+    ret = gen_hqc(*key, key_type, pem, pem_len, rng);
     break;
   default:
     fprintf(stderr, "enum CertType %d not supported\n", key_type);
@@ -823,7 +929,7 @@ int main(int argc, char *argv[]) {
   enum Ctc_SigType root_sig_type = CTC_ED448;
   enum CertType int_key_type = ECC_TYPE;
   enum Ctc_SigType int_sig_type = CTC_SHA384wECDSA;
-  enum CertType leaf_key_type = ED25519_TYPE;
+  enum CertType leaf_key_type = ML_KEM_LEVEL1_TYPE;
   enum Ctc_SigType leaf_sig_type = CTC_ED25519;
   enum CertType client_key_type = RSA_TYPE;
   enum Ctc_SigType client_sig_type = CTC_SHA256wRSA;
