@@ -1,9 +1,48 @@
+# May 23, 2025
+- [ ] Implement and verify `PublicKeyToDer` for PQClean ML-KEM
+
+What would a ML-KEM-512 public key's DER look like? Here are the components:
+- The last component is a `BIT STRING`. A ml-kem-512 public key contains 800 bytes. Bit string values need one more byte to encode the offset (how many unused bits at the end of the last octet), so the value of the bit string takes 801 bytes. The length `801 = 0x0321` needs long-form encoding: `0x82 0x03 0x21`. The tag of a bit string is `0x03`. **Hence the entire bit string takes 805 bytes**.
+- Another inner component is the OID. The OID will be wrapped in a sequence that contains only a single element (the OID).
+    - The inner OID type needs to encode the OID `2.16.840.1.101.3.4.4.1`. `2.16` encodes as `2 * 40 + 16 = 96 = 0x60`. `840`'s binary form is `0b110_1001000`, which encodes as `0b10000110 0b01001000 = 0x86 0x48`. The rest of the integers are all less than 127 and are thus trivially encoded. The value of the OID type is thus `60:86:48:01:65:03:04:04:01`. The length is `0x09`. The tag is `0x06`. The total length of the OID type is 11 bytes.
+    - The `SEQUENCE` wrapping the OID type adds a tag `0x30` and a length `0x0b`, for a **total length of 13 bytes**.
+- The outermost SEQUENCE needs to capture both the bit string and the inner sequence containing the OID. The value of the outer sequence is thus 818 bytes long. The length field requires long form encoding `82:03:32`. Adds the tag `0x30`.
+
+The final length should thus be **822** bytes.
+
+My current implementation returns 813 bytes, and the reported OID sum is 0xffffffff. I suspect something went wrong when encoding the OID. Any `KeyToDer` method will call `SetAsymKeyDerPublic`, which calls `SetASN_Oid` with `keyType`. `SetASN_OID` is a macro that calls `OidFromId`
+
+After adding static oid arrays to `asn.c` the length is correct. I think it is safe to assume that if the length is correct then the content it correct.
+
 # May 22, 2025
 TODO:
 - [ ] Refactor `MakeAnyCert` to accept `void *key` and `enum CertType key_type` instead of a hard coded set of arguments
 - [ ] Modify `EncodePublicKey_ex` to accept key type for PQClean ML-KEM, one-time ML-KEM, and HQC
 - [ ] Implement `PublicKeyToDer` for PQClean ML-KEM, one-time ML-KEM, and HQC.
 
+Found that because `WOLFSSL_OLD_OID_SUM` is NOT defined, WolfSSL's OID sum actually uses an updated kind of "XOR sum" which resolves the collision problem that the old "naive sum" runs into. For now it is safe to assume that the OID sums will not collide.
+
+Implementing `PublicKeyToDer` and `PrivateKeyToDer` are both necessary for the KEM schemes. What would a ML-KEM public key look like? An Ed448 public key looked like this in DER:
+
+```
+ 296: 2 [  67]  (2) │├┬SEQUENCE
+ 298: 2 [   5]  (3) ││├┬SEQUENCE
+ 300: 2 +   3   (4) │││└─OBJECT ID       :(0x7f8e65d4) 1.3.101.113
+ 305: 2 +  58   (3) ││└─BIT STRING
+```
+
+ML-KEM-512's OID is `2.16.840.1.101.3.4.4.1`, which translates in octet sequence to `96:82:48:01:65:03:04:04:01`
+
+Initial output:
+
+```
+   0: 4 [ 809]  (0) ┌SEQUENCE
+   4: 2 [   2]  (1) ├┬SEQUENCE
+   6: 2 +   0   (2) │└─OBJECT ID       :(0xffffffff)
+   8: 4 + 801   (1) └─BIT STRING
+```
+
+The OID sum is not correct.
 
 # May 21, 2025
 Start adding KEM certificate!
