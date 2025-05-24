@@ -1,3 +1,6 @@
+# May 24, 2025
+Starting this week I am finally moving onto implementing the KEMTLS protocol. Wiggers' thesis work was built on rustls, and the embedded system work was built on WolfSSL. Although the embedded work only included the client side, and it is missing the KEMTLS-PDK works, I will still rely heavily on it. The [repository](https://git.fslab.de/rgonza2s/wolfssl-kemtls-updated) containing the modified WolfSSL is self-hosted using GitLab. I don't want to have to sign up for another GitLab account, so I will get a mirror uploaded to my personal GitHub account.
+
 # May 23, 2025
 - [x] Refactor `MakeAnyCert` to accept `void *key` and `enum CertType key_type` instead of a hard coded set of arguments
 - [x] Modify `EncodePublicKey_ex` to accept key type for PQClean ML-KEM, one-time ML-KEM, and HQC
