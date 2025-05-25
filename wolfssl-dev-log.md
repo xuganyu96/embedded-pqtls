@@ -1,5 +1,45 @@
+# May 26, 2025
+Next milestone: **KEM-based unilateral authentication**
+- [ ] Server needs to be able to load KEM private key and KEM leaf certificate; if the private key is a KEM key, then server needs to know to send `Certificate`, to not send `CertificateVerify`, and to expect `ClientKemCiphertext`.
+- [ ] Client needs to specify KEM algorithms in `ClientHello` using the `signature_algorithms` extension
+- [ ] Client needs to process peer certificate. If peer certificate contains KEM public key, then client needs to send `ClientKemCiphertext`
+- [ ] Server needs to process `ClientKemCiphertext` and send `ServerFinished`
+
+# May 25, 2025
+Let's gather the modifications I will need to make to WolfSSL:
+
+**ClientHello's `signature_algorithms` extension**: RFC 8446 Section 4.2.3 states 
+
+> Clients which desire the server to authenticate itself via a certificate must send the `signature_algorithms` extension. If a server is authenticating via a certificate and the client has not sent a `signature_algorithms` extension, then the server must abort the handshake with a `missing_extension` alert.
+
+ClientHello's `signature_algorithms` extension needs a way to specify "server should authenticate using KEM, such as ML-KEM or HQC"
+
+**Server authentication**: in both signature-authenticated and KEM-authenticated TLS, the authentication phase begins after `ClientHello`, `ServerHello`, (and optionally `EncryptedExtension`). 
+
+With signature-based authentication:
+1. server sends `Certificate`, `CertificateVerify`, and `Finished`. Server optionally sends `CertificateRequest` if requesting client authentication
+1. client processes `Certificate`, `CertificateVerify`, and `Finished`, then sends its own `Finished`. Client optionally sends `Certificate` and `CertificateVerify` if server requests client authentication.
+
+With unilateral KEM-based authentication:
+1. server sends `Certificate`.
+1. client uses the KEM public key from server's `Certificate` and sends `KemCiphertext`, followed by client's `Finished`
+1. server decapsulates `KemCiphertext`, then sends `Finished`
+
+With mutual KEM-based authentication:
+1. server sends `Certificate` and `CertificateRequest`
+1. client processes server's `Certificate` and sends `KemCiphertext`. Client sends `Certificate`
+1. server processes client's `KemCiphertext` and `Certificate` and sends `KemCiphertext`
+1. client processes server's `KemCiphertext` and sends `Finished`
+1. server sends `Finished`
+
+Side notes: post-handshake authentication is a open problem for KEMTLS, though it is supported in TLS 1.3 (RFC 8446 Section 4.2.6). There is also the problem of certificate issuance: certificate signing request (CSR) also needs to be authenticated, otherwise someone who does not possess the corresponding secret key can obtain CA-certified certificates containing public keys that do not belong to them.
+
+Big surprise: [KEMTLS vs. Post-Quantum TLS: performance on embedded systems](https://eprint.iacr.org/2022/1712.pdf) does not have PDK, does not have client authentication.
+
 # May 24, 2025
 Starting this week I am finally moving onto implementing the KEMTLS protocol. Wiggers' thesis work was built on rustls, and the embedded system work was built on WolfSSL. Although the embedded work only included the client side, and it is missing the KEMTLS-PDK works, I will still rely heavily on it. The [repository](https://git.fslab.de/rgonza2s/wolfssl-kemtls-updated) containing the modified WolfSSL is self-hosted using GitLab. I don't want to have to sign up for another GitLab account, so I will get a mirror uploaded to my personal GitHub account.
+
+I definitely don't want to manage KEMTLS implementations on two separate codebases, nor do I want to take the time to learn how rustls works. Consequently, I will need to implement both client side and server side operations on WolfSSL. This will hopefully impress the people at WolfSSL and open doors for me later down the road.
 
 # May 23, 2025
 - [x] Refactor `MakeAnyCert` to accept `void *key` and `enum CertType key_type` instead of a hard coded set of arguments
