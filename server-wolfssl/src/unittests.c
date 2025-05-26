@@ -135,7 +135,7 @@ static int ssl_load_kem_privkey() {
   if (ctx == NULL)
     return -1;
   if ((err = wolfSSL_CTX_use_PrivateKey_buffer(ctx, der, der_sz,
-                                               SSL_FILETYPE_DEFAULT)) < 0) {
+                                               SSL_FILETYPE_DEFAULT)) != SSL_SUCCESS) {
     // TODO: this currently returns -463 (WOLFSSL_BAD_FILE)
     wolfSSL_CTX_free(ctx);
     wolfSSL_Cleanup();
@@ -151,6 +151,7 @@ int main(void) {
   int err = 0;
 
   wc_InitRng(&grng);
+  wolfSSL_Debugging_ON();
 
   if ((err = pqclean_mlkem_der()) < 0)
     return exit_err("pqclean_mlkem_der", err);

@@ -5,6 +5,32 @@ Next milestone: **KEM-based unilateral authentication**
 - [ ] Client needs to process peer certificate. If peer certificate contains KEM public key, then client needs to send `ClientKemCiphertext`
 - [ ] Server needs to process `ClientKemCiphertext` and send `ServerFinished`
 
+First: `wolfssl_ctx` cannot load KEM key. `wolfSSL_CTX_use_PrivateKey_buffer` will return `-463 (WOLFSSL_BAD_FILE)` 
+
+`wolfSSL_CTX_use_PrivateKey_buffer` calls `ProcessBuffer` with parameter `type=PRIVATEKEY_TYPE`. `ProcessBuffer` then calls `static int ProcessBufferPrivateKey`. `ProcessBufferPrivateKey` will return WOLFSSL_BAD_FILE because algId remains 0 (i.e. cannot determine algorithm id).
+
+Modified the `.clangd` at WolfSSL source root to use another user config:
+
+```yaml
+CompileFlags:
+    Add: [
+        -I/REDACTED/embedded-pqtls/wolfssl,
+        -I/REDACTED/embedded-pqtls/server-wolfssl/config,
+        -DWOLFSSL_USER_SETTINGS,
+    ]
+```
+
+I need to implement `ProcessBufferTryDecodeMlKem`, which should largely follow `ProcessBufferTryDecodeDilithium`:
+- Allocate for a Dilithium key `XMALLOC(sizeof(dilithium_key), heap, DYNAMIC_TYPE_DILITHIUM)`, return MEMORY_E on error. Not sure what `DYNAMIC_TYPE_DILITHIUM` is trying to do; might be a hint for memory management.
+- `wc_dilithium_init`, `dilithium_PrivateKeyDecode`. If `PrivateKeyDecode` is successful, then set `keyFormatTemp`, which should be a OidSum, then use `keyFormatTemp` to set `keyTypeTemp` (the code for `signature_algorithm`) and `keySizeTemp`; on error return `ALGO_ID_E`
+- WolfSSL has a method for making sure that the loaded private meets the minimal security requirement. For example, if `WOLFSSL_CTX` is configured to require an RSA key with minimum size 2048, then WolfSSL will fail to load a 1024-bit RSA key; I think for now I can ignore this, just leave a note
+
+Now I need to implement `wc_PQCleanMlKemKey_DerToPrivateKey`. `wc_Dilithium_PrivateKeyDecode` calls `DecodeAsymKey_Assign`, so I will do the same, and that means I need to cover the case for ml-kem in `DecodeAsymKey_Assign`.
+
+It turns out `DecodeAsymKey_Assign` does not need extra handling. So `wc_PQCleanMlKemKey_DerToPrivateKey` just kind of works.
+
+Now `ProcessBufferTryDecode` can call `ProcessBufferTryDecodeMlKem` can get the correct *keyFormat.
+
 # May 25, 2025
 Let's gather the modifications I will need to make to WolfSSL:
 
