@@ -1,9 +1,12 @@
 /* unit tests for Ganyu's modifications to WolfSSL
  */
 
+#include "wolfssl/wolfcrypt/asn_public.h"
 #include <stdio.h>
 #include <wolfssl/wolfcrypt/settings.h>
 
+#include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/ed25519.h>
 #include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #include <wolfssl/wolfcrypt/random.h>
 
@@ -65,6 +68,85 @@ static int pqclean_mlkem_der() {
   return err;
 }
 
+/* Create an ssl object and try to load a signature private key
+ */
+static int ssl_load_sig_privkey() {
+  int err = 0;
+  byte der[KEY_DER_MAX_SZ];
+  word32 der_sz;
+
+  ed25519_key key;
+  if ((err = wc_ed25519_init(&key)) < 0)
+    return err;
+  if ((err = wc_ed25519_make_key(&grng, ED25519_KEY_SIZE, &key)) < 0)
+    return err;
+  if ((err = wc_Ed25519PrivateKeyToDer(&key, der, sizeof(der))) < 0) {
+    return err;
+  } else {
+    der_sz = err;
+  }
+  wc_ed25519_free(&key);
+
+  if ((err = wolfSSL_Init()) < 0)
+    return err;
+  WOLFSSL_CTX *ctx;
+
+  ctx = wolfSSL_CTX_new(wolfTLSv1_3_server_method());
+  if (ctx == NULL)
+    return -1;
+  if ((err = wolfSSL_CTX_use_PrivateKey_buffer(ctx, der, der_sz,
+                                               SSL_FILETYPE_DEFAULT)) < 0) {
+    wolfSSL_CTX_free(ctx);
+    wolfSSL_Cleanup();
+    return err;
+  }
+  wolfSSL_CTX_free(ctx);
+  wolfSSL_Cleanup();
+
+  return err;
+}
+
+/* Create an ssl object and try to load a KEM private key
+ */
+static int ssl_load_kem_privkey() {
+  int err = 0;
+  byte der[KEY_DER_MAX_SZ];
+  word32 der_sz;
+
+  PQCleanMlKemKey key;
+  if ((err = wc_PQCleanMlKemKey_Init(&key)) < 0)
+    return err;
+  if ((err = wc_PQCleanMlKemKey_SetLevel(&key, 1)) < 0)
+    return err;
+  if ((err = wc_PQCleanMlKemKey_MakeKey(&key, &grng)) < 0)
+    return err;
+  if ((err = wc_PQCleanMlKemKey_PrivateKeyToDer(&key, der, sizeof(der))) < 0) {
+    return err;
+  } else {
+    der_sz = err;
+  }
+  wc_PQCleanMlKemKey_Free(&key);
+
+  if ((err = wolfSSL_Init()) < 0)
+    return err;
+  WOLFSSL_CTX *ctx;
+
+  ctx = wolfSSL_CTX_new(wolfTLSv1_3_server_method());
+  if (ctx == NULL)
+    return -1;
+  if ((err = wolfSSL_CTX_use_PrivateKey_buffer(ctx, der, der_sz,
+                                               SSL_FILETYPE_DEFAULT)) < 0) {
+    // TODO: this currently returns -463 (WOLFSSL_BAD_FILE)
+    wolfSSL_CTX_free(ctx);
+    wolfSSL_Cleanup();
+    return err;
+  }
+  wolfSSL_CTX_free(ctx);
+  wolfSSL_Cleanup();
+
+  return err;
+}
+
 int main(void) {
   int err = 0;
 
@@ -72,6 +154,10 @@ int main(void) {
 
   if ((err = pqclean_mlkem_der()) < 0)
     return exit_err("pqclean_mlkem_der", err);
+  if ((err = ssl_load_sig_privkey()) < 0)
+    return exit_err("ssl_load_sig_privkey", err);
+  if ((err = ssl_load_kem_privkey()) < 0)
+    return exit_err("ssl_load_kem_privkey", err);
 
   printf("Ok.\n");
   return err;
