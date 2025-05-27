@@ -31,6 +31,17 @@ It turns out `DecodeAsymKey_Assign` does not need extra handling. So `wc_PQClean
 
 Now `ProcessBufferTryDecode` can call `ProcessBufferTryDecodeMlKem` can get the correct *keyFormat.
 
+`wolfSSL_CTX_use_PrivateKey_buffer` supposedly "load a private key into SSL context" but I could not see where the private key is "loaded".
+- `wolfSSL_CTX_use_PrivateKey_buffer` calls `ProcessBuffer`
+- `ProcessBuffer` calls `ProcessBufferPrivateKey`
+- `ProcessBufferPrivateKey` calls `ProcessBufferPrivKeyHandleDer` then `ProcessBufferTryDecode`.
+    - `ProcessBufferPrivKeyHandleDer`: put the DER buffer into the SSL or the SSL context object. If the `ssl` object is not null then the DER buffer is assigned to `ssl->buffers.key`. If the `ctx` object is not null then the DER buffer is assigned to `ctx->privateKey`.
+    - `ProcessBufferTryDecode` tries to decode the input DER buffer as RSA, ECC, Ed25519/448, etc. until something clicks. However, `ctx` is not modified in `ProcessBufferTryDecodeDilithium`. This method only figures out the `keyFormat` (i.e. OID sum, correspondin to the type `enum Key_Sum`), the `keyType` (i.e. the code for `enum SignatureAlgorithm`), and the `keySize` (bytes of private key). The key object created in `ProcessBufferTryDecodeDilithium` is cleared and freed at the end of the function call.
+
+So in other words, `wolfSSL_CTX_use_PrivateKey_buffer` will assign the DER buffer, but not the decoded key object, to the ssl (or context) object. This means that when server or client needs to send `CertificateVerify`, they will need to decode the key again.
+- `ssl->buffers.key` is used in `DoTls13CertificateRequest`: if client has both certificates (also stored in `ssl->buffers.certificate`) and key, then set `ssl->options.sendVerify` to `SEND_CERT`.
+- `SendTls13CertificateVerify`
+
 # May 25, 2025
 Let's gather the modifications I will need to make to WolfSSL:
 
