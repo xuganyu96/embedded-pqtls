@@ -1,10 +1,15 @@
-# May 26, 2025
+# May 27, 2025
 Next milestone: **KEM-based unilateral authentication**
-- [ ] Server needs to be able to load KEM private key and KEM leaf certificate; if the private key is a KEM key, then server needs to know to send `Certificate`, to not send `CertificateVerify`, and to expect `ClientKemCiphertext`.
+- [x] Server needs to be able to load KEM private key and KEM leaf certificate; if the private key is a KEM key, then server needs to know to send `Certificate`, to not send `CertificateVerify`, and to expect `ClientKemCiphertext`.
 - [ ] Client needs to specify KEM algorithms in `ClientHello` using the `signature_algorithms` extension
 - [ ] Client needs to process peer certificate. If peer certificate contains KEM public key, then client needs to send `ClientKemCiphertext`
 - [ ] Server needs to process `ClientKemCiphertext` and send `ServerFinished`
 
+Today:
+- Generate a certificate chain with ml-kem leaf certificate, figure out a way to start testing for handshake
+- Client needs to process a KEM certificate
+
+# May 26, 2025
 First: `wolfssl_ctx` cannot load KEM key. `wolfSSL_CTX_use_PrivateKey_buffer` will return `-463 (WOLFSSL_BAD_FILE)` 
 
 `wolfSSL_CTX_use_PrivateKey_buffer` calls `ProcessBuffer` with parameter `type=PRIVATEKEY_TYPE`. `ProcessBuffer` then calls `static int ProcessBufferPrivateKey`. `ProcessBufferPrivateKey` will return WOLFSSL_BAD_FILE because algId remains 0 (i.e. cannot determine algorithm id).
