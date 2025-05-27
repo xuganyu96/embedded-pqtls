@@ -929,10 +929,10 @@ int main(int argc, char *argv[]) {
   enum Ctc_SigType root_sig_type = CTC_ML_DSA_LEVEL3;
   enum CertType int_key_type = ML_DSA_LEVEL3_TYPE;
   enum Ctc_SigType int_sig_type = CTC_ML_DSA_LEVEL3;
-  enum CertType leaf_key_type = ML_DSA_LEVEL2_TYPE;
-  enum Ctc_SigType leaf_sig_type = CTC_ML_DSA_LEVEL2;
+  enum CertType leaf_key_type = ML_KEM_LEVEL3_TYPE; /* can be KEM key */
+  enum Ctc_SigType leaf_sig_type = CTC_ML_DSA_LEVEL3;
   enum CertType client_key_type = ML_DSA_LEVEL2_TYPE;
-  enum Ctc_SigType client_sig_type = CTC_ML_DSA_LEVEL2;
+  enum Ctc_SigType client_sig_type = CTC_ML_DSA_LEVEL2; /* can be KEM key */
   certchain_suite_t suite = {root_key_type,   root_sig_type,  int_key_type,
                              int_sig_type,    leaf_key_type,  leaf_sig_type,
                              client_key_type, client_sig_type};

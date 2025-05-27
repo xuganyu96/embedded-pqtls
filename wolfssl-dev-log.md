@@ -1,13 +1,52 @@
-# May 27, 2025
 Next milestone: **KEM-based unilateral authentication**
-- [x] Server needs to be able to load KEM private key and KEM leaf certificate; if the private key is a KEM key, then server needs to know to send `Certificate`, to not send `CertificateVerify`, and to expect `ClientKemCiphertext`.
-- [ ] Client needs to specify KEM algorithms in `ClientHello` using the `signature_algorithms` extension
-- [ ] Client needs to process peer certificate. If peer certificate contains KEM public key, then client needs to send `ClientKemCiphertext`
-- [ ] Server needs to process `ClientKemCiphertext` and send `ServerFinished`
+- [x] Server can start
+- [x] Client can start
+- [x] Client can send ClientHello
+- [x] Server can process ClientHello
+- [x] Server can send ServerHello
+- [x] Server can send Certificate
+- [x] Client can process ServerHello
+- [ ] Client can process server's Certificate
+- [ ] Client can send KemCiphertext
+- [ ] Server can process KemCiphertext
+- [ ] Server can send Finished
+- [ ] Client can send Finished
 
-Today:
-- Generate a certificate chain with ml-kem leaf certificate, figure out a way to start testing for handshake
-- Client needs to process a KEM certificate
+# May 27, 2025
+Not quite done with `ssl_load.c`: **server cannot load certificate chain whose leaf is a KEM certificate**. The first fix is to modify `static int GetCertKey` from `asn.c` to handle `case ML_KEM_LEVEL1k` and variants. Not sure what `StoreKey` does but let's just roll with it for now. After that the server loading certificate chain passes, but there is a loggging message "Cert key not supported", reported from `wolfssl_set_have_from_key_oid`. This function sets some flags such as `ssl->options.haveDilithiumSig`, so I made similar flags `haveMlKemAuth` and `haveHqcAuth`. There is also a minimum public key size check in `ProcessBufferCertPublicKey`.
+
+At [wolfssl@021a7f6], server can load certificate chain and leaf key containing ml-kem key. I can now run server and client pair.
+
+```bash
+# focus on unilateral authentication for now
+./tls13server --debug --certs certs/server-chain.crt --key certs/leaf.key 8000
+./tls13client --cafile certs/root.crt localhost 8000
+```
+
+Server debugging log will complain:
+
+```
+wolfSSL Entering DoTls13ClientHello
+Supported Versions extension received
+Adding signature algorithms extension
+Key Share extension received
+TLSX_KeyShare_HandlePQCleanMlKemKeyServer: level set to 1
+Skipping Supported Versions - already processed
+Signature Algorithms extension received
+Supported Groups extension received
+wolfSSL Entering MatchSuite
+wolfSSL Entering VerifyServerSuite
+Requires AEAD
+Verified suite validity
+Unsupported cipher suite, ClientHello 1.3
+wolfSSL Leaving DoTls13ClientHello, return -501
+```
+
+The error message "Unsupported cipher suite, ClientHello 1.3" is raised in `DoTls13ClientHello` if `MatchSuite` returns error code. `MatchSuite_ex` returned 0. The actual problem is `PickHashSigAlgo`, which returns -501 (`MATCH_SUITE_ERROR`). In other words, I need a way for client to specify `signature_algorithms`.
+
+Client calls `TLSX_PopulateExtensions`, which calls `TLSX_SetSignatureAlgorithms` to instantiate an empty `signature_algorithms` extension and push onto the list of extensions. **`TLSX_SetSignatureAlgorithms` is not where the signature algorithms are set**. Instead, the call chain is `wolfSSL_new -> InitSSL -> InitSSL_CTX_Suites -> InitSuites_EitherSide -> InitSuites -> InitSuitesHashSigAlgo`
+
+Modified `AddSuiteHashSigAlgo` so the 2-byte code for ML-KEM and HQC as "signature algorithm" is added. Modified `InitSuitesHashSigAlgo` so that client will send `signature_algorithms` extension including ML-KEM and HQC. Modified `DecodeSigAlg` so the 2-byte code for ML-KEM and HQC as signature algorithm correctly decode back to `enum SignatureAlgorithm` and `enum wc_MACAlgorithm`. **Now server can process `ClientHello`, send `ServerHello`, and send `Certificate`, but not `CertificateVerify`**
 
 # May 26, 2025
 First: `wolfssl_ctx` cannot load KEM key. `wolfSSL_CTX_use_PrivateKey_buffer` will return `-463 (WOLFSSL_BAD_FILE)` 

@@ -28,7 +28,6 @@ echo "[INFO] Starting server..."
 ./tls13server \
   --certs "$CERTDIR/server-chain.crt" \
   --key "$CERTDIR/leaf.key" \
-  --cafile "$CERTDIR/root.crt" \
   8000 &
 
 SERVER_PID=$!
@@ -38,8 +37,6 @@ echo "[INFO] Server PID: $SERVER_PID" && sleep 1
 echo "[INFO] Starting client..."
 if ./tls13client \
     --cafile "$CERTDIR/root.crt" \
-    --certs "$CERTDIR/client-chain.crt" \
-    --key "$CERTDIR/client.key" \
     localhost 8000; then
     echo "[INFO] Client completed successfully."
 else
