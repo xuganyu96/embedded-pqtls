@@ -123,7 +123,6 @@ I first need to break it up into two steps. Instead of going straight to `SERVER
 
 ```c
 case HELLO_AGAIN_REPLY:
-    /* Get the response/s from the server. */
     while (ssl->options.serverState < SERVER_CERT_COMPLETE) {
         if ((ssl->error = ProcessReply(ssl)) < 0) {
                 WOLFSSL_ERROR(ssl->error);
