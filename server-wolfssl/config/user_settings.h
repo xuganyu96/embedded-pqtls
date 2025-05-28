@@ -485,6 +485,8 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 /* ------------------------------------------------------------------------- */
 
 #define WOLFSSL_TLS13
+#define WOLFSSL_NO_TLS12
+#define NO_OLD_TLS
 #define WOLFSSL_OLD_PRIME_CHECK /* Use faster DH prime checking */
 #define HAVE_TLS_EXTENSIONS
 #define HAVE_SUPPORTED_CURVES
