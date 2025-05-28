@@ -14,11 +14,84 @@ Next milestone: **KEM-based unilateral authentication**
 - [ ] Client can send Finished
 
 # May 28, 2025
-**If server's private key is a KEM key, then server should not send CertificateVerify**. Instead:
-- server sends `Certificate` and starts waiting for `KemCiphertext` (main goal of the day)
-- client processes server's `Certificate`, then sends `KemCiphertext`
-- server processes client's `KemCiphertext`, then sends `Finished`
-- client processes server's `Finished`, then sends `Finished`
+## Add SSL state "awaiting client KemCiphertext"
+Modify the state machine so that **after sending `Certificate`, if server's private key is a KEM key then enter `expectClientKemCiphertext` instead of sending `CertificateVerify`**.
+
+```
+wolfSSL Entering SendTls13Certificate
+growing output buffer
+wolfSSL Entering BuildTls13Message
+wolfSSL Entering EncryptTls13
+wolfSSL Leaving BuildTls13Message, return 0
+Shrinking output buffer
+wolfSSL Leaving SendTls13Certificate, return 0
+accept state CERT_SENT
+wolfSSL Entering SendTls13CertificateVerify
+growing output buffer
+wolfSSL Leaving SendTls13CertificateVerify, return -173
+wolfSSL error occurred, error = -173
+```
+
+`tls13.c` contains the workflow of the TLS state machine. After server calls `SendTls13Certificate`, it sets `ssl->options.acceptState` to `TLS13_CERT_SENT`, and later in the switch block if the state is `TLS13_CERT_SENT` then server will call `SentTls13CertificateVerify`. There are two ways to mod this:
+- after `SendTls13Certificate`, depending on the private key type, set `acceptState` to a new state such as `KEMTLS_CERT_SENT`
+- after `SendTls13Certificate`, set `acceptState` to `TLS13_CERT_SENT`, but under `case TLS13_CERT_SENT`, do different thing depending on the type of private key.
+
+I like the first option. How does WolfSSL handle "waiting for peer response"? For server there are two scenarios: waiting for `ClientHello` at the beginning of the handshake, and waiting for client authentication (i.e. client's `Certificate`, `CertificateVerify`). For accept `ClientHello`:
+
+```c
+case TLS13_ACCEPT_BEGIN :
+    while (ssl->options.clientState < CLIENT_HELLO_COMPLETE) {
+        if ((ssl->error = ProcessReply(ssl)) < 0) {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        }
+    ssl->options.acceptState = TLS13_ACCEPT_CLIENT_HELLO_DONE;
+    WOLFSSL_MSG("accept state ACCEPT_CLIENT_HELLO_DONE");
+    if (!IsAtLeastTLSv1_3(ssl->version))
+        return wolfSSL_accept(ssl);
+```
+
+There is also the section, which comes after `TLS13_CERT_VERIFY_SENT` and `TLS13_ACCEPT_FINISHED_SENT`, so this is probably where the server is waiting for client's `Certificate` and `CertificateVerify`.
+
+```c
+case TLS13_PRE_TICKET_SENT :
+    while (ssl->options.clientState < CLIENT_FINISHED_COMPLETE) {
+        if ( (ssl->error = ProcessReply(ssl)) < 0) {
+                WOLFSSL_ERROR(ssl->error);
+                return WOLFSSL_FATAL_ERROR;
+            }
+    }
+    ssl->options.acceptState = TLS13_ACCEPT_FINISHED_DONE;
+    WOLFSSL_MSG("accept state ACCEPT_FINISHED_DONE");
+    FALL_THROUGH;
+```
+
+I need a way to know if server's private key is KEM key or signature key. This is easy since previously I've left `ssl->options.haveMlKemKey` and `ssl->options.haveHqcKey`.
+
+Ran into an unexpected behavior:
+
+```c
+case CERT_REQ_SENT:
+    /* send Certificate */
+    if (ssl->options.haveMlKemAuth || ssl->options.haveHqcAuth) {
+        ssl->options.acceptState = KEMTLS_CERT_SENT;
+        WOLFSSL_MSG("accept state KEMTLS_CERT_SENT");
+    } else {
+        ssl->options.acceptState = TLS13_CERT_SENT;
+        WOLFSSL_MSG("accept state TLS13_CERT_SENT");
+    }
+    FALL_THROUGH;
+
+case KEMTLS_CERT_SENT :
+    WOLFSSL_MSG("Need to implement DoKemTlsClientKemCiphertext");
+    WOLFSSL_ERROR(NOT_COMPILED_IN);
+    return WOLFSSL_FATAL_ERROR;
+
+case TLS13_CERT_SENT :
+    /* send CertificateVerify */
+```
+
+Even if `acceptState` is assigned `TLS13_CERT_SENT`, the code will still go through `KEMTLS_CERT_SENT`
 
 # May 27, 2025
 Not quite done with `ssl_load.c`: **server cannot load certificate chain whose leaf is a KEM certificate**. The first fix is to modify `static int GetCertKey` from `asn.c` to handle `case ML_KEM_LEVEL1k` and variants. Not sure what `StoreKey` does but let's just roll with it for now. After that the server loading certificate chain passes, but there is a loggging message "Cert key not supported", reported from `wolfssl_set_have_from_key_oid`. This function sets some flags such as `ssl->options.haveDilithiumSig`, so I made similar flags `haveMlKemAuth` and `haveHqcAuth`. There is also a minimum public key size check in `ProcessBufferCertPublicKey`.

@@ -39,7 +39,7 @@ static enum Ctc_SigType int_sig_type = CTC_ML_DSA_LEVEL3;
 /* ML-KEM OID: 2.16.840.1.101.3.4.4.2
  * ML-DSA OID: 2.16.840.1.101.3.4.3.17 */
 static enum CertType leaf_key_type =
-    0 ? ML_KEM_LEVEL3_TYPE : ML_DSA_LEVEL3_TYPE;
+    1 ? ML_KEM_LEVEL3_TYPE : ML_DSA_LEVEL3_TYPE;
 static enum Ctc_SigType leaf_sig_type = CTC_ML_DSA_LEVEL3;
 static enum CertType client_key_type = ML_DSA_LEVEL2_TYPE;
 static enum Ctc_SigType client_sig_type = CTC_ML_DSA_LEVEL2;
