@@ -45,10 +45,11 @@ echo "[INFO] Server PID: $SERVER_PID" && sleep 1
 # Step 4: Run the client in the foreground
 echo "[INFO] Starting client..."
 if ./tls13client \
+    --debug \
     --cafile "$CERTDIR/root.crt" \
     --certs "$CERTDIR/client-chain.crt" \
     --key "$CERTDIR/client.key" \
-    localhost 8000; then
+    localhost 8000 > client.log 2>&1; then
     echo "[INFO] Client completed successfully."
 else
     echo "[ERROR] Client encountered an error."

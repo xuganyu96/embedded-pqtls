@@ -91,7 +91,71 @@ case TLS13_CERT_SENT :
     /* send CertificateVerify */
 ```
 
-Even if `acceptState` is assigned `TLS13_CERT_SENT`, the code will still go through `KEMTLS_CERT_SENT`
+Even if `acceptState` is assigned `TLS13_CERT_SENT`, the code will still go through `KEMTLS_CERT_SENT`. I don't have an elegant way to work around this within `wolfSSL_accept_TLSv13`; this is only going to get worse if I want to implement PDK later. Instead, I want to try the following idea:
+1. create another method for instantiating with `ctx = wolfSSL_CTX_new(KEMTLS_client_method());`
+1. since TLS 1.3 actually uses extension `supported_versions` to specify TLS version, we can extend this extension so client sends a different code to indicate that it wants to do KEMTLS handshake
+1. server will process `ClientHello.extensions.supported_versions`: if the supported version is TLS 1.3 then call `wolfSSL_accept_TLSv13`, else call `accept_KEMTLS`
+
+Client calls `wolfSSL_connect`, where if `ssl->options.tls1_3`, then returns `wolfSSL_connect_TLSv13()` (this also mirrors the server calls `wolfSSL_accept_TLSv13()`!). This means the roadmap becomes:
+- implement a way so that `ssl->options.kemtls` is set to true on the client side
+- implement `wolfSSL_connect_KEMTLS()`
+- implement `wolfSSL_accept_KEMTLS()`
+
+On a second thought maybe this is too ambitious. Let's keep working within the framework of a TLSv13 handshake.
+- under `wolfSSL_accept_TLSv13()` (server side), if server's private keys are KEM keys (`ssl->options.haveMlKemUath || ssl->options.haveHqcAuth`) then call `accept_KEMTLS` and directly return its output
+
+Hijacking client side is not as easy. Here is the relevant part under `wolfSSL_connect_TLSv13()`:
+
+```c
+case HELLO_AGAIN_REPLY:
+    while (ssl->options.serverState < SERVER_FINISHED_COMPLETE) {
+        if ((ssl->error = ProcessReply(ssl)) < 0) {
+                WOLFSSL_ERROR(ssl->error);
+                return WOLFSSL_FATAL_ERROR;
+        }
+    }
+    ssl->options.connectState = FIRST_REPLY_DONE;
+    WOLFSSL_MSG("connect state: FIRST_REPLY_DONE");
+    FALL_THROUGH;
+```
+
+I first need to break it up into two steps. Instead of going straight to `SERVER_FINISHED_COMPLETE`, client first needs to go to `SERVER_CERT_COMPLETE`, then check if the leaf certificate has KEM key. If yes, then hijack with `connect_KEMTLS`; if no, then proceed as normal. After the break-up:
+
+```c
+case HELLO_AGAIN_REPLY:
+    /* Get the response/s from the server. */
+    while (ssl->options.serverState < SERVER_CERT_COMPLETE) {
+        if ((ssl->error = ProcessReply(ssl)) < 0) {
+                WOLFSSL_ERROR(ssl->error);
+                return WOLFSSL_FATAL_ERROR;
+        }
+
+    }
+    /* GYX: DoTls13Certificate happened before this line so we can check
+        * some flag and let connect_KEMTLS() hijack the control flow */
+    WOLFSSL_MSG("serverState is at SERVER_CERT_COMPLETE");
+    if (ssl->options.haveMlKemAuth || ssl->options.haveHqcAuth) {
+        /* GYX: DoTls13Certificate needs to set haveMlKemAuth or haveHqcAuth */
+        ssl->error = connect_KEMTLS(ssl);
+        if (ssl->error != 0) {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        } else {
+            return WOLFSSL_SUCCESS;
+        }
+    }
+
+    while (ssl->options.serverState < SERVER_FINISHED_COMPLETE) {
+        if ((ssl->error = ProcessReply(ssl)) < 0) {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        }
+    }
+
+    ssl->options.connectState = FIRST_REPLY_DONE;
+    WOLFSSL_MSG("connect state: FIRST_REPLY_DONE");
+    FALL_THROUGH;
+```
 
 # May 27, 2025
 Not quite done with `ssl_load.c`: **server cannot load certificate chain whose leaf is a KEM certificate**. The first fix is to modify `static int GetCertKey` from `asn.c` to handle `case ML_KEM_LEVEL1k` and variants. Not sure what `StoreKey` does but let's just roll with it for now. After that the server loading certificate chain passes, but there is a loggging message "Cert key not supported", reported from `wolfssl_set_have_from_key_oid`. This function sets some flags such as `ssl->options.haveDilithiumSig`, so I made similar flags `haveMlKemAuth` and `haveHqcAuth`. There is also a minimum public key size check in `ProcessBufferCertPublicKey`.
