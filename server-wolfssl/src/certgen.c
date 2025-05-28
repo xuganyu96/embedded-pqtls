@@ -1,8 +1,4 @@
-/**
- * Generate a certificate chain: root, int, leaf, client
- * BUG: sometimes the output of certgen will cause client to reject server's
- * certificates
- */
+/* Generate a certificate chain: root, int, leaf, client */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -33,19 +29,17 @@
 #define NOT_BEFORE_DATE "250101000000Z"
 #define NOT_AFTER_DATE "350101000000Z"
 
-#define CERT_DER_MAX_SIZE 100000
-#define KEY_DER_MAX_SIZE 100000
-#define CERT_PEM_MAX_SIZE 100000
-#define KEY_PEM_MAX_SIZE 100000
+#define BUF_MAX_SIZE 100000
 #define PATH_MAX_SIZE 1024
 
-/* TODO: cli args --root-key, --int-key, --leaf-key, and --client-key */
 static enum CertType root_key_type = ML_DSA_LEVEL3_TYPE;
 static enum Ctc_SigType root_sig_type = CTC_ML_DSA_LEVEL3;
 static enum CertType int_key_type = ML_DSA_LEVEL3_TYPE;
 static enum Ctc_SigType int_sig_type = CTC_ML_DSA_LEVEL3;
+/* ML-KEM OID: 2.16.840.1.101.3.4.4.2
+ * ML-DSA OID: 2.16.840.1.101.3.4.3.17 */
 static enum CertType leaf_key_type =
-    1 ? ML_KEM_LEVEL3_TYPE : ML_DSA_LEVEL3_TYPE;
+    0 ? ML_KEM_LEVEL3_TYPE : ML_DSA_LEVEL3_TYPE;
 static enum Ctc_SigType leaf_sig_type = CTC_ML_DSA_LEVEL3;
 static enum CertType client_key_type = ML_DSA_LEVEL2_TYPE;
 static enum Ctc_SigType client_sig_type = CTC_ML_DSA_LEVEL2;
@@ -98,21 +92,21 @@ typedef struct certchain_suite {
  * this is okay.
  */
 typedef struct certchain_out {
-  byte root_cert_pem[CERT_PEM_MAX_SIZE];
+  byte root_cert_pem[BUF_MAX_SIZE];
   size_t root_cert_len;
-  byte root_key_pem[KEY_PEM_MAX_SIZE];
+  byte root_key_pem[BUF_MAX_SIZE];
   size_t root_key_len;
-  byte int_cert_pem[CERT_PEM_MAX_SIZE];
+  byte int_cert_pem[BUF_MAX_SIZE];
   size_t int_cert_len;
-  byte int_key_pem[KEY_PEM_MAX_SIZE];
+  byte int_key_pem[BUF_MAX_SIZE];
   size_t int_key_len;
-  byte leaf_cert_pem[CERT_PEM_MAX_SIZE];
+  byte leaf_cert_pem[BUF_MAX_SIZE];
   size_t leaf_cert_len;
-  byte leaf_key_pem[KEY_PEM_MAX_SIZE];
+  byte leaf_key_pem[BUF_MAX_SIZE];
   size_t leaf_key_len;
-  byte client_cert_pem[CERT_PEM_MAX_SIZE];
+  byte client_cert_pem[BUF_MAX_SIZE];
   size_t client_cert_len;
-  byte client_key_pem[KEY_PEM_MAX_SIZE];
+  byte client_key_pem[BUF_MAX_SIZE];
   size_t client_key_len;
 } certchain_out_t;
 
@@ -215,7 +209,7 @@ static int malloc_key(void **key, enum CertType key_type, size_t *key_size) {
 static int gen_rsa2048(RsaKey *key, uint8_t *pem, size_t *pem_len,
                        WC_RNG *rng) {
   int ret = 0;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
   int der_sz, pem_sz;
   if ((ret = wc_InitRsaKey_ex(key, NULL, INVALID_DEVID)) < 0) {
     return ret;
@@ -244,7 +238,7 @@ static int gen_ecdsa(ecc_key *key, enum Ctc_SigType sig_type, uint8_t *pem,
                      size_t *pem_len, WC_RNG *rng) {
   int ret = 0;
   int curve_id;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
   int der_sz, pem_sz;
 
   switch (sig_type) {
@@ -287,7 +281,7 @@ static int gen_ecdsa(ecc_key *key, enum Ctc_SigType sig_type, uint8_t *pem,
 static int gen_ed25519(ed25519_key *key, uint8_t *pem, size_t *pem_len,
                        WC_RNG *rng) {
   int ret = 0;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
   int der_sz, pem_sz;
   if ((ret = wc_ed25519_init(key)) < 0) {
     return ret;
@@ -311,7 +305,7 @@ static int gen_ed25519(ed25519_key *key, uint8_t *pem, size_t *pem_len,
 static int gen_ed448(ed448_key *key, uint8_t *pem, size_t *pem_len,
                      WC_RNG *rng) {
   int ret = 0;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
   int der_sz, pem_sz;
   if ((ret = wc_ed448_init(key)) < 0) {
     return ret;
@@ -334,7 +328,7 @@ static int gen_ed448(ed448_key *key, uint8_t *pem, size_t *pem_len,
 static int gen_mldsa(MlDsaKey *key, enum CertType key_type, uint8_t *pem,
                      size_t *pem_len, WC_RNG *rng) {
   int level, ret, der_sz, pem_sz;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
 
   switch (key_type) {
   case ML_DSA_LEVEL2_TYPE:
@@ -375,7 +369,7 @@ static int gen_mldsa(MlDsaKey *key, enum CertType key_type, uint8_t *pem,
 static int gen_sphincs(sphincs_key *key, enum CertType key_type, uint8_t *pem,
                        size_t *pem_len, WC_RNG *rng) {
   int ret, der_sz, pem_sz;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
   byte level, optim;
   switch (key_type) {
   case SPHINCS_FAST_LEVEL1_TYPE:
@@ -432,7 +426,7 @@ static int gen_falcon(falcon_key *key, enum CertType key_type, uint8_t *pem,
                       size_t *pem_len, WC_RNG *rng) {
   byte level;
   int ret, der_sz, pem_sz;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
 
   switch (key_type) {
   case FALCON_LEVEL1_TYPE:
@@ -470,7 +464,7 @@ static int gen_falcon(falcon_key *key, enum CertType key_type, uint8_t *pem,
 static int gen_mlkem(PQCleanMlKemKey *key, enum CertType key_type, uint8_t *pem,
                      size_t *pem_len, WC_RNG *rng) {
   int level, ret, der_sz, pem_sz;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
 
   switch (key_type) {
   case ML_KEM_LEVEL1_TYPE:
@@ -510,7 +504,7 @@ static int gen_mlkem(PQCleanMlKemKey *key, enum CertType key_type, uint8_t *pem,
 static int gen_hqc(PQCleanHqcKey *key, enum CertType key_type, uint8_t *pem,
                    size_t *pem_len, WC_RNG *rng) {
   int level, ret, der_sz, pem_sz;
-  uint8_t der[KEY_DER_MAX_SIZE];
+  uint8_t der[BUF_MAX_SIZE];
 
   switch (key_type) {
   case ML_KEM_LEVEL1_TYPE:
@@ -645,8 +639,8 @@ static int gen_cert_chain(certchain_suite_t suite, certchain_out_t *out,
   int root_cert_der_sz, root_cert_pem_sz, int_cert_der_sz, int_cert_pem_sz,
       leaf_cert_der_sz, leaf_cert_pem_sz, client_cert_der_sz,
       client_cert_pem_sz;
-  uint8_t root_cert_der[CERT_DER_MAX_SIZE], int_cert_der[CERT_DER_MAX_SIZE],
-      leaf_cert_der[CERT_DER_MAX_SIZE], client_cert_der[CERT_DER_MAX_SIZE];
+  uint8_t root_cert_der[BUF_MAX_SIZE], int_cert_der[BUF_MAX_SIZE],
+      leaf_cert_der[BUF_MAX_SIZE], client_cert_der[BUF_MAX_SIZE];
   Cert root_cert, int_cert, leaf_cert, client_cert;
 
   /* root certificate */
@@ -918,8 +912,8 @@ int main(int argc, char *argv[]) {
   WC_RNG rng;
   wc_InitRng(&rng);
   certchain_out_t out;
-  uint8_t server_chain_pem[CERT_PEM_MAX_SIZE * 3],
-      client_chain_pem[CERT_PEM_MAX_SIZE * 2];
+  uint8_t server_chain_pem[BUF_MAX_SIZE * 3],
+      client_chain_pem[BUF_MAX_SIZE * 2];
 
   memset(&cli_args, 0, sizeof(cli_args_t));
   ret = parse_args(&cli_args, argc, argv);
