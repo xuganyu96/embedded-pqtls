@@ -19,7 +19,8 @@ cmake .. && make
 
 # Step 2: Generate fresh certificates
 echo "[INFO] Generating certificates..."
-CERTDIR="certs"
+CERTDIR="/tmp/tmpcerts"  # dump certificates to /tmp
+# CERTDIR="/tmp/tmpcerts_$(openssl rand -hex 12)"
 mkdir -p "$CERTDIR"
 ./certgen "$CERTDIR"
 

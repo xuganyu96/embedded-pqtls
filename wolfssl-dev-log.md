@@ -6,11 +6,19 @@ Next milestone: **KEM-based unilateral authentication**
 - [x] Server can send ServerHello
 - [x] Server can send Certificate
 - [x] Client can process ServerHello
+- [ ] Server transitions to "waiting for `KemCiphertext`" after sending `Certificate`
 - [ ] Client can process server's Certificate
 - [ ] Client can send KemCiphertext
 - [ ] Server can process KemCiphertext
 - [ ] Server can send Finished
 - [ ] Client can send Finished
+
+# May 28, 2025
+**If server's private key is a KEM key, then server should not send CertificateVerify**. Instead:
+- server sends `Certificate` and starts waiting for `KemCiphertext` (main goal of the day)
+- client processes server's `Certificate`, then sends `KemCiphertext`
+- server processes client's `KemCiphertext`, then sends `Finished`
+- client processes server's `Finished`, then sends `Finished`
 
 # May 27, 2025
 Not quite done with `ssl_load.c`: **server cannot load certificate chain whose leaf is a KEM certificate**. The first fix is to modify `static int GetCertKey` from `asn.c` to handle `case ML_KEM_LEVEL1k` and variants. Not sure what `StoreKey` does but let's just roll with it for now. After that the server loading certificate chain passes, but there is a loggging message "Cert key not supported", reported from `wolfssl_set_have_from_key_oid`. This function sets some flags such as `ssl->options.haveDilithiumSig`, so I made similar flags `haveMlKemAuth` and `haveHqcAuth`. There is also a minimum public key size check in `ProcessBufferCertPublicKey`.
@@ -46,7 +54,21 @@ The error message "Unsupported cipher suite, ClientHello 1.3" is raised in `DoTl
 
 Client calls `TLSX_PopulateExtensions`, which calls `TLSX_SetSignatureAlgorithms` to instantiate an empty `signature_algorithms` extension and push onto the list of extensions. **`TLSX_SetSignatureAlgorithms` is not where the signature algorithms are set**. Instead, the call chain is `wolfSSL_new -> InitSSL -> InitSSL_CTX_Suites -> InitSuites_EitherSide -> InitSuites -> InitSuitesHashSigAlgo`
 
-Modified `AddSuiteHashSigAlgo` so the 2-byte code for ML-KEM and HQC as "signature algorithm" is added. Modified `InitSuitesHashSigAlgo` so that client will send `signature_algorithms` extension including ML-KEM and HQC. Modified `DecodeSigAlg` so the 2-byte code for ML-KEM and HQC as signature algorithm correctly decode back to `enum SignatureAlgorithm` and `enum wc_MACAlgorithm`. **Now server can process `ClientHello`, send `ServerHello`, and send `Certificate`, but not `CertificateVerify`**
+Modified `AddSuiteHashSigAlgo` so the 2-byte code for ML-KEM and HQC as "signature algorithm" is added. Modified `InitSuitesHashSigAlgo` so that client will send `signature_algorithms` extension including ML-KEM and HQC. Modified `DecodeSigAlg` so the 2-byte code for ML-KEM and HQC as signature algorithm correctly decode back to `enum SignatureAlgorithm` and `enum wc_MACAlgorithm`. **Now server can process `ClientHello`, send `ServerHello`, and send `Certificate`, but not `CertificateVerify`**:
+
+```
+wolfSSL Entering SendTls13Certificate
+growing output buffer
+wolfSSL Entering BuildTls13Message
+wolfSSL Entering EncryptTls13
+wolfSSL Leaving BuildTls13Message, return 0
+Shrinking output buffer
+wolfSSL Leaving SendTls13Certificate, return 0
+accept state CERT_SENT
+wolfSSL Entering SendTls13CertificateVerify
+growing output buffer
+wolfSSL Leaving SendTls13CertificateVerify, return -173
+```
 
 # May 26, 2025
 First: `wolfssl_ctx` cannot load KEM key. `wolfSSL_CTX_use_PrivateKey_buffer` will return `-463 (WOLFSSL_BAD_FILE)` 
