@@ -15,7 +15,7 @@ trap cleanup EXIT
 # Step 1: Build the binaries
 echo "[INFO] Building project..."
 mkdir -p build && cd build
-cmake .. && make
+cmake .. && make -j8
 
 # Step 2: Validate input
 if [ "$#" -ne 1 ]; then

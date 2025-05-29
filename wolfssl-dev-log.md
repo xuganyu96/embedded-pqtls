@@ -6,12 +6,30 @@ Next milestone: **KEM-based unilateral authentication**
 - [x] Server can send ServerHello
 - [x] Server can send Certificate
 - [x] Client can process ServerHello
-- [ ] Server transitions to "waiting for `KemCiphertext`" after sending `Certificate`
-- [ ] Client can process server's Certificate
+- [x] Server transitions to "waiting for `KemCiphertext`" after sending `Certificate`
+- [x] Client can process server's Certificate
 - [ ] Client can send KemCiphertext
 - [ ] Server can process KemCiphertext
 - [ ] Server can send Finished
 - [ ] Client can send Finished
+
+# May 29, 2025
+**The entrypoints of KEMTLS** for client and server respectively:
+- **server**: under `wolfSSL_accept_TLSv13`, after `SendTls13Certificate` returns, if `ssl->options.haveMlKemAuth` or `ssl->options.haveHqcAuth`, then call `accept_KEMTLS` and return its return code.
+- **client**: under `wolfSSL_connect_TLSv13()`, after `serverState` reaches `SERVER_CERT_COMPLETE` (i.e. `DoTls13Certificate` returns), call `connect_KEMTLS` and return whatever it returns.
+
+Implementing `accept_KEMTLS` and `connect_KEMTLS` are the only things remaining, I think.
+
+## Send `ClientKemCiphertext`
+**When processing server certificates, allocate for key, shared secret, and ciphertext upon KEM key**. Server's public key will be stored at `ssl->peerXXXKey` (e.g. `ssl->peerDilithiumKey`). Add `peerMlKemKey` and `peerHqcKey` as attributes to `struct WOLFSSL`. `internal.c` has `FreeHandshakeResources`, which handles cleaning up allocated keys, but I could not find a place where these values are initialized.
+
+If `args->dCert->keyOID` is `ML_KEM_LEVELxk`, then call `                                    mlkem_ret = AllocKey(ssl, DYNAMIC_TYPE_MLKEM, (void **)&ssl->peerMlKemKey);`, but how does `AllocKey` know how much space to allocate?
+
+
+- [ ] Construct `ClientKemCiphertext`
+- [ ] Transition client state to `ClientKemCiphertextSent`, the next step should be "waiting for server Finished"
+
+
 
 # May 28, 2025
 ## Add SSL state "awaiting client KemCiphertext"
