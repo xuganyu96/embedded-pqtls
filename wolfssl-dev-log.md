@@ -23,13 +23,50 @@ Implementing `accept_KEMTLS` and `connect_KEMTLS` are the only things remaining,
 ## Send `ClientKemCiphertext`
 **When processing server certificates, allocate for key, shared secret, and ciphertext upon KEM key**. Server's public key will be stored at `ssl->peerXXXKey` (e.g. `ssl->peerDilithiumKey`). Add `peerMlKemKey` and `peerHqcKey` as attributes to `struct WOLFSSL`. `internal.c` has `FreeHandshakeResources`, which handles cleaning up allocated keys, but I could not find a place where these values are initialized.
 
-If `args->dCert->keyOID` is `ML_KEM_LEVELxk`, then call `                                    mlkem_ret = AllocKey(ssl, DYNAMIC_TYPE_MLKEM, (void **)&ssl->peerMlKemKey);`, but how does `AllocKey` know how much space to allocate?
+If `args->dCert->keyOID` is `ML_KEM_LEVELxk`, then call `                                    mlkem_ret = AllocKey(ssl, DYNAMIC_TYPE_MLKEM, (void **)&ssl->peerMlKemKey);`, but how does `AllocKey` know how much space to allocate? It uses the OID sum to identify the key type and the level. Also modify `FreeKey` so dynamically allocated keys can be properly freed.
 
+Here is Gonzalez's implementation for sending KemCiphertext, assuming that the ciphertext has already been generated at `ProcessPeerCerts`
 
-- [ ] Construct `ClientKemCiphertext`
-- [ ] Transition client state to `ClientKemCiphertextSent`, the next step should be "waiting for server Finished"
+```c
+static int SendClientKemCiphertextTls13(WOLFSSL* ssl) {
+    WOLFSSL_ENTER("SendClientKemCiphertextTls13");
+    byte *input, *output;
+    int ret, sendSz, headerSz = HANDSHAKE_HEADER_SZ, outputSz;
+    word32 i = RECORD_HEADER_SZ + HANDSHAKE_HEADER_SZ;
 
+    outputSz = ssl->kemCiphertextSz + MAX_MSG_EXTRA;
+    if ((ret = CheckAvailableSize(ssl, outputSz)) != 0)
+        return ret;
+    output = ssl->buffers.outputBuffer.buffer +
+             ssl->buffers.outputBuffer.length;
+    /* input points to begining of handshake header */
+    input = output + RECORD_HEADER_SZ;
+    AddTls13Headers(output, ssl->kemCiphertextSz, client_key_exchange, ssl);
+    XMEMCPY(input + HANDSHAKE_HEADER_SZ, ssl->kemCiphertext, ssl->kemCiphertextSz);
+    sendSz = BuildTls13Message(ssl, output, outputSz, input,
+                               headerSz + ssl->kemCiphertextSz, handshake, 1, 0, 0);
+    if (sendSz < 0)
+        return BUILD_MSG_ERROR;
+#ifdef WOLFSSL_CALLBACKS
+    if (ssl->hsInfoOn) AddPacketName(ssl, "ClientKemCiphertext");
+        if (ssl->toInfoOn) {
+            AddPacketInfo(ssl, "ClientKemCiphertext", handshake, output, sendSz,
+                          WRITE_PROTO, ssl->heap);
+        }
+#endif
+    ssl->buffers.outputBuffer.length += sendSz;
+    if (ssl->options.groupMessages != 0) {
+        return ret;
+    }
+    ret = SendBuffered(ssl);
+    if (ret != 0 && ret != WANT_WRITE)
+        return ret;
+    WOLFSSL_LEAVE("SendClientKemCiphertextTls13", ret);
+    return ret;
+}
+```
 
+It is relatively straightforward to adapt it to my API.
 
 # May 28, 2025
 ## Add SSL state "awaiting client KemCiphertext"
