@@ -8,7 +8,7 @@ Next milestone: **KEM-based unilateral authentication**
 - [x] Client can process ServerHello
 - [x] Server transitions to "waiting for `KemCiphertext`" after sending `Certificate`
 - [x] Client can process server's Certificate
-- [ ] Client can send KemCiphertext
+- [x] Client can send KemCiphertext
 - [ ] Server can process KemCiphertext
 - [ ] Server can send Finished
 - [ ] Client can send Finished
@@ -67,6 +67,23 @@ static int SendClientKemCiphertextTls13(WOLFSSL* ssl) {
 ```
 
 It is relatively straightforward to adapt it to my API.
+
+## Server `DoKemTlsClientKemCiphertext`
+I need to implement `DoKemTlsClientKemCiphertext`, where the server uses its private key to decapsulate client's `KemCiphertext`. However, before implementing and calling `DoKemTlsClientKemCiphertext`, we need to parse the record and strip the record header and the handshake header. Parsing record and extracting the inner data is done by `ProcessReply` in `internal.h`. Example usage:
+
+```c
+/* GYX: after client replies to ServerHello (or ServerHelloAgain), keep processing
+ * server response (including Certificate, CertificateVerify, and server's Finish)
+ * until server's Finish has been processed.
+ */
+while (ssl->options.serverState < SERVER_FINISHED_COMPLETE) {
+if ((ssl->error = ProcessReply(ssl)) < 0) {
+        WOLFSSL_ERROR(ssl->error);
+        return WOLFSSL_FATAL_ERROR;
+}
+```
+
+`ProcessReply` is a big function that includes parsing the record layer, decrypting opaque fragments, finding the tag, then pass the fragment to the underlying protocol. In this context it's for processing Handshake messages, thus we need to modify `DoTls13HandShakeMsg`. `DoTls13HandshakeMsg` passes the handling to `DoTls13HandShakeMsgType`
 
 # May 28, 2025
 ## Add SSL state "awaiting client KemCiphertext"
