@@ -9,9 +9,9 @@ Next milestone: **KEM-based unilateral authentication**
 - [x] Server transitions to "waiting for `KemCiphertext`" after sending `Certificate`
 - [x] Client can process server's Certificate
 - [x] Client can send KemCiphertext
-- [ ] Server can process KemCiphertext
-- [ ] Server can send Finished
+- [x] Server can process KemCiphertext
 - [ ] Client can send Finished
+- [ ] Server can send Finished
 
 # May 30, 2025
 
@@ -28,7 +28,29 @@ Ciphertext size is consistent with key level, but the shared secret (comparing l
 
 There are two problems I need to troubleshoot:
 - [x] ciphertexts are inconsistent between client and server. This is resolved by accounting for `*inOutIdx`
-- after `DoKemTlsClientKemCiphertext`, server does not exit from `ProcessReply`
+- after `DoKemTlsClientKemCiphertext`, server does not exit from `ProcessReply`, but we will fix it later.
+
+## Implement `SendKemTlsFinish`
+According to the [original KEMTLS paper](https://eprint.iacr.org/2020/534.pdf), Client can send `ClientFinished` right after sending `ClientKemCiphertext`, so let's do that first. Before implementing `SendKemTlsClientFinish`, we first need to derive the authenticated shared secret (preMasterKey). From Gonzalez's work we have:
+
+```c
+int DeriveAuthenticatedSecret(WOLFSSL* ssl) {
+    byte key[WC_MAX_DIGEST_SIZE];
+    int ret;
+    /* Create key=dHS */
+    ret = DeriveKeyMsg(ssl, key, -1, ssl->arrays->preMasterSecret,
+                       derivedLabel, DERIVED_LABEL_SZ,
+                       NULL, 0, ssl->specs.mac_algorithm);
+    if (ret != 0)
+        return ret;
+    /* Generate preMasterSecret=AHS */
+    return wc_Tls13_HKDF_Extract(ssl->arrays->preMasterSecret,
+                       key, ssl->specs.hash_size,
+                       ssl->kemSecretKey, ssl->kemSecretKeySz, mac2hash(ssl->specs.mac_algorithm));
+}
+```
+
+Here `ssl->specs.mac_algorithm` specifies some kind of `hashAlgo` (e.g. sha256, sha384, sha512, etc.) and the length of the hash matches `ssl->specs.hash_size`.
 
 # May 29, 2025
 **The entrypoints of KEMTLS** for client and server respectively:
