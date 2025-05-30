@@ -13,6 +13,23 @@ Next milestone: **KEM-based unilateral authentication**
 - [ ] Server can send Finished
 - [ ] Client can send Finished
 
+# May 30, 2025
+
+## Implement `DoKemTlsClientKemCiphertext`
+The private key is loaded with `wolfSSL_CTX_UsePrivateKey_file`, we need to retrieve it.
+
+In `SendTls13CertificateVerify` there is `DecodePrivateKey(ssl, &args->argLen)`:
+- raw bytes of the keys are stored in `ssl->buffers.key->buffer`
+- the parsed key is stored in `ssl->hsKey`
+
+Copy the ciphertext from the buffers to `ssl->kemCiphertext`, then decapsulate into `ssl->kemSharedSecret`. There is no need to clean up ciphertext or shared secret: they will be cleaned up at `wolfSSL_CleanUp`. There is the need to free the key, which is allocated within this function.
+
+Ciphertext size is consistent with key level, but the shared secret (comparing log between client and server) is inconsistent. Dumping hex reveals even the ciphertexts are different.
+
+There are two problems I need to troubleshoot:
+- [x] ciphertexts are inconsistent between client and server. This is resolved by accounting for `*inOutIdx`
+- after `DoKemTlsClientKemCiphertext`, server does not exit from `ProcessReply`
+
 # May 29, 2025
 **The entrypoints of KEMTLS** for client and server respectively:
 - **server**: under `wolfSSL_accept_TLSv13`, after `SendTls13Certificate` returns, if `ssl->options.haveMlKemAuth` or `ssl->options.haveHqcAuth`, then call `accept_KEMTLS` and return its return code.

@@ -207,12 +207,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
       }
     }
-    ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
-    if (ssl_err != WOLFSSL_SUCCESS) {
-      fprintf(stderr, "Failed to set key exchange groups (err %d)\n", ssl_err);
-      wolfSSL_CTX_free(ctx);
-      exit(EXIT_FAILURE);
-    }
+    // ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
+    // if (ssl_err != WOLFSSL_SUCCESS) {
+    //   fprintf(stderr, "Failed to set key exchange groups (err %d)\n", ssl_err);
+    //   wolfSSL_CTX_free(ctx);
+    //   exit(EXIT_FAILURE);
+    // }
 
     ssl = wolfSSL_new(ctx);
     if (!ssl) {
