@@ -50,7 +50,9 @@ int DeriveAuthenticatedSecret(WOLFSSL* ssl) {
 }
 ```
 
-Here `ssl->specs.mac_algorithm` specifies some kind of `hashAlgo` (e.g. sha256, sha384, sha512, etc.) and the length of the hash matches `ssl->specs.hash_size`.
+Here `ssl->specs.mac_algorithm` specifies some kind of `hashAlgo` (e.g. sha256, sha384, sha512, etc.) and the length of the hash matches `ssl->specs.hash_size`. Gonzalez also called `DeriveTls13Keys` with `secret=implicit_key`, but this enum member no longer exists. I will try using `update_traffic_key` and see if it works first.
+
+Gonzalez directly called `SendTls13Finished` instead of writing a custom Finished. Maybe I can do the same, if I correclty updated the key schedule. Similarly, if the key schedule is correct then I might be able to use `DoTls13Finished`, as well.
 
 # May 29, 2025
 **The entrypoints of KEMTLS** for client and server respectively:
