@@ -20,6 +20,7 @@
   "Usage: tls13client [--cafile root.crt] [--certs client-chain.crt] "         \
   "[--key client.key] <hostname> <port>"
 
+static int kex_pqonly = 1;
 static int kex_groups_pqonly[] = {
     PQCLEAN_ML_KEM_512, PQCLEAN_ML_KEM_768, PQCLEAN_ML_KEM_1024,
     PQCLEAN_HQC_128,    PQCLEAN_HQC_192,    PQCLEAN_HQC_256,
@@ -207,12 +208,16 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
       }
     }
-    // ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
-    // if (ssl_err != WOLFSSL_SUCCESS) {
-    //   fprintf(stderr, "Failed to set key exchange groups (err %d)\n", ssl_err);
-    //   wolfSSL_CTX_free(ctx);
-    //   exit(EXIT_FAILURE);
-    // }
+    if (kex_pqonly) {
+      ssl_err =
+          wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly, kex_groups_nelems);
+      if (ssl_err != WOLFSSL_SUCCESS) {
+        fprintf(stderr, "Failed to set key exchange groups (err %d)\n",
+                ssl_err);
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_FAILURE);
+      }
+    }
 
     ssl = wolfSSL_new(ctx);
     if (!ssl) {
