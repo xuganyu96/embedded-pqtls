@@ -6,6 +6,7 @@ set -euo pipefail
 cleanup() {
     if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
         echo "[INFO] Cleaning up: terminating server (PID $SERVER_PID)..."
+        sleep 1
         kill "$SERVER_PID"
         wait "$SERVER_PID" 2>/dev/null || true
     fi
@@ -36,7 +37,6 @@ echo "[INFO] Starting server..."
   --debug \
   --certs "$CERTDIR/server-chain.crt" \
   --key "$CERTDIR/leaf.key" \
-  --cafile "$CERTDIR/root.crt" \
   8000 > server.log 2>&1 &
 
 SERVER_PID=$!

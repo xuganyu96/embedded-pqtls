@@ -78,7 +78,25 @@ When under `accept_KEMTLS`, `EarlySanityCheckMsgReceived` is called for the seco
 
 `GetHandshakeHeader` is pretty straightforward, there is no decryption.
 
-Even after removing `SendTls13Finished` from the client, server still reports "have more record in buffer after `DoKemTlsClientKemCiphertext` exits". **Resolved**: the discrepancy lies with `ssl->keys.padSz`.
+Even after removing `SendTls13Finished` from the client, server still reports "have more record in buffer after `DoKemTlsClientKemCiphertext` exits". **Resolved**: the discrepancy lies with `ssl->keys.padSz`. Once the `keys.padSz` is added to `*inOutIdx`, server can correctly identify the end of the record and not read garbage.
+
+Given the experience of troubleshooting `ProcessReply` for the server, I think maybe it is better to write my own `SendKemTlsFinished` and `DoKemTlsFinished`. Something to recall is that is a Certificate-based TLS handshake, serer sends `Finished` before client sends `Finished`, so client runs `DoTls13Finished` before `SendTls13Finished`.
+
+**The key schedule**:
+1. `ES` and `dES` are static values. `ES = HKDF_extract(0, 0)` and `dES = HKDF_expand(ES, "derived", NULL)`
+1. `HS` (handshake secret): `HS = HKDF_extract(dES, ss_e)`, where `ss_e` is the ephemeral shared secret
+    1. `CHTS = HKDF_expand(HS, "c hs traffic", CH..SH)` is the client handshake traffic key
+    1. `SHTS = HKDF_expand(HS, "s hs traffic", CH..SH)` is the server handshake traffic key
+    1. `dHS = HKDF_expand(HS, "derived", NULL)` is *derived handshake secret*
+1. `AHS = HKDF_extract(dHS, ss_s)` is *authenticated handshake secret*
+1. `dAHS = HKDF_expand(AHS, "derived", NULL)` is *derived authenticated handshake secret*
+1. `MS = HKDF_extract(dAHS, 0)` is **master secret**
+    - `client_finished_key = HKDF_expand(MS, "c finished", NULL)` is client's MAC key for Finished
+    - `finished_finished_key = HKDF_expand(MS, "s finished", NULL)` is server's MAC key for Finished
+
+Based on this key schedule:
+- I need to update the master secret
+- Once the master secret is updated to include KEM based authentication secrets, the application traffic secrets will all fall into place without further intervention
 
 # May 30, 2025
 
