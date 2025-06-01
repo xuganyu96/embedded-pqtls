@@ -13,6 +13,73 @@ Next milestone: **KEM-based unilateral authentication**
 - [ ] Client can send Finished
 - [ ] Server can send Finished
 
+# June 1, 2025
+## Figure out `ClientFinished` and `ServerFinished`
+After some more thinking, I realized that I don't actually need to implement "sending Finished" and "processing Finished" on my own. Existing [`Finished` message](https://datatracker.ietf.org/doc/html/rfc8446#autoid-52) already computes an HMAC using the `finished_key` as the key against a transcript hash that contains the handshake context, `Certificate`, and `CertificateVerify`. What I need to do is to understand the key schedule of Certificate-based authentication and how the transcript hash is obtained, then:
+- [ ] update key schedule so that the shared secret from KEM-based authentication is properly mixed in
+- [ ] update the transcript hash to include `KemCiphertext`
+- [ ] transition from `SendFinished` and `DoFinished` to sending/receiving application data
+
+The API of [HKDF](https://datatracker.ietf.org/doc/html/rfc5869) includes two items:
+
+```c
+/* Given a possibly non-uniform input (input key material) and a non-secret salt,
+ * apply the hash function specified by hash_type, and write the output to out.
+ * The length of output is determined by the hash_type
+ *
+ * The goal of extract is to output a uniform secret (or as close to uniform as
+ * possible) that can be used as pseudorandom key using an input that is possibly
+ * not uniform, such as the output of Diffie-Hellman key exchange.
+ *
+ * Salting is not required but highly recommended. Salt is non-secret and can 
+ * be re-used.
+ */
+int HKDF_extract(enum HashType hash_type, uint8_t *salt, uint8_t *in, uint8_t *out);
+
+/* Given a cryptographically strong pseudorandom key (PRK) of short length, 
+ * output a equally strong pseudoranodm key of specified length.
+ */
+int HKDF_expand(uint8_t *prk, void *ctx, uint8_t *out, size_t outlen);
+```
+
+In [RFC 8446 Section 7.1](https://datatracker.ietf.org/doc/html/rfc8446#section-7.1) we know that `DeriveSecret` is a wrapper around `HKDF_expand` that adds a label (e.g. a static string "derive") and a context (i.e. the transcript hash).
+
+Let's circle back to `SendKemTlsKemCiphertext`: **where does the `KemCiphertext` message gets included into the transcript hash?**
+- `SendBuffered` does not add message to transcript hash
+- `BuildTls13Message` does not add to transcript hash
+- `SendTls13ClientHello` calls `HashOutput`: this seems like the API that updates the transcript hash
+
+After adding debugging message to `HashOutput` and `HashInput` ran into this problem:
+- I manually called `HashOutput` in client's `SendKemTlsClientKemCiphertext`, got `hash output 1092 bytes`, and server's log showed `hash input 1092 bytes`, but then client log showed another `Hashing 1185 bytes` before leaving `SendKemTlsClientKemCiphertext`
+- Resolved: `BuildTls13Message` already has the option to hash output, so there is not need to call `HashOutput` separately in `SendKemTlsClientKemCiphertext`
+
+I've disbled the code in `SendKemTlsClientKemCiphertext` that tempers with the key schedule. Client can send KemCiphertext and ClientFinished, but after server processes ClientKemCiphertext it cannot process Finished. Within `accept_KEMTLS`, `ProcessReply` returns `-394`, though `ssl->options.clientState` is correctly set to `CLIENT_KEM_CIPHERTEXT_DONE`.
+
+```log
+wolfSSL Leaving wc_PQCleanMlKemKey_DerToPrivateKey, return 0
+GYX: server-side ciphertext
+GYX: Dump ( 1088 bytes): a2:a1:fb:e0:6c:74:d0:c8:...:16:1d:7c:05:0d:b7:70:a6
+GYX: server-side shared secret
+GYX: Dump (   32 bytes): 6c:d3:d1:5f:5f:6c:95:90:...:31:21:a8:50:ac:15:ee:5f
+wolfSSL Leaving DoKemTlsClientKemCiphertext, return 0
+GYX: Hashing <input 1092 bytes> to transcript
+wolfSSL Leaving DoTls13HandShakeMsgType(), return 0
+wolfSSL Leaving DoTls13HandShakeMsg, return 0
+More messages in record
+received record layer msg
+got HANDSHAKE
+wolfSSL Entering DoTls13HandShakeMsg
+wolfSSL Entering EarlySanityCheckMsgReceived
+Unknown message type
+wolfSSL Entering SendAlert
+```
+
+When under `accept_KEMTLS`, `EarlySanityCheckMsgReceived` is called for the second time (the first time is for processing `type=client_key_exchange`, which is normal), `GetHandshakeHeader` assigned to `type` the value `0x6d` (and assigns `size` the value `0x8152358`), which does not make sense. **perhaps the encryption key is wrong?**. Need to investigate `GetHandshakeHeader`.
+
+`GetHandshakeHeader` is pretty straightforward, there is no decryption.
+
+Even after removing `SendTls13Finished` from the client, server still reports "have more record in buffer after `DoKemTlsClientKemCiphertext` exits". **Resolved**: the discrepancy lies with `ssl->keys.padSz`.
+
 # May 30, 2025
 
 ## Implement `DoKemTlsClientKemCiphertext`
