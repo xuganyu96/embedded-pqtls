@@ -98,6 +98,10 @@ Based on this key schedule:
 - I need to update the master secret
 - Once the master secret is updated to include KEM based authentication secrets, the application traffic secrets will all fall into place without further intervention
 
+So I tried piggybacking off of the existing `SendTls13Finished` and `DoTls13Finished`. They work, but the structure of the protocol changed too much. For example, in TLS 1.3, server sends Finished before client sends Finished, so server processes Client's Finished after it has sent server's Finished, but in KEMTLS, server first processes Client's Finished, then sends its own Finished. The re-ordering means all kinds of sanity checks in `ProcessReply` needs re-writing, which I am just not willing to cope with.
+
+Instead, I should roll my own `SendKemTlsFinished` and `DoKemTlsFinished`, so later when I need to add client-authentication, I don't run into more spaghetti code.
+
 # May 30, 2025
 
 ## Implement `DoKemTlsClientKemCiphertext`
