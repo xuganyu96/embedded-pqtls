@@ -13,6 +13,56 @@ Next milestone: **KEM-based unilateral authentication**
 - [ ] Client can send Finished
 - [ ] Server can send Finished
 
+# June 2, 2025
+Running late on the project timeline, gotta crunch! First, add `WOLFSSL_VIS_FOR_TESTS` so that `Tls13BuildMessage` does not raise deprecation warnings.
+
+## Figuring out the key schedule
+Recall from the KEMTLS paper the key schedule of KEMTLS:
+
+**The key schedule**:
+1. `ES` and `dES` are static values. `ES = HKDF_extract(0, 0)` and `dES = HKDF_expand(ES, "derived", NULL)`
+1. `HS` (handshake secret): `HS = HKDF_extract(dES, ss_e)`, where `ss_e` is the ephemeral shared secret
+    1. `CHTS = HKDF_expand(HS, "c hs traffic", CH..SH)` is the client handshake traffic key
+    1. `SHTS = HKDF_expand(HS, "s hs traffic", CH..SH)` is the server handshake traffic key
+    1. `dHS = HKDF_expand(HS, "derived", NULL)` is *derived handshake secret*
+1. `AHS = HKDF_extract(dHS, ss_s)` is *authenticated handshake secret*
+1. `dAHS = HKDF_expand(AHS, "derived", NULL)` is *derived authenticated handshake secret*
+1. `MS = HKDF_extract(dAHS, 0)` is **master secret**
+    - `client_finished_key = HKDF_expand(MS, "c finished", NULL)` is client's MAC key for Finished
+    - `finished_finished_key = HKDF_expand(MS, "s finished", NULL)` is server's MAC key for Finished
+
+This is important because I need the correct `MasterSecret` before deriving the `Finished` keys (`ssl->keys->client_write_MAC_secret` and server counterpart) and the application traffic keys (`ssl->keys->server_write_MAC_secret`). The most immediate source is the handshake secret (HS), which I suspect to be `ssl->arrays->preMasterSecret`: this is true:
+- `DoTls13ServerHello` calls `TLSX_KeyShare_Process`, which calls `TLSX_KeyShare_ProcessPqcClient_ex`, where the `ssOutput` parameter is `ssl->arrays->preMasterSecret`.
+
+Let's read how WolfSSL does key schedule update:
+
+```c
+int DeriveMasterSecret(WOLFSSL* ssl)
+{
+    byte key[WC_MAX_DIGEST_SIZE];
+    int ret;
+    if (ssl == NULL || ssl->arrays == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    ret = DeriveKeyMsg(ssl, key, -1, ssl->arrays->preMasterSecret,
+                        derivedLabel, DERIVED_LABEL_SZ,
+                        NULL, 0, ssl->specs.mac_algorithm);
+    if (ret != 0)
+        return ret;
+
+    PRIVATE_KEY_UNLOCK();
+    ret = Tls13_HKDF_Extract(ssl, ssl->arrays->masterSecret,
+            key, ssl->specs.hash_size,
+            ssl->arrays->masterSecret, 0, mac2hash(ssl->specs.mac_algorithm));
+    PRIVATE_KEY_LOCK();
+
+    return ret;
+}
+```
+
+`DeriveKeyMsg` is a wrapper around HKDF expand. The parameter `key` in `DeriveKeyMsg` is expected to be an HMAC secret; in other words, the output of some HKDF_extract call. This means that **it is wrong to directly put KEM shared secret**; instead `KEM_ss` needs to go through HKDF_extract. However, `DoTls13ClientHello` is not a good place to run `HKDF_Extract` because when handling key share, the cipher suite is not yet determined, so `ssl->specs.mac_algorithm` is still NULL.
+
 # June 1, 2025
 ## Figure out `ClientFinished` and `ServerFinished`
 After some more thinking, I realized that I don't actually need to implement "sending Finished" and "processing Finished" on my own. Existing [`Finished` message](https://datatracker.ietf.org/doc/html/rfc8446#autoid-52) already computes an HMAC using the `finished_key` as the key against a transcript hash that contains the handshake context, `Certificate`, and `CertificateVerify`. What I need to do is to understand the key schedule of Certificate-based authentication and how the transcript hash is obtained, then:

@@ -258,7 +258,6 @@ extern "C" {
 #endif
 #endif
 
-
 /* ------------------------------------------------------------------------- */
 /* Hashing */
 /* ------------------------------------------------------------------------- */
@@ -492,6 +491,8 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define HAVE_SUPPORTED_CURVES
 #define WOLFSSL_BASE64_ENCODE
 #define WOLFSSL_TLS13_SHA512
+#define WOLFSSL_VIS_FOR_TESTS /* enable so BuildTls13Message does not raise    \
+                                 deprecastion warnings */
 
 #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
 #define WOLFSSL_RSA_KEY_CHECK
