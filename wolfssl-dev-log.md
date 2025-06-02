@@ -63,6 +63,9 @@ int DeriveMasterSecret(WOLFSSL* ssl)
 
 `DeriveKeyMsg` is a wrapper around HKDF expand. The parameter `key` in `DeriveKeyMsg` is expected to be an HMAC secret; in other words, the output of some HKDF_extract call. This means that **it is wrong to directly put KEM shared secret**; instead `KEM_ss` needs to go through HKDF_extract. However, `DoTls13ClientHello` is not a good place to run `HKDF_Extract` because when handling key share, the cipher suite is not yet determined, so `ssl->specs.mac_algorithm` is still NULL.
 
+## Implementing sending and handling `Finished`
+Implementing `SendKemTlsFinished` and `DoKemTlsFinished` is largely identical to `SendTls13Finished` and `DoTls13Finished`. There are some sanity checks that I need to skip becaue the order of Finished message in a KEMTLS handshake is different from TLS 1.3.
+
 # June 1, 2025
 ## Figure out `ClientFinished` and `ServerFinished`
 After some more thinking, I realized that I don't actually need to implement "sending Finished" and "processing Finished" on my own. Existing [`Finished` message](https://datatracker.ietf.org/doc/html/rfc8446#autoid-52) already computes an HMAC using the `finished_key` as the key against a transcript hash that contains the handshake context, `Certificate`, and `CertificateVerify`. What I need to do is to understand the key schedule of Certificate-based authentication and how the transcript hash is obtained, then:
