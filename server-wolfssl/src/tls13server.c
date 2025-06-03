@@ -1,6 +1,7 @@
 /**
  * TLS 1.3 server
- * TODO: consider making it multi-threaded so multiple clients can connect at the same time
+ * TODO: consider making it multi-threaded so multiple clients can connect at
+ * the same time
  */
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -126,6 +127,33 @@ int parse_args(cli_args_t *args, int argc, char *argv[]) {
   return 0;
 }
 
+/* block until having received something, then write it back and exit
+ */
+int echo_server(WOLFSSL *ssl) {
+  int ret = 0;
+  uint8_t buf[80];
+  size_t buflen = 0;
+
+  /* for testing purpose only */
+  while (buflen <= 0) {
+    ret = wolfSSL_read(ssl, buf, sizeof(buf));
+    if (ret <= 0) {
+      fprintf(stderr, "read (err=%d)\n", ret);
+      return -1;
+    }
+    fprintf(stderr, "received %d bytes\n", ret);
+    buflen += (size_t)ret;
+  }
+
+  ret = wolfSSL_write(ssl, buf, buflen);
+  if (ret <= 0) {
+    fprintf(stderr, "failed to write %zu bytes\n", buflen);
+    return ret;
+  }
+  fprintf(stderr, "wrote %zu bytes\n", buflen);
+  return 0;
+}
+
 // static int kex_groups_pqonly[] = {
 //     WOLFSSL_ML_KEM_512,
 // };
@@ -245,6 +273,13 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "Error string: %s\n", errmsg);
     } else {
       printf("Successful handshake\n");
+    }
+
+    err = echo_server(ssl);
+    if (err) {
+      fprintf(stderr, "echo_server returned %d\n", err);
+    } else {
+      printf("Ok.\n");
     }
 
     wolfSSL_shutdown(ssl);

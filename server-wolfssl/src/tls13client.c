@@ -155,6 +155,45 @@ static int tcp_connect(const char *host, int port) {
 
 static void tcp_close(int sockfd) { close(sockfd); }
 
+/* Send a short message to the server, then check if the response matches what
+ * was sent
+ */
+static int test_echo(WOLFSSL *ssl) {
+  uint8_t msg[] = {6, 9, 4, 2, 0};
+  size_t msglen = sizeof(msg);
+  uint8_t cmp[128];
+  size_t cmplen;
+
+  int ret = wolfSSL_write(ssl, msg, sizeof(msg));
+  if (ret <= 0) {
+    fprintf(stderr, "wolfSSL_write returned %d\n", ret);
+    return ret;
+  } else {
+    fprintf(stderr, "wrote %d bytes\n", ret);
+  }
+
+  ret = wolfSSL_read(ssl, cmp, sizeof(cmp));
+  if (ret <= 0) {
+    fprintf(stderr, "wolfSSL_read returned %d\n", ret);
+    return ret;
+  } else {
+    fprintf(stderr, "received %d bytes\n", ret);
+  }
+  cmplen = (size_t)ret;
+
+  if (cmplen != msglen) {
+    fprintf(stderr, "expected %zu bytes, received %zu bytes\n", msglen, cmplen);
+    return -1;
+  }
+
+  if (memcmp(msg, cmp, msglen) != 0) {
+    fprintf(stderr, "tx and rx do not match\n");
+    return -1;
+  }
+
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   cli_args_t args;
   cli_args_init(&args);
@@ -250,6 +289,19 @@ int main(int argc, char *argv[]) {
       return -1;
     }
     printf("Handshake succeeded %s\n", args.hostname);
+    int echo_ret = test_echo(ssl);
+    if (echo_ret) {
+      fprintf(stderr, "test_echo failed\n");
+      wolfSSL_shutdown(ssl);
+      tcp_close(sockfd);
+      wolfSSL_free(ssl);
+      ssl = NULL;
+      wolfSSL_CTX_free(ctx);
+      ctx = NULL;
+      exit(EXIT_FAILURE);
+    } else {
+      printf("echo Ok.\n");
+    }
 
     // Clean up
     wolfSSL_shutdown(ssl);

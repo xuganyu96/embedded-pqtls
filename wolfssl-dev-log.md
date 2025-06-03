@@ -1,17 +1,41 @@
-Next milestone: **KEM-based unilateral authentication**
-- [x] Server can start
-- [x] Client can start
-- [x] Client can send ClientHello
-- [x] Server can process ClientHello
-- [x] Server can send ServerHello
-- [x] Server can send Certificate
-- [x] Client can process ServerHello
-- [x] Server transitions to "waiting for `KemCiphertext`" after sending `Certificate`
-- [x] Client can process server's Certificate
-- [x] Client can send KemCiphertext
-- [x] Server can process KemCiphertext
-- [ ] Client can send Finished
-- [ ] Server can send Finished
+**Next milestone**
+- [ ] KEM based unilateral authentication
+    - [x] Server can start
+    - [x] Client can start
+    - [x] Client can send ClientHello
+    - [x] Server can process ClientHello
+    - [x] Server can send ServerHello
+    - [x] Server can send Certificate
+    - [x] Client can process ServerHello
+    - [x] Server transitions to "waiting for `KemCiphertext`" after sending `Certificate`
+    - [x] Client can process server's Certificate
+    - [x] Client can send KemCiphertext
+    - [x] Server can process KemCiphertext
+    - [x] Client can send Finished
+    - [x] Server can send Finished
+    - [ ] Client/Server can exchange application data
+
+# June 3, 2025
+Now that `wolfSSL_connect` returns 0, I need to verify that the connection actually works. Modify the test server into an echo server and check that the client can send and receive application data.
+
+Using mldsa-44 chain, client write reports "wrote 5 bytes", which is correct, but server reports receiving 0 bytes:
+
+```log
+wolfSSL Entering wolfSSL_read
+wolfSSL Entering wolfSSL_read_internal
+wolfSSL Entering ReceiveData
+wolfSSL Entering RetrySendAlert
+growing input buffer
+wolfSSL Entering DecryptTls13
+received record layer msg
+got app DATA
+wolfSSL Leaving ReceiveData(), return 0
+wolfSSL Leaving wolfSSL_read_internal, return 0
+```
+
+Based on this log, `ProcessReply` received a record, but `ReceiveData` returned 0. I made a stupid mistake of passing 0 to `wolfSSL_read(ssl, data, len=0)` so of course it returned 0. After fixing that, handshake and echo with ML-DSA-44 chain works.
+
+
 
 # June 2, 2025
 Running late on the project timeline, gotta crunch! First, add `WOLFSSL_VIS_FOR_TESTS` so that `Tls13BuildMessage` does not raise deprecation warnings.
