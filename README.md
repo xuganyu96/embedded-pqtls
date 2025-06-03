@@ -1,9 +1,9 @@
-# KEMTLS and PQ-TLS on Raspberry Pi Pico
+# Post-quantum TLS 1.3 on embedded device
 Content of this repository:
 - **pico**: C project for running TLS client on Raspberry Pi Pico 2 W
 - **server-wolfssl**: TLS client, server, and certificate generator on desktop environment
-- **server-rustls**: some wrapper scripts around Thom Wiggers' original repository
 - **wolfssl**: a fork of WolfSSL that contains the modifications
+- **certificates**: ready-made certificate chains
 
 ```bibtex
 @InProceedings{CCS:SchSteWig20,

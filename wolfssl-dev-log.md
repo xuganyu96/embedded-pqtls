@@ -1,5 +1,5 @@
 **Next milestone**
-- [ ] KEM based unilateral authentication
+- [x] KEM based unilateral authentication
     - [x] Server can start
     - [x] Client can start
     - [x] Client can send ClientHello
@@ -13,7 +13,7 @@
     - [x] Server can process KemCiphertext
     - [x] Client can send Finished
     - [x] Server can send Finished
-    - [ ] Client/Server can exchange application data
+    - [x] Client/Server can exchange application data
 
 # June 3, 2025
 ## Further testing: echo
