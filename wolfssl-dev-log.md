@@ -16,6 +16,7 @@
     - [ ] Client/Server can exchange application data
 
 # June 3, 2025
+## Further testing: echo
 Now that `wolfSSL_connect` returns 0, I need to verify that the connection actually works. Modify the test server into an echo server and check that the client can send and receive application data.
 
 Using mldsa-44 chain, client write reports "wrote 5 bytes", which is correct, but server reports receiving 0 bytes:
@@ -35,7 +36,88 @@ wolfSSL Leaving wolfSSL_read_internal, return 0
 
 Based on this log, `ProcessReply` received a record, but `ReceiveData` returned 0. I made a stupid mistake of passing 0 to `wolfSSL_read(ssl, data, len=0)` so of course it returned 0. After fixing that, handshake and echo with ML-DSA-44 chain works.
 
+However, KEMTLS handshake fails. Client reports:
 
+```log
+wolfSSL Leaving connect_KEMTLS, return 0
+wolfSSL Entering wolfSSL_write
+wolfSSL Entering wolfSSL_write
+handshake not complete, trying to finish
+wolfSSL Entering wolfSSL_negotiate
+wolfSSL Entering wolfSSL_connect_TLSv13
+wolfSSL Entering ReinitSSL
+wolfSSL Entering RetrySendAlert
+Unknown connect state ERROR
+wolfSSL Leaving wolfSSL_negotiate, return -1
+wolfSSL Leaving wolfSSL_write, return -1
+wolfSSL_write returned -1
+test_echo failed
+```
+
+Somehow the handshake is not marked finished. Looking at `ssl_in_handshake` we have:
+
+```c
+if (ssl->options.side == WOLFSSL_CLIENT_END) {
+    if (IsAtLeastTLSv1_3(ssl->version))
+        return ssl->options.connectState < FINISHED_DONE;
+    if (IsAtLeastTLSv1_2(ssl))
+        return ssl->options.connectState < SECOND_REPLY_DONE;
+    return 0;
+}
+```
+
+Maybe `connectState` is not "big enough". After fixing that, client got:
+
+```log
+wolfSSL Entering ReceiveData
+wolfSSL Entering RetrySendAlert
+growing input buffer
+wolfSSL Entering DecryptTls13
+Decrypt failed
+wolfSSL Entering SendAlert
+wolfSSL Entering SendAlert
+SendAlert: 20 bad_record_mac
+```
+
+Now we need to resolve mismatching application traffic keys.
+
+## Synchronize application key
+Client log:
+
+```log
+wolfSSL Leaving DoKemTlsFinished, return 0
+GYX: Hashing <input 52 bytes> to transcript
+Derive Master Secret
+Derive Client Traffic Secret
+Derive Server Traffic Secret
+Derive Client Key
+Derive Server Key
+Derive Client IV
+Derive Server IV
+wolfSSL Leaving DoTls13HandShakeMsgType(), return 0
+wolfSSL Leaving DoTls13HandShakeMsg, return 0
+Shrinking input buffer
+wolfSSL Leaving connect_KEMTLS, return 0
+```
+
+Why does WolfSSL derive MS, CTS, STS, and keys after `DoKemTlsFinished`? Because `DoTls13HandShakeMsgType` calls `DeriveMasterSecret` and the sort. After resolving that, server reports:
+
+```log
+wolfSSL Leaving accept_KEMTLS, return 0
+wolfSSL Entering wolfSSL_read
+wolfSSL Entering wolfSSL_read_internal
+wolfSSL Entering ReceiveData
+Handshake not complete, trying to finish
+wolfSSL Entering wolfSSL_negotiate
+wolfSSL Entering wolfSSL_accept_TLSv13
+wolfSSL Entering ReinitSSL
+wolfSSL Entering RetrySendAlert
+Unknown accept state ERROR
+```
+
+Similar to `connectState`, on the server side `acceptState < TLS13_TICKET_SENT` must be true. I just need to move `KEMTLS_ACCEPT_FINISHED_SENT` to be bigger than `TLS13_TICKET_SENT`.
+
+Derive traffic keys with `DeriveTls13Keys` and `SetKeysSide`. I have no idea what I am doing but the test script will reports `echo Ok` so I am content.
 
 # June 2, 2025
 Running late on the project timeline, gotta crunch! First, add `WOLFSSL_VIS_FOR_TESTS` so that `Tls13BuildMessage` does not raise deprecation warnings.

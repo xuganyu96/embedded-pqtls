@@ -55,4 +55,9 @@ else
     echo "[ERROR] Client encountered an error."
 fi
 
+if grep -q 'echo Ok' client.log; then
+    echo "[INFO] Client echo is Ok"
+else
+    echo "[ERROR] Client echo failed"
+fi
 # Cleanup will be handled by the trap
