@@ -57,3 +57,24 @@ Content of this repository:
   url =          "https://eprint.iacr.org/2022/1712",
 }
 ```
+
+# Dev environment setup
+```yaml
+# wolfssl/.clangd 
+CompileFlags:
+  Add: [
+    "-Wall",
+    "-Wextra",
+    "-DWOLFSSL_USER_SETTINGS",
+    "-I/path/to/wolfssl",
+    "-I/path/to/server/config",
+  ]
+```
+
+```yaml
+# .clang-format
+BasedOnStyle: LLVM
+TabWidth: 4
+IndentWidth: 4
+UseTab: Never
+```
