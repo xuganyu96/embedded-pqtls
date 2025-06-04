@@ -49,16 +49,16 @@
  * ML_KEM_LEVELx_TYPE + CTC_ML_KEM_LEVELx (x = 1, 3, 5)
  * HQC_LEVELx_TYPE + CTC_HQC_LEVELx (x = 1, 3, 5)
  */
-static enum CertType root_key_type = ML_DSA_LEVEL5_TYPE;
-static enum Ctc_SigType root_sig_type = CTC_ML_DSA_LEVEL5;
-static enum CertType int_key_type = ML_DSA_LEVEL3_TYPE;
-static enum Ctc_SigType int_sig_type = CTC_ML_DSA_LEVEL3;
+static enum CertType root_key_type = RSA_TYPE;
+static enum Ctc_SigType root_sig_type = CTC_SHA384wRSA;
+static enum CertType int_key_type = ECC_TYPE;
+static enum Ctc_SigType int_sig_type = CTC_SHA384wECDSA;
 /* ML-KEM OID: 2.16.840.1.101.3.4.4.2
  * ML-DSA OID: 2.16.840.1.101.3.4.3.17 */
-static enum CertType leaf_key_type = ML_DSA_LEVEL2_TYPE;
-static enum Ctc_SigType leaf_sig_type = CTC_ML_DSA_LEVEL2;
-static enum CertType client_key_type = ML_DSA_LEVEL2_TYPE;
-static enum Ctc_SigType client_sig_type = CTC_ML_DSA_LEVEL2;
+static enum CertType leaf_key_type = ECC_TYPE;
+static enum Ctc_SigType leaf_sig_type = CTC_SHA256wECDSA;
+static enum CertType client_key_type = ECC_TYPE;
+static enum Ctc_SigType client_sig_type = CTC_SHA256wECDSA;
 
 static void set_certname(CertName *cert_name, const char *country,
                          const char *state, const char *locality,

@@ -38,3 +38,10 @@ target_link_libraries(certgen wolfssl)
 
 add_executable(asn1 src/asn1.c)
 target_link_libraries(asn1 wolfssl)
+
+add_executable(tls13server src/tls13server.c)
+target_link_libraries(tls13server wolfssl)
+
+add_executable(tls13client src/tls13client.c)
+target_link_libraries(tls13client wolfssl)
+

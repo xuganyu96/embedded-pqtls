@@ -263,3 +263,6 @@ int main(void) {
 
 This can then be expanded to a full program to generate the entire chain.
 See `src/certgen.c` in the source code for details.
+You can use the [example asn1 program](https://github.com/wolfSSL/wolfssl/blob/master/examples/asn1/asn1.c) to inspect certificates and private keys. `openssl x509 -text -noout -in <certificate>` can also be used to inspect certificates (but not private keys).
+We will talk more about ASN1, DER, and how WolfSSL works with them in later section.
+Finally, with a full set of certificate chain and key, you can test a complete TLS handshake using the example client and server [here](https://github.com/wolfSSL/wolfssl/tree/master/examples/).

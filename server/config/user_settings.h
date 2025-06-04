@@ -347,7 +347,7 @@ extern "C" {
 
 #undef DEBUG_WOLFSSL
 #undef NO_ERROR_STRINGS
-#if 0
+#if 1
     #define DEBUG_WOLFSSL
 #else
     #if 0
@@ -502,6 +502,8 @@ extern "C" {
 #define WOLFSSL_SHAKE256
 #define HAVE_DILITHIUM
 #define WOLFSSL_WC_DILITHIUM
+#define WOLFSSL_HAVE_MLKEM
+#define WOLFSSL_WC_MLKEM
 #define WOLFSSL_CERT_GEN
 // #define WOLFSSL_HAVE_KEMTLS
 #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
