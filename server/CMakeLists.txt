@@ -35,3 +35,6 @@ add_compile_options(-Wall -Wextra)
 # Compiling individual binaries
 add_executable(certgen src/certgen.c)
 target_link_libraries(certgen wolfssl)
+
+add_executable(asn1 src/asn1.c)
+target_link_libraries(asn1 wolfssl)

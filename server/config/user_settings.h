@@ -149,8 +149,8 @@ extern "C" {
         //#define HAVE_ECC192
         //#define HAVE_ECC224
         #undef NO_ECC256
-        //#define HAVE_ECC384
-        //#define HAVE_ECC521
+        #define HAVE_ECC384
+        #define HAVE_ECC521
     #endif
 
     /* Fixed point cache (speeds repeated operations against same private key) */
@@ -236,13 +236,25 @@ extern "C" {
 /* Ed25519 / Curve25519 */
 #undef HAVE_CURVE25519
 #undef HAVE_ED25519
-#if 0
+#if 1
     #define HAVE_CURVE25519
     #define HAVE_ED25519 /* ED25519 Requires SHA512 */
 
     /* Optionally use small math (less flash usage, but much slower) */
-    #if 1
+    #if 0
         #define CURVED25519_SMALL
+    #endif
+#endif
+
+#undef HAVE_CURVE448
+#undef HAVE_ED448
+#if 1
+    #define HAVE_CURVE448
+    #define HAVE_ED448 /* ED448 Requires SHA512 */
+
+    /* Optionally use small math (less flash usage, but much slower) */
+    #if 0
+        #define CURVED448_SMALL
     #endif
 #endif
 
@@ -275,12 +287,12 @@ extern "C" {
 
 /* Sha512 */
 #undef WOLFSSL_SHA512
-#if 0
+#if 1
     #define WOLFSSL_SHA512
 
     /* Sha384 */
     #undef  WOLFSSL_SHA384
-    #if 0
+    #if 1
         #define WOLFSSL_SHA384
     #endif
 
@@ -485,13 +497,16 @@ extern "C" {
 #define HAVE_SUPPORTED_CURVES
 #define WOLFSSL_BASE64_ENCODE
 
+/* GYX: enabled by me */
 #define WOLFSSL_SHAKE128
 #define WOLFSSL_SHAKE256
 #define HAVE_DILITHIUM
 #define WOLFSSL_WC_DILITHIUM
 #define WOLFSSL_CERT_GEN
+// #define WOLFSSL_HAVE_KEMTLS
+#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
+#define WOLFSSL_ASN_PRINT
 
-//#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
 //#define KEEP_PEER_CERT
 //#define HAVE_COMP_KEY
 
