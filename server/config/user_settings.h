@@ -501,7 +501,11 @@ extern "C" {
 #define WOLFSSL_SHAKE128
 #define WOLFSSL_SHAKE256
 #define HAVE_DILITHIUM
+#if 1
+#define PQCLEAN_DILITHIUM
+#else
 #define WOLFSSL_WC_DILITHIUM
+#endif
 #define WOLFSSL_HAVE_MLKEM
 #define WOLFSSL_WC_MLKEM
 #define WOLFSSL_CERT_GEN
