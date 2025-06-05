@@ -508,6 +508,9 @@ extern "C" {
 // #define WOLFSSL_HAVE_KEMTLS
 #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
 #define WOLFSSL_ASN_PRINT
+#define HAVE_SPHINCS
+#define PQCLEAN_SPHINCS
+// #define HAVE_FALCON
 
 //#define KEEP_PEER_CERT
 //#define HAVE_COMP_KEY

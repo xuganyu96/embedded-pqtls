@@ -266,3 +266,38 @@ See `src/certgen.c` in the source code for details.
 You can use the [example asn1 program](https://github.com/wolfSSL/wolfssl/blob/master/examples/asn1/asn1.c) to inspect certificates and private keys. `openssl x509 -text -noout -in <certificate>` can also be used to inspect certificates (but not private keys).
 We will talk more about ASN1, DER, and how WolfSSL works with them in later section.
 Finally, with a full set of certificate chain and key, you can test a complete TLS handshake using the example client and server [here](https://github.com/wolfSSL/wolfssl/tree/master/examples/).
+
+## Integration with PQClean
+WolfSSL comes with full support for ML-KEM and ML-DSA, and although it has the scaffolding for SPHINCS and Falcon, the implementation relies on `liboqs`. I've decided for no particular reason to NOT use `liboqs`; instead I will use `PQClean`. Similar to WolfSSL, I will compile PQClean into a static library, then use the public API to modify WolfSSL.
+
+PQClean (and for that matter `liboqs`) comes with its own implementation of `randombytes` and Keccak API. I did some preliminary benchmarking and found PQClean's Keccak API to be marginally slower than WolfCrypt's implementation, so I will keep Keccak as it is. On the other hand, the "randombytes" API must be replaced with the `WC_RNG` API because later when we move to an embedded platform there will not be a `/dev/urandom` for a source of entropy.
+
+First fork [PQClean](https://github.com/PQClean/PQClean/) and add the fork to this repository as a submodule. Then we need to adapt the `randombytes` API
+- `pqclean/common` needs to be in include path
+- add a way to use `WC_RNG` as backend for `randombytes`
+- grep all mentions of the `randombytes` function and replace with `WC_RNG`
+
+Add `WC_RNG` as backend to `randombytes.h`, then add the following section to CMakeLists.txt:
+
+```cmake
+# Compile PQClean, on MacOS desktop I will do only the clean impls
+set(PQCLEAN_ROOT "${CMAKE_CURRENT_LIST_DIR}/../PQClean" CACHE PATH "Path to PQCleang")
+get_filename_component(PQCLEAN_ROOT "${PQCLEAN_ROOT}" ABSOLUTE)
+if(NOT IS_DIRECTORY "${PQCLEAN_ROOT}")
+    message(FATAL_ERROR "'${PQCLEAN_ROOT}' is not a valid directory.")
+endif()
+message(STATUS "Using PQClean from ${PQCLEAN_ROOT}")
+    include_directories(${PQCLEAN_ROOT})
+    include_directories(${PQCLEAN_ROOT}/common)
+    file(GLOB_RECURSE PQCLEAN_SRC 
+        "${PQCLEAN_ROOT}/common/fips202.c"
+        "${PQCLEAN_ROOT}/common/randombytes.c"
+        "${PQCLEAN_ROOT}/crypto_kem/ml-kem-512/clean/*.c"
+        # ...
+    )
+add_library(pqclean STATIC ${PQCLEAN_SRC})
+target_compile_definitions(pqclean PUBLIC HAVE_WC_RNG)
+```
+
+## Adding SPHINCS+ and Falcon
+Now we have PQClean, we can instantiate the SPHINCS+ and Falcon scaffolding with actual implementations.

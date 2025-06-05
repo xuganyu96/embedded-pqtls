@@ -1,6 +1,7 @@
 **what's next**:
 - [ ] Write-up
 - [ ] Clean-up:
+    - [ ] How to add SPHINCS, Falcon, HQC, and McEliece from PQClean
     - [ ] How to add a new KEM and use it for ephemeral key exchange
     - [ ] How to add a new Signature and use it for generating certificates, private keys, and TLS signatures
     - [ ] KEMTLS: load KEM private keys, send/process KemCiphertext, updated key schedule, handling Finished in a different order than in TLS 1.3

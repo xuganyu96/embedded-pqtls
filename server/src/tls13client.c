@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/random.h>
 
 #define SLEEP_MS 100
 #define TEST_ROUNDS 1
