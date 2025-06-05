@@ -510,7 +510,8 @@ extern "C" {
 #define WOLFSSL_ASN_PRINT
 #define HAVE_SPHINCS
 #define PQCLEAN_SPHINCS
-// #define HAVE_FALCON
+#define HAVE_FALCON
+#define PQCLEAN_FALCON
 
 //#define KEEP_PEER_CERT
 //#define HAVE_COMP_KEY

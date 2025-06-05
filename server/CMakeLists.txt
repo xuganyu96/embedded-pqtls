@@ -64,7 +64,7 @@ add_library(pqclean STATIC ${PQCLEAN_SRC})
 target_compile_definitions(pqclean PUBLIC HAVE_WC_RNG WOLFSSL_USER_SETTINGS)
 
 # Compile WolfSSL into a static library
-set(WOLFSSL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../wolfssl" CACHE PATH "Path to WolfSSLg")
+set(WOLFSSL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../wolfssl" CACHE PATH "Path to WolfSSL")
 get_filename_component(WOLFSSL_ROOT "${WOLFSSL_ROOT}" ABSOLUTE)
 if(NOT IS_DIRECTORY "${WOLFSSL_ROOT}")
     message(FATAL_ERROR "'${WOLFSSL_ROOT}' is not a valid directory.")
@@ -76,7 +76,7 @@ file(GLOB WOLFSSL_SRC
   "${WOLFSSL_ROOT}/wolfcrypt/src/*.c"
 )
 add_library(wolfssl STATIC ${WOLFSSL_SRC} ${PQCLEAN_SRC})
-target_compile_definitions(wolfssl PUBLIC WOLFSSL_USER_SETTINGS)
+target_compile_definitions(wolfssl PUBLIC WOLFSSL_USER_SETTINGS HAVE_WC_RNG)
 target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations)
 
 # Global compilation flags

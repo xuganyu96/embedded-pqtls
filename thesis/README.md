@@ -301,3 +301,4 @@ target_compile_definitions(pqclean PUBLIC HAVE_WC_RNG)
 
 ## Adding SPHINCS+ and Falcon
 Now we have PQClean, we can instantiate the SPHINCS+ and Falcon scaffolding with actual implementations.
+There is a bug where SPHINCS+ and Falcon private keys cannot be loaded, but I currently do not care for the situation where SPHINCS+ and/or Falcon is a leaf/client key.
