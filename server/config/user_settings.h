@@ -516,6 +516,8 @@ extern "C" {
 #define PQCLEAN_SPHINCS
 #define HAVE_FALCON
 #define PQCLEAN_FALCON
+#define HAVE_HQC
+#define PQCLEAN_HQC
 
 //#define KEEP_PEER_CERT
 //#define HAVE_COMP_KEY

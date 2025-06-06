@@ -305,4 +305,7 @@ There is a bug where SPHINCS+ and Falcon private keys cannot be loaded, but I cu
 
 For fairness of comparison I want to use PQClean's ML-DSA as well, which can be integrated in similar fashion.
 
-## Adding ML-KEM and HQC to key exchange
+## Adding ML-KEM and HQC for key exchange
+`TLSX_KeyShare_IsSupported` was renamed(?) to `TLSX_IsGroupSupported`.
+
+Will worry about using KEM for authentication later.
