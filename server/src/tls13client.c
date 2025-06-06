@@ -34,7 +34,7 @@ static int kex_groups_pqonly[] = {
     PQCLEAN_HQC_128,    PQCLEAN_HQC_192,    PQCLEAN_HQC_256,
     OT_ML_KEM_512,      OT_ML_KEM_768,      OT_ML_KEM_1024,
 #endif
-    HQC_128,
+    WOLFSSL_ML_KEM_1024,
 };
 static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
 

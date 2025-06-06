@@ -14,7 +14,7 @@ A peer's Master's thesis has 50 pages of main content. For a first draft I want 
 ## Implementation
 In Thom Wiggers' thesis, *"Implementing and measuring post-quantum TLS in Rust"* is a section that spans 15 pages! I should document my implementation, as well.
 
-# Implementation with WolfSSL
+# Implementation with [WolfSSL@7898823](https://github.com/wolfssl/wolfssl/tree/7898823)
 [WolfSSL](https://github.com/wolfSSL/wolfssl) is a small, fast, and portable implementation of TLS/SSL for embedded devices. It optimizes for code size and memory footprint. WolfSSL also has its own cryptography library called WolfCrypt, which provides symemtric and asymmetric cryptographic primitives used throughout the TLS implementation.
 
 ## Compiling WolfSSL
@@ -272,12 +272,7 @@ WolfSSL comes with full support for ML-KEM and ML-DSA, and although it has the s
 
 PQClean (and for that matter `liboqs`) comes with its own implementation of `randombytes` and Keccak API. I did some preliminary benchmarking and found PQClean's Keccak API to be marginally slower than WolfCrypt's implementation, so I will keep Keccak as it is. On the other hand, the "randombytes" API must be replaced with the `WC_RNG` API because later when we move to an embedded platform there will not be a `/dev/urandom` for a source of entropy.
 
-First fork [PQClean](https://github.com/PQClean/PQClean/) and add the fork to this repository as a submodule. Then we need to adapt the `randombytes` API
-- `pqclean/common` needs to be in include path
-- add a way to use `WC_RNG` as backend for `randombytes`
-- grep all mentions of the `randombytes` function and replace with `WC_RNG`
-
-Add `WC_RNG` as backend to `randombytes.h`, then add the following section to CMakeLists.txt:
+I chose to add `WC_RNG` as a backend to PQClean's `randombytes` API. This requires the `randombytes` implementation to hold a static reference to some RNG instace, and a function for pointing that reference to a user-supplied `WC_RNG`. It is safe to assume that we will not use PQClean API calls outside WolfSSL, so there will not be use-after-free after WolfSSL cleans up the RNG.
 
 ```cmake
 # Compile PQClean, on MacOS desktop I will do only the clean impls
@@ -306,6 +301,25 @@ There is a bug where SPHINCS+ and Falcon private keys cannot be loaded, but I cu
 For fairness of comparison I want to use PQClean's ML-DSA as well, which can be integrated in similar fashion.
 
 ## Adding ML-KEM and HQC for key exchange
-`TLSX_KeyShare_IsSupported` was renamed(?) to `TLSX_IsGroupSupported`.
+WolfSSL has its in-house implementation of ML-KEM and ML-DSA. 
+They were mysteriously optimized. 
+The WolfCrypt ML-KEM implementation is somehow twice as fast as the reference implementation. 
+While the performance is great for production system, it is not great when I need a fair comparison across different post-quantum cryptography schemes.
+I also need to add HQC and one-time ML-KEM.
 
-Will worry about using KEM for authentication later.
+While the WolfCrypt ML-KEM is not suitable for comparison, it does pave the way for straightforward addition of other KEM schemes with similar `keygen`, `encap`, and `decap` API. Here are the steps for adding them.
+- In `wolfssl/ssl.h` there is an enum that defines the various "named groups". ML-KEM is already added, so HQC can be added to the enum as well. Later we will feed these enum variants to `wolfSSL_CTX_set_groups` to fix the KEM used in `ClientHello`.
+- There are a few validation tests to modify so the added named groups are accepted: `TLSX_IsGroupSupported`, `isValidCurveGroup`, `NamedGroupIsPqc`.
+- The added named groups also need to be added to the list of `int preferredGroup[]` in `tls.c`. Apparently WolfSSL will match the groups set in `wolfSSL_CTX_set_groups` with `preferredGroup`, and if there is no match, then it will send `ClientHello` with no `key_share`. This is allowed by RFC 8446: client can ask server to send server's list of supported key exchange groups using `HelloRetryRequest`. However, this is not what we want, so we will add the new groups to `preferredGroup` and ensure that the first `ClientHello` contains the correct key share.
+- Add new schemes to the handshake control flow. Note that these functions were originally hard-coded with WolfCrypt ML-KEM, so it is necessary to move the abstraction down by one function call (e.g. `TLSX_KeyShare_GenPqcKeyClient` originally directly calls `wc_MlKemKey_MakeKey`, but now calls `TLSX_KeyShare_GenMlKemKeyClient` or `TLSX_KeyShare_GenHqcKeyClient`).
+    - `TLSX_KeyShare_GenPqcKeyClient`, called by `SendTls13ClientHello` when client is generating `ClientHello`.
+    - `TLSX_KeyShare_HandlePqcKeyServer`, called by `DoTls13ClientHello` when server is processing client's key share.
+    - `TLSX_KeyShare_ProcessPqcClient`, called by `DoTls13ServerHello` when client is processing server's key share.
+
+For key exchange, each KEM needs to implement the following API
+- A `XXXKey` struct, which usually includes the level of the scheme, some byte arrays for public key and secret key, and some flags for whether these keys are present.
+- KeyGen, Encap, and Decap
+- export/import public key and secret key: for black-box KEM schemes it is sufficient to dump the bytes
+- Setting level and getting level, getting public key, secret key, ciphertext, and shared secret sizes
+
+Later when we add KEM for authentication we will need to implement encoding to and decoding according to DER.
