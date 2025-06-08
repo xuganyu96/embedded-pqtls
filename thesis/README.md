@@ -338,3 +338,8 @@ Here are the modifications to WolfSSL:
 Now that we have KEM-based certificate and private keys, the next step is to be able to load the certificates and keys into the handshake.
 - For loading private keys, I need to modify `static int ProcessBufferTryDecode`. This function simply tries all possible decoding until one succeeds.
     - Need to add KEMs to `enum SignatureAlgorithm`. This is only the internal coding for WolfSSL. We also need to define the RFC 8446 coding (2 bytes) for the `signature_algorithm` extension, but that is for later.
+
+For loading public key:
+- Modify `GetCertKey` and `ProcessBufferCertPublicKey` to handle the KEM
+
+Once a KEM certificate is loaded, we need some way to indicate that the handshake will be authenticated using KEM, so we need to add some flags to `WOLFSSL` and `WOLFSSL_CTX` structs, then set them in `static void wolfssl_set_have_key_oid`.
