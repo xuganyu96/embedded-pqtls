@@ -343,3 +343,6 @@ For loading public key:
 - Modify `GetCertKey` and `ProcessBufferCertPublicKey` to handle the KEM
 
 Once a KEM certificate is loaded, we need some way to indicate that the handshake will be authenticated using KEM, so we need to add some flags to `WOLFSSL` and `WOLFSSL_CTX` structs, then set them in `static void wolfssl_set_have_key_oid`.
+
+## Modifying ClientHello and ServerHello
+The first handshake control flow to change is Sending ClientHello and ServerHello, where the `signature_algorithm` extension needs negotiation. Here we need to add the SignatureAlgorithm point (2 bytes). Client should indicate that it can handle KEM algorithms as `signature_algorithm`, while server should process client's extensions.
