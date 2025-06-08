@@ -227,16 +227,16 @@ int main(int argc, char *argv[]) {
         ret = -1;
         goto shutdown;
     }
+    err = wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
+    if (err != WOLFSSL_SUCCESS) {
+        fprintf(stderr, "Failed to load private key (err %d)\n", err);
+        ret = -1;
+        goto shutdown;
+    }
     err = wolfSSL_CTX_use_certificate_chain_file_format(ctx, args.certs,
                                                         SSL_FILETYPE_PEM);
     if (err != WOLFSSL_SUCCESS) {
         fprintf(stderr, "Failed to load certificate chain\n");
-        ret = -1;
-        goto shutdown;
-    }
-    err = wolfSSL_CTX_use_PrivateKey_file(ctx, args.keyfile, SSL_FILETYPE_PEM);
-    if (err != WOLFSSL_SUCCESS) {
-        fprintf(stderr, "Failed to load private key (err %d)\n", err);
         ret = -1;
         goto shutdown;
     }

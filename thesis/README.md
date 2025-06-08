@@ -334,3 +334,7 @@ Here are the modifications to WolfSSL:
     - Function signature of `MakeCert` needs to change
     - Implemented `EncodePublicKey_ex` to accept ML-KEM and HQC keys
 - Need to implement `PublicKeyToDer`, `PrivateKeyToDer`, and `DerToPrivateKey`, although the last one is not immediately used in certificate generation.
+
+Now that we have KEM-based certificate and private keys, the next step is to be able to load the certificates and keys into the handshake.
+- For loading private keys, I need to modify `static int ProcessBufferTryDecode`. This function simply tries all possible decoding until one succeeds.
+    - Need to add KEMs to `enum SignatureAlgorithm`. This is only the internal coding for WolfSSL. We also need to define the RFC 8446 coding (2 bytes) for the `signature_algorithm` extension, but that is for later.
