@@ -14,7 +14,7 @@
 #include <wolfssl/wolfcrypt/sphincs.h>
 #include <wolfssl/wolfcrypt/types.h>
 #ifdef WOLFSSL_HAVE_KEMTLS
-#include <wolfssl/wolfcrypt/pqclean_hqc.h>
+#include <wolfssl/wolfcrypt/hqc.h>
 #include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #endif
 
@@ -40,14 +40,16 @@
  * ECC_TYPE + CTC_SHA256wECDSA | CTC_SHA384wECDSA | CTC_SHA512wECDSA
  * ED25519_TYPE + CTC_ED25519
  * ED448_TYPE + CTC_ED448
+ *
  * ---------- post-quantum ----------
  * ML_DSA_LEVELx_TYPE + CTC_ML_DSA_LEVELx (x = 2, 3, 5)
  * SPHINCS_FAST_LEVELx_TYPE + CTC_SPHINCS_FAST_LEVELx (x = 1, 3)
  * SPHINCS_SMALL_LEVELx_TYPE + CTC_SPHINCS_SMALL_LEVELx (x = 1, 3, 5)
  * FALCON_LEVELx_TYPE + CTC_FALCON_LEVELx (x = 1, 5)
  *
- * SPHINCS_FAST_LEVEL5 is too large
- * GYX: cannot load SPHINCS private keys
+ * NOTE: SPHINCS_FAST_LEVEL5 is too large
+ * NOTES: cannot load SPHINCS or Falcon private key
+ *
  * ---------- KEMTLS ----------
  * ML_KEM_LEVELx_TYPE + CTC_ML_KEM_LEVELx (x = 1, 3, 5)
  * HQC_LEVELx_TYPE + CTC_HQC_LEVELx (x = 1, 3, 5)
@@ -56,9 +58,10 @@ static enum CertType root_key_type = ML_DSA_LEVEL5_TYPE;
 static enum Ctc_SigType root_sig_type = CTC_ML_DSA_LEVEL5;
 static enum CertType int_key_type = ML_DSA_LEVEL3_TYPE;
 static enum Ctc_SigType int_sig_type = CTC_ML_DSA_LEVEL3;
-/* ML-KEM OID: 2.16.840.1.101.3.4.4.2
- * ML-DSA OID: 2.16.840.1.101.3.4.3.17 */
-static enum CertType leaf_key_type = ML_DSA_LEVEL2_TYPE;
+/* ML-KEM-512 OID: 2.16.840.1.101.3.4.4.1
+ * HQC-128 OID: 2.16.840.1.101.3.4.4.4
+ * ML-DSA-44 OID: 2.16.840.1.101.3.4.3.17 */
+static enum CertType leaf_key_type = HQC_LEVEL1_TYPE;
 static enum Ctc_SigType leaf_sig_type = CTC_ML_DSA_LEVEL2;
 static enum CertType client_key_type = ML_DSA_LEVEL2_TYPE;
 static enum Ctc_SigType client_sig_type = CTC_ML_DSA_LEVEL2;
@@ -208,7 +211,7 @@ static int malloc_key(void **key, enum CertType key_type, size_t *key_size) {
     } else if (is_mlkem(key_type)) {
         capacity = sizeof(PQCleanMlKemKey);
     } else if (is_hqc(key_type)) {
-        capacity = sizeof(PQCleanHqcKey);
+        capacity = sizeof(HqcKey);
 #endif
     } else if (key_type == RSA_TYPE) {
         capacity = sizeof(RsaKey);
@@ -536,35 +539,35 @@ static int gen_mlkem(PQCleanMlKemKey *key, enum CertType key_type, uint8_t *pem,
     return ret;
 }
 
-static int gen_hqc(PQCleanHqcKey *key, enum CertType key_type, uint8_t *pem,
+static int gen_hqc(HqcKey *key, enum CertType key_type, uint8_t *pem,
                    size_t *pem_len, WC_RNG *rng) {
     int level, ret, der_sz, pem_sz;
     uint8_t der[BUF_MAX_SIZE];
 
     switch (key_type) {
-    case ML_KEM_LEVEL1_TYPE:
+    case HQC_LEVEL1_TYPE:
         level = 1;
         break;
-    case ML_KEM_LEVEL3_TYPE:
+    case HQC_LEVEL3_TYPE:
         level = 3;
         break;
-    case ML_KEM_LEVEL5_TYPE:
+    case HQC_LEVEL5_TYPE:
         level = 5;
         break;
     default:
         return BAD_FUNC_ARG;
     }
 
-    if ((ret = wc_PQCleanHqcKey_Init(key)) < 0) {
+    if ((ret = wc_HqcKey_Init(key)) < 0) {
         return ret;
     }
-    if ((ret = wc_PQCleanHqcKey_SetLevel(key, level)) < 0) {
+    if ((ret = wc_HqcKey_SetLevel(key, level)) < 0) {
         return ret;
     }
-    if ((ret = wc_PQCleanHqcKey_MakeKey(key, rng)) < 0) {
+    if ((ret = wc_HqcKey_MakeKey(key, rng)) < 0) {
         return ret;
     }
-    der_sz = wc_PQCleanHqcKey_PrivateKeyToDer(key, der, sizeof(der));
+    der_sz = wc_HqcKey_PrivateKeyToDer(key, der, sizeof(der));
     if (der_sz <= 0) {
         return der_sz;
     }

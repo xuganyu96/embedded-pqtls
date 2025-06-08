@@ -501,7 +501,7 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define WOLFSSL_WC_MLKEM
 #define PQCLEAN_MLKEM
 #define WOLFSSL_CERT_GEN
-// #define WOLFSSL_HAVE_KEMTLS
+#define WOLFSSL_HAVE_KEMTLS
 #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
 #define WOLFSSL_ASN_PRINT
 #define HAVE_SPHINCS
