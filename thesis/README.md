@@ -349,3 +349,13 @@ The first handshake control flow to change is Sending ClientHello and ServerHell
 
 ## The rest of the control flow
 TODO: need to write this
+
+# Implementing on Raspberry Pi Pico
+The Raspberry Pi Pico 2 W is a microcontroller with 2 Cortex-M33 cores and a built-in wireless module that can be used to connect to 2.4 GHz Wifi.
+
+## Development environment setup
+I used the Pico SDK (official SDK from Raspberry Pi). To get started, clone the `pico-sdk` repository, set up an environment variable `PICO_SDK_PATH`, copy the `pico-sdk/external/pico_sdk_import.cmake` file, then setup a `CMakeList.txt` file as follows:
+
+```cmake
+
+```
