@@ -359,3 +359,23 @@ I used the Pico SDK (official SDK from Raspberry Pi). To get started, clone the 
 ```cmake
 
 ```
+
+# There is a memory somewhere, my Pico is running out of memory
+➜  wolfssl git:(kemtls) git diff 7898823 | grep "XMALLOC"
++        ssl->kemCiphertext = XMALLOC(ctLen, ssl->heap, DYNAMIC_TYPE_KEMCT);
++        ssl->kemSharedSecret = XMALLOC(ssLen, ssl->heap, DYNAMIC_TYPE_KEMSS);
++                XMALLOC(ssl->kemCiphertextSz, ssl->heap, DYNAMIC_TYPE_KEMCT);
++                XMALLOC(ssl->kemSharedSecretSz, ssl->heap, DYNAMIC_TYPE_KEMSS);
++                XMALLOC(ssl->kemCiphertextSz, ssl->heap, DYNAMIC_TYPE_KEMCT);
++                XMALLOC(ssl->kemSharedSecretSz, ssl->heap, DYNAMIC_TYPE_KEMSS);
++    key = (PQCleanMlKemKey *)XMALLOC(sizeof(PQCleanMlKemKey), heap,
++    key = (HqcKey *)XMALLOC(sizeof(HqcKey), heap,
++        privKey = XMALLOC(privKeyLen, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
++        kse->pubKey = XMALLOC(kse->pubKeyLen, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
++        privKey = XMALLOC(privKeyLen, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
++        kse->pubKey = XMALLOC(kse->pubKeyLen, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
++        ciphertext = XMALLOC(ctLen, ssl->heap, DYNAMIC_TYPE_TLSX);
+-        kemKey = (KyberKey*) XMALLOC(sizeof(KyberKey), ssl->heap,
+-        ciphertext = (byte*)XMALLOC(ctSz, ssl->heap, DYNAMIC_TYPE_TLSX);
++        ciphertext = XMALLOC(ctLen, ssl->heap, DYNAMIC_TYPE_TLSX);
++        ciphertext = XMALLOC(ctLen, ssl->heap, DYNAMIC_TYPE_TLSX);
