@@ -54,8 +54,8 @@
  * ML_KEM_LEVELx_TYPE + CTC_ML_KEM_LEVELx (x = 1, 3, 5)
  * HQC_LEVELx_TYPE + CTC_HQC_LEVELx (x = 1, 3, 5)
  */
-static enum CertType root_key_type = ML_DSA_LEVEL5_TYPE;
-static enum Ctc_SigType root_sig_type = CTC_ML_DSA_LEVEL5;
+static enum CertType root_key_type = ML_DSA_LEVEL3_TYPE;
+static enum Ctc_SigType root_sig_type = CTC_ML_DSA_LEVEL3;
 static enum CertType int_key_type = ML_DSA_LEVEL3_TYPE;
 static enum Ctc_SigType int_sig_type = CTC_ML_DSA_LEVEL3;
 /* ML-KEM-512 OID: 2.16.840.1.101.3.4.4.1
