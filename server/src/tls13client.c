@@ -4,6 +4,7 @@
  * client will verify peer and abort handshake accordingly. If client
  * authentication is needed, then --certs and --key must be supplied together.
  */
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

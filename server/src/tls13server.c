@@ -10,6 +10,7 @@
  * openssl s_client -CAfile root.crt -verify_return_error -connect \
  *     localhost:8000 < /dev/null
  */
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
