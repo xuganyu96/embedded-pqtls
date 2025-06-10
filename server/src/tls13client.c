@@ -8,6 +8,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__APPLE__) && defined(__MACH__)
+// macOS-specific: define CLOCK_MONOTONIC if needed
+#include <AvailabilityMacros.h>
+#if !defined(CLOCK_MONOTONIC)
+#define CLOCK_MONOTONIC 1
+#endif
+#include <sys/time.h>
+#endif
 
 #include <arpa/inet.h>
 #include <ctype.h>
@@ -17,6 +25,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <wolfssl/internal.h>
 #include <wolfssl/ssl.h>
 #include <wolfssl/wolfcrypt/random.h>
 
@@ -67,6 +76,23 @@ void cli_args_init(cli_args_t *args) {
     if (args) {
         memset(args, 0, sizeof(cli_args_t));
     }
+}
+
+// Get current time in microseconds using clock_gettime
+uint64_t current_time_microseconds() {
+    struct timespec ts;
+#ifdef __APPLE__
+    // macOS 10.12+ supports clock_gettime()
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        // Fallback for older systems (very rare)
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+    }
+#else
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+#endif
+    return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
 
 // Helper function to check if a string is a number
@@ -291,6 +317,10 @@ int main(int argc, char *argv[]) {
         printf("Connected to %s:%d\n", args.hostname, args.port);
         wolfSSL_set_fd(ssl, sockfd);
 
+#ifdef WOLFSSL_HAVE_TELEMETRY
+        wolfSSL_reset_telemetry(ssl);
+        wolfSSL_set_time_cb(ssl, current_time_microseconds);
+#endif
         int ssl_conn_ret;
         if ((ssl_conn_ret = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
             // https://www.wolfssl.com/documentation/manuals/wolfssl/chapter08.html
@@ -306,6 +336,11 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         printf("Handshake succeeded %s\n", args.hostname);
+#ifdef WOLFSSL_HAVE_TELEMETRY
+        if (ssl->tel.ch_start_set) {
+            printf("ClientHello start %llu\n", ssl->tel.ch_start_ts);
+        }
+#endif
         int echo_ret = test_echo(ssl);
         if (echo_ret) {
             fprintf(stderr, "test_echo failed\n");

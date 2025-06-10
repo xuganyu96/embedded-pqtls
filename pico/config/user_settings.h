@@ -549,7 +549,7 @@ unsigned long get_rand_32(void);
 /* ------------------------------------------------------------------------- */
 #define HAVE_DILITHIUM
 #define WOLFSSL_WC_DILITHIUM
-// NOTE: enable it to use Dilithium instead of ML-DSA
+// GYX: enable it to use Dilithium instead of ML-DSA
 // #define WOLFSSL_DILITHIUM_FIPS204_DRAFT
 #define WOLFSSL_HAVE_MLKEM
 #define WOLFSSL_WC_MLKEM
@@ -564,6 +564,7 @@ unsigned long get_rand_32(void);
 #define WOLFSSL_SHA3
 #define WOLFSSL_SHAKE128
 #define WOLFSSL_SHAKE256
+#define WOLFSSL_HAVE_TELEMETRY
 
 #ifdef __cplusplus
 }

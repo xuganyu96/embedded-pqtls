@@ -510,6 +510,7 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define PQCLEAN_FALCON
 #define HAVE_HQC
 #define PQCLEAN_HQC
+#undef WOLFSSL_HAVE_TELEMETRY
 
 // #define KEEP_PEER_CERT
 // #define HAVE_COMP_KEY

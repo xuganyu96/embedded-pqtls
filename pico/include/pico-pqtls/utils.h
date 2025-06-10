@@ -28,10 +28,10 @@
 #define DEBUG_printf(fmt, ...)                                                 \
   printf(COLOR_GREY "DEBUG   : " fmt COLOR_RESET, ##__VA_ARGS__)
 #else
-#define CRITICAL_printf(fmt, ...) printf("CRITICAL: " fmt, ##__VA_ARGS__)
-#define WARNING_printf(fmt, ...) printf("WARNING : " fmt, ##__VA_ARGS__)
-#define INFO_printf(fmt, ...) printf("INFO    : " fmt, ##__VA_ARGS__)
-#define DEBUG_printf(fmt, ...) printf("DEBUG   : " fmt, ##__VA_ARGS__)
+#define CRITICAL_printf(fmt, ...) do { } while (0)
+#define WARNING_printf(fmt, ...) do { } while (0)
+#define INFO_printf(fmt, ...) do {} while (0)
+#define DEBUG_printf(fmt, ...) do {} while (0)
 #endif
 
 /**
