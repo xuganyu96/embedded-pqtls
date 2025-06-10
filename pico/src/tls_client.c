@@ -11,7 +11,7 @@
 
 #define SLEEP_MS (100)
 
-#include "pico-pqtls/cafiles/mldsa65-mldsa65-mldsa44.h"
+#include "pico-pqtls/cafiles/mldsa65-mldsa65-hqc128.h"
 
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
@@ -21,17 +21,17 @@
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "ml-kem-512"
+#define KEX_NAME "hqc-128"
 static int kex_groups[] = {
     // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
     // WOLFSSL_ECC_SECP521R1,
     // WOLFSSL_ECC_X25519,
     // WOLFSSL_ECC_X448,
-    WOLFSSL_ML_KEM_512,
+    // WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
     // WOLFSSL_ML_KEM_1024
-    // HQC_128,
+    HQC_128,
     // HQC_192,
     // HQC_256,
 };
