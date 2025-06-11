@@ -11,7 +11,7 @@
 
 #define SLEEP_MS (100)
 
-#include "pico-pqtls/cafiles/sha256ecdsa.h"
+#include "pico-pqtls/cafiles/ed25519.h"
 
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
