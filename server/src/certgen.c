@@ -132,8 +132,13 @@ typedef struct certchain_out {
     size_t client_key_len;
 } certchain_out_t;
 
-static int get_server_chain(certchain_out_t *out, uint8_t *chain, size_t len) {
-    if (len < (out->root_cert_len + out->int_cert_len + out->leaf_cert_len)) {
+static int get_server_chain(certchain_out_t *out, uint8_t *chain, size_t len,
+                            int include_root) {
+    size_t min_len = out->leaf_cert_len + out->int_cert_len;
+    if (include_root) {
+        min_len += out->root_cert_len;
+    }
+    if (len < min_len) {
         return BUFFER_E;
     }
     size_t offset = 0;
@@ -141,19 +146,26 @@ static int get_server_chain(certchain_out_t *out, uint8_t *chain, size_t len) {
     offset += out->leaf_cert_len;
     memcpy(chain + offset, out->int_cert_pem, out->int_cert_len);
     offset += out->int_cert_len;
-    memcpy(chain + offset, out->root_cert_pem, out->root_cert_len);
+    if (include_root) {
+        memcpy(chain + offset, out->root_cert_pem, out->root_cert_len);
+    }
 
     return 0;
 }
 
-static int get_client_chain(certchain_out_t *out, uint8_t *chain, size_t len) {
-    if (len < (out->root_cert_len + out->client_cert_len)) {
+static int get_client_chain(certchain_out_t *out, uint8_t *chain, size_t len,
+                            int include_root) {
+    size_t min_len = out->client_cert_len;
+    if (include_root)
+        min_len += out->root_cert_len;
+    if (len < min_len) {
         return BUFFER_E;
     }
     size_t offset = 0;
     memcpy(chain + offset, out->client_cert_pem, out->client_cert_len);
     offset += out->client_cert_len;
-    memcpy(chain + offset, out->root_cert_pem, out->root_cert_len);
+    if (include_root)
+        memcpy(chain + offset, out->root_cert_pem, out->root_cert_len);
 
     return 0;
 }
@@ -455,7 +467,7 @@ static int gen_sphincs(sphincs_key *key, enum CertType key_type, uint8_t *pem,
 
     return ret;
 }
-#endif  /* HAVE_SPHINCS */
+#endif /* HAVE_SPHINCS */
 
 #ifdef HAVE_FALCON
 static int gen_falcon(falcon_key *key, enum CertType key_type, uint8_t *pem,
@@ -979,8 +991,8 @@ int main(int argc, char *argv[]) {
     size_t server_chain_len =
         out.root_cert_len + out.int_cert_len + out.leaf_cert_len;
     size_t client_chain_len = out.root_cert_len + out.client_cert_len;
-    get_server_chain(&out, server_chain_pem, sizeof(server_chain_pem));
-    get_client_chain(&out, client_chain_pem, sizeof(client_chain_pem));
+    get_server_chain(&out, server_chain_pem, sizeof(server_chain_pem), 0);
+    get_client_chain(&out, client_chain_pem, sizeof(client_chain_pem), 0);
 
     export_pem(cli_args.certdir, "root.crt", out.root_cert_pem,
                out.root_cert_len);
