@@ -1,1 +1,0 @@
-pyserial  # required by scripts/readserial.py

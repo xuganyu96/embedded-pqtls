@@ -9,3 +9,4 @@ Ready-made certificate chains. If the folder contains one name, then all certifi
 |ML-KEM-512|ML-DSA-65|ML-DSA-65|ML-KEM-512||
 |ML-KEM-512|ML-DSA-65|ML-DSA-65|ML-DSA-44||
 |HQC-128|ML-DSA-65|ML-DSA-65|ML-KEM-512||
+|HQC-128|ML-DSA-65|ML-DSA-65|HQC-128||
