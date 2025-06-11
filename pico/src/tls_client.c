@@ -21,12 +21,12 @@
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "P256R1"
+#define KEX_NAME "x25519"
 static int kex_groups[] = {
-    WOLFSSL_ECC_SECP256R1,
+    // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
     // WOLFSSL_ECC_SECP521R1,
-    // WOLFSSL_ECC_X25519,
+    WOLFSSL_ECC_X25519,
     // WOLFSSL_ECC_X448,
     // WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
