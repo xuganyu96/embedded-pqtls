@@ -542,10 +542,23 @@ After sending \texttt{Finished}, the client can start sending application data w
 Because application data will be encrypted under application traffic key derived from authenticated handshake secret, any server successfully decrypting them is implicitly authenticated.
 Finally, client explicitly authenticates the server after receiving server's \texttt{Finished}.
 
-% TODO: talk about server side divergence from TLS 1.3
+On the server side, KEMTLS and TLS 1.3 handshake flow first diverges after server finishes sending its \texttt{Certificate}. 
+If either of \texttt{haveMlKemAuth} and \texttt{haveHqcAuth} flag is set, then after exiting \texttt{SendTls13Certificate}, instead of constructing and sending \texttt{CertificateVerify}, server will receive and process \texttt{KemCiphertext}.
+After decapsulating client's \texttt{KemCiphertext}, server similarly needs to update the key schedule: first derive the authenticated handshake secret using the authentication secret, then derive new handshake traffic keys, HMAC keys for processing client's \texttt{Finished} and constructing server's \texttt{Finished}, and finally the application traffic keys.
+Last but not least, server needs to construct and send its \texttt{Finished} before it can start sending application data.
+
+In our implementation, we used the handshake message type for \texttt{client\_key\_exchange} when constructing \texttt{KemCiphertext}. \texttt{client\_key\_exchange} is a handshake message type that exists only in TLS 1.2 or prior but not in TLS 1.3. 
+This upsets some sanity checks in WolfSSL's TLS 1.3 state machine. Similarly, the different order of messages, particularly the order of \texttt{Finished}, can also cause the same set of sanity checks to fail. 
+For the purpose of benchmarking performance only, we modified the these sanity checks to ignore message orders when \texttt{haveMlKemAuth} or \texttt{haveHqcAuth} is set.
+However, in production use, KEMTLS will definitely require a distinct set of checks to ensure the integrity of the handshake state machine.
 
 \subsection{Miscellaneous comments}
-% TODO: mention the off-by-one error about SPHINCS+
+We appreciate the many thoughtful design choices made in both WolfSSL and WolfCrypt. Using C preprocessing macros defined in a easily manageable \texttt{user\_settings.h} file allowed us to build for three different platforms (Apple Silicon on the author's laptop running MacOS, \texttt{x86\_64} on the test server running Linux, and 32-bit ARM on baremetal) using a single codebase. The modular I/O callback API made it possible to run WolfSSL on the Pi Pico without any RTOS. WolfSSL's repository even provided ready-made integration with the \texttt{Pico-SDK} so that using Pico's hardware RNG with WolfCrypt's \texttt{WC\_RNG} struct requires no additional effort from the authors.
+
+Another difficulty with WolfSSL comes from the need for manual memory management. This is especially the case when building for the Pico, which has only 512kB SRAM and can be easily overwhelmed by memory leaks since post-quantum keys, ciphertexts, and signatures all consume 1-10 kilobytes of memories each. Fortunately, there are only a handful of places where WolfSSL requires dynamic memory allocations, and they are either freed within the function scope or freed at the end of the handshake as part of \texttt{wolfSSL\_shutdown} or \texttt{wolfSSL\_free}. Other instances of dynamic memory allocation were flawlessly managed in WolfSSL's existing source code, allowing the Pico to continuously perform thousands of handshakes without exhausting its SRAM or needing assistance from an RTOS.
+
+\section{Raspberry Pi Pico}
+
 
 % %======================================================================
 % \chapter{Observations}
