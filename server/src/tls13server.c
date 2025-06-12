@@ -255,6 +255,7 @@ int main(int argc, char *argv[]) {
         wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
     }
 
+    int rounds = 0;
     while (1) {
         stream =
             accept(listener, (struct sockaddr *)&addr, (socklen_t *)&addr_size);
@@ -279,7 +280,7 @@ int main(int argc, char *argv[]) {
             wolfSSL_ERR_error_string(wolfSSL_get_error(ssl, err), errmsg);
             fprintf(stderr, "Error string: %s\n", errmsg);
         } else {
-            printf("Successful handshake\n");
+            printf("Successful handshake %d\n", rounds++);
         }
 
         err = echo_server(ssl);
