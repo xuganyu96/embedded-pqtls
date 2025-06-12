@@ -43,7 +43,7 @@ static err_t tcp_recv_handler(void *arg, struct tcp_pcb *tpcb, struct pbuf *p,
   } else if (p) {
     if (stream->rx_pbuf) {
       uint32_t remaining_cap = 0xFFFF - stream->rx_pbuf->tot_len;
-      if (remaining_cap > p->tot_len) {
+      if (remaining_cap < p->tot_len) {
         lwip_err = ERR_WOULDBLOCK;
       } else {
         pbuf_cat(stream->rx_pbuf, p);
