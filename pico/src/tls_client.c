@@ -16,7 +16,8 @@
 // #include "pico-pqtls/cafiles/ed25519.h"
 // #include "pico-pqtls/cafiles/mldsa44.h"
 // #include "pico-pqtls/cafiles/sphincs128f-mldsa44-mldsa44-mldsa44.h"
-#include "pico-pqtls/cafiles/mldsa44-mldsa44-mlkem512-mldsa44.h"
+// #include "pico-pqtls/cafiles/mldsa44-mldsa44-mlkem512-mldsa44.h"
+#include "pico-pqtls/cafiles/mldsa44-mldsa44-hqc128-mldsa44.h"
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
 #endif
@@ -25,17 +26,17 @@
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "mlkem512"
+#define KEX_NAME "hqc128"
 static int kex_groups[] = {
     // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
     // WOLFSSL_ECC_SECP521R1,
     // WOLFSSL_ECC_X25519,
     // WOLFSSL_ECC_X448,
-    WOLFSSL_ML_KEM_512,
+    // WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
     // WOLFSSL_ML_KEM_1024
-    // HQC_128,
+    HQC_128,
     // HQC_192,
     // HQC_256,
 };
