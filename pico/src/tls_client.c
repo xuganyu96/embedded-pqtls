@@ -26,7 +26,7 @@
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "otmlkem512"
+#define KEX_NAME "ot-mlkem512"
 static int kex_groups[] = {
     // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
@@ -262,6 +262,10 @@ int main(void) {
                 absolute_time_diff_us(tls_hs_start, tls_hs_end);
             INFO_printf("TLS handshake #%03d success, dur=%" PRIu32 " ms\n",
                         round, us_to_ms(hs_dur_us));
+#ifndef USE_COLORED_LOGGING
+            (void)hs_dur_us;
+            (void)round;
+#endif
         }
         int echo_ret = test_echo(ssl);
         if (echo_ret) {
