@@ -39,12 +39,16 @@
 
 static int kex_pqonly = 1;
 static int kex_groups_pqonly[] = {
-    WOLFSSL_ML_KEM_512,
-    WOLFSSL_ML_KEM_768,
-    WOLFSSL_ML_KEM_1024,
-    HQC_128,
-    HQC_192,
-    HQC_256,
+    /* GYX: OT_ML_KEM_512 works, but 768/1024 does not */
+    // OT_ML_KEM_512,
+    // OT_ML_KEM_768,
+    OT_ML_KEM_1024,
+    // WOLFSSL_ML_KEM_512,
+    // WOLFSSL_ML_KEM_768,
+    // WOLFSSL_ML_KEM_1024,
+    // HQC_128,
+    // HQC_192,
+    // HQC_256,
 };
 static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
 

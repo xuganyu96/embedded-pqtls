@@ -344,7 +344,7 @@ extern "C" {
 
 #undef DEBUG_WOLFSSL
 #undef NO_ERROR_STRINGS
-#if 0
+#if 1
 #define DEBUG_WOLFSSL
 #else
 #if 0
@@ -510,6 +510,7 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define PQCLEAN_FALCON
 #define HAVE_HQC
 #define PQCLEAN_HQC
+#define HAVE_OTMLKEM /* IND-1CCA MLKEM */
 #undef WOLFSSL_HAVE_TELEMETRY
 
 // #define KEEP_PEER_CERT

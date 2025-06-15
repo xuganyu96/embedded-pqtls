@@ -560,6 +560,7 @@ unsigned long get_rand_32(void);
 #define PQCLEAN_FALCON
 #define HAVE_HQC
 #define PQCLEAN_HQC
+#define HAVE_OTMLKEM /* IND-1CCA MLKEM */
 #define WOLFSSL_HAVE_KEMTLS
 #define WOLFSSL_SHA3
 #define WOLFSSL_SHAKE128
