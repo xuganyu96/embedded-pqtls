@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -172,6 +173,8 @@ int main(int argc, char *argv[]) {
     int err;
     int ret = 0;
     cli_args_t args;
+    struct timespec accept_finish_ts, accept_start_ts;
+
     cli_args_init(&args);
     if ((err = parse_args(&args, argc, argv)) != 0) {
         exit(err);
@@ -273,6 +276,7 @@ int main(int argc, char *argv[]) {
             goto shutdown;
         }
         wolfSSL_set_fd(ssl, stream);
+        clock_gettime(CLOCK_MONOTONIC, &accept_start_ts);
         err = wolfSSL_accept(ssl);
         if (err != WOLFSSL_SUCCESS) {
             char errmsg[80];
@@ -280,7 +284,11 @@ int main(int argc, char *argv[]) {
             wolfSSL_ERR_error_string(wolfSSL_get_error(ssl, err), errmsg);
             fprintf(stderr, "Error string: %s\n", errmsg);
         } else {
-            printf("Successful handshake %d\n", rounds++);
+            clock_gettime(CLOCK_MONOTONIC, &accept_finish_ts);
+            int64_t interval =
+                (accept_finish_ts.tv_sec - accept_start_ts.tv_sec) * 1000000 +
+                (accept_finish_ts.tv_nsec - accept_start_ts.tv_nsec) / 1000;
+            printf("Successful handshake %04d (dur=%9"PRIi64")\n", rounds++, interval);
         }
 
         err = echo_server(ssl);
