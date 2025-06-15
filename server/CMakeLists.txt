@@ -27,6 +27,7 @@ message(STATUS "Using PQClean from ${PQCLEAN_ROOT}")
         "${PQCLEAN_ROOT}/common/fips202.c"
         "${PQCLEAN_ROOT}/common/randombytes.c"
         "${PQCLEAN_ROOT}/crypto_kem/ml-kem-512/clean/*.c"
+        "${PQCLEAN_ROOT}/crypto_kem/ot-ml-kem-512/clean/*.c"
         "${PQCLEAN_ROOT}/crypto_kem/ml-kem-768/clean/*.c"
         "${PQCLEAN_ROOT}/crypto_kem/ml-kem-1024/clean/*.c"
         "${PQCLEAN_ROOT}/crypto_kem/hqc-128/clean/*.c"
