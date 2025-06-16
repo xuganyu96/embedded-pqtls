@@ -16,7 +16,8 @@
 // #include "pico-pqtls/cafiles/ed25519.h"
 // #include "pico-pqtls/cafiles/mldsa44.h"
 // #include "pico-pqtls/cafiles/sphincs128f-mldsa44-mldsa44-mldsa44.h"
-#include "pico-pqtls/cafiles/falcon512-mldsa44-mldsa44-mldsa44.h"
+// #include "pico-pqtls/cafiles/falcon512-mldsa44-mldsa44-mldsa44.h"
+#include "pico-pqtls/cafiles/sphincs128s-mldsa44-mldsa44.h"
 // #include "pico-pqtls/cafiles/mldsa44-mldsa44-mlkem512-mldsa44.h"
 // #include "pico-pqtls/cafiles/mldsa44-mldsa44-hqc128-mldsa44.h"
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
