@@ -142,7 +142,6 @@ file(GLOB COMMON_SRC src/common/*.c)
 add_executable(bench_wolfcrypt
     src/bench_wolfcrypt.c
     ${COMMON_SRC}
-    ${WOLFSSL_ROOT}/wolfcrypt/benchmark/benchmark.c
 )
 pico_enable_stdio_uart(bench_wolfcrypt 0)
 pico_enable_stdio_usb(bench_wolfcrypt 1)
