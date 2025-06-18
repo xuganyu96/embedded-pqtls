@@ -26,6 +26,9 @@
 #include <wolfssl/wolfcrypt/curve25519.h>
 #include <wolfssl/wolfcrypt/curve448.h>
 #include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/hqc.h>
+#include <wolfssl/wolfcrypt/otmlkem.h>
+#include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #include <wolfssl/wolfcrypt/random.h>
 
 #include "pico-pqtls/utils.h"
@@ -233,17 +236,17 @@ static void ecdhe521_keygen(void *args) {
     }
 }
 
-static void ecdhe256_setup(struct ecdhe_args *args, WC_RNG *rng) {
+static void ecdhe_setup(struct ecdhe_args *args, WC_RNG *rng, int curve_id) {
     int ret;
     wc_ecc_init(&args->alice);
     wc_ecc_init(&args->bob);
-    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(ECC_SECP256R1),
+    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(curve_id),
                           &args->alice);
     if (ret < 0) {
         printf("returned %d\n", ret);
         exit(-1);
     }
-    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(ECC_SECP256R1),
+    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(curve_id),
                           &args->bob);
     if (ret < 0) {
         printf("returned %d\n", ret);
@@ -253,47 +256,7 @@ static void ecdhe256_setup(struct ecdhe_args *args, WC_RNG *rng) {
     args->bob.rng = rng;
 }
 
-static void ecdhe384_setup(struct ecdhe_args *args, WC_RNG *rng) {
-    int ret;
-    wc_ecc_init(&args->alice);
-    wc_ecc_init(&args->bob);
-    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(ECC_SECP384R1),
-                          &args->alice);
-    if (ret < 0) {
-        printf("returned %d\n", ret);
-        exit(-1);
-    }
-    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(ECC_SECP384R1),
-                          &args->bob);
-    if (ret < 0) {
-        printf("returned %d\n", ret);
-        exit(-1);
-    }
-    args->alice.rng = rng;
-    args->bob.rng = rng;
-}
-
-static void ecdhe521_setup(struct ecdhe_args *args, WC_RNG *rng) {
-    int ret;
-    wc_ecc_init(&args->alice);
-    wc_ecc_init(&args->bob);
-    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(ECC_SECP521R1),
-                          &args->alice);
-    if (ret < 0) {
-        printf("wc_ecc_make_key returned %d\n", ret);
-        exit(-1);
-    }
-    ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(ECC_SECP521R1),
-                          &args->bob);
-    if (ret < 0) {
-        printf("wc_ecc_make_key returned %d\n", ret);
-        exit(-1);
-    }
-    args->alice.rng = rng;
-    args->bob.rng = rng;
-}
-
-static void ecdhe256_agree(void *args) {
+static void ecdhe_agree(void *args) {
     struct ecdhe_args *keypair = (struct ecdhe_args *)args;
     byte out[80];
     word32 outlen = 80;
@@ -305,26 +268,305 @@ static void ecdhe256_agree(void *args) {
     }
 }
 
-static void ecdhe384_agree(void *args) {
-    struct ecdhe_args *keypair = (struct ecdhe_args *)args;
-    byte out[80];
-    word32 outlen = 80;
-    int ret =
-        wc_ecc_shared_secret(&keypair->alice, &keypair->bob, out, &outlen);
+struct mlkem_args {
+    WC_RNG *rng;
+    PQCleanMlKemKey key;
+    byte ct[PQCLEAN_MLKEM_MAX_CIPHERTEXT_SIZE];
+    byte ss[PQCLEAN_MLKEM_SS_SIZE];
+};
+
+static void mlkem512_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    PQCleanMlKemKey key;
+    wc_PQCleanMlKemKey_Init(&key);
+    wc_PQCleanMlKemKey_SetLevel(&key, 1);
+    int ret = wc_PQCleanMlKemKey_MakeKey(&key, rng);
     if (ret < 0) {
-        printf("wc_ecc_shared_secret returned %d\n", ret);
+        printf("wc_PQCleanMlKemKey_MakeKey returned %d\n", ret);
         exit(-1);
     }
 }
 
-static void ecdhe521_agree(void *args) {
-    struct ecdhe_args *keypair = (struct ecdhe_args *)args;
-    byte out[80];
-    word32 outlen = 80;
-    int ret =
-        wc_ecc_shared_secret(&keypair->alice, &keypair->bob, out, &outlen);
+static void mlkem768_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    PQCleanMlKemKey key;
+    wc_PQCleanMlKemKey_Init(&key);
+    wc_PQCleanMlKemKey_SetLevel(&key, 3);
+    int ret = wc_PQCleanMlKemKey_MakeKey(&key, rng);
     if (ret < 0) {
-        printf("wc_ecc_shared_secret returned %d\n", ret);
+        printf("wc_PQCleanMlKemKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void mlkem1024_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    PQCleanMlKemKey key;
+    wc_PQCleanMlKemKey_Init(&key);
+    wc_PQCleanMlKemKey_SetLevel(&key, 5);
+    int ret = wc_PQCleanMlKemKey_MakeKey(&key, rng);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void mlkem_setup(struct mlkem_args *args, int level, WC_RNG *rng) {
+    int ret;
+    ret = wc_PQCleanMlKemKey_Init(&args->key);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_Init returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_PQCleanMlKemKey_SetLevel(&args->key, level);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_SetLevel returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_PQCleanMlKemKey_MakeKey(&args->key, rng);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_PQCleanMlKemKey_Encapsulate(&args->key, args->ct, args->ss, rng);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_Encapsulate returned %d\n", ret);
+        exit(-1);
+    }
+    args->rng = rng;
+}
+
+static void mlkem_encap(void *_args) {
+    struct mlkem_args *args = (struct mlkem_args *)_args;
+    int ret;
+    byte ct[PQCLEAN_MLKEM_MAX_CIPHERTEXT_SIZE];
+    byte ss[PQCLEAN_MLKEM_SS_SIZE];
+    ret = wc_PQCleanMlKemKey_Encapsulate(&args->key, ct, ss, args->rng);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_Encapsulate returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void mlkem_decap(void *_args) {
+    struct mlkem_args *args = (struct mlkem_args *)_args;
+    int ret;
+    byte ss_cmp[PQCLEAN_MLKEM_SS_SIZE];
+    word32 ctLen;
+    ret = wc_PQCleanMlKemKey_CipherTextSize(&args->key, &ctLen);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_CipherTextSize returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_PQCleanMlKemKey_Decapsulate(&args->key, ss_cmp, args->ct, ctLen);
+    if (ret < 0) {
+        printf("wc_PQCleanMlKemKey_Decapsulate returned %d\n", ret);
+        exit(-1);
+    }
+    if (memcmp(args->ss, ss_cmp, sizeof(ss_cmp)) != 0) {
+        printf("ML-KEM decap incorrect\n");
+        exit(-1);
+    }
+}
+
+struct hqc_args {
+    WC_RNG *rng;
+    HqcKey key;
+    byte ct[PQCLEAN_HQC_MAX_CIPHERTEXT_SIZE];
+    byte ss[PQCLEAN_HQC_MAX_SHAREDSECRET_SIZE];
+};
+
+static void hqc128_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    HqcKey key;
+    wc_HqcKey_Init(&key);
+    wc_HqcKey_SetLevel(&key, 1);
+    int ret = wc_HqcKey_MakeKey(&key, rng);
+    if (ret < 0) {
+        printf("wc_HqcKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void hqc192_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    HqcKey key;
+    wc_HqcKey_Init(&key);
+    wc_HqcKey_SetLevel(&key, 3);
+    int ret = wc_HqcKey_MakeKey(&key, rng);
+    if (ret < 0) {
+        printf("wc_HqcKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void hqc256_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    HqcKey key;
+    wc_HqcKey_Init(&key);
+    wc_HqcKey_SetLevel(&key, 5);
+    int ret = wc_HqcKey_MakeKey(&key, rng);
+    if (ret < 0) {
+        printf("wc_HqcKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void hqc_setup(struct hqc_args *args, int level, WC_RNG *rng) {
+    int ret;
+    ret = wc_HqcKey_Init(&args->key);
+    if (ret < 0) {
+        printf("wc_HqcKey_Init returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_HqcKey_SetLevel(&args->key, level);
+    if (ret < 0) {
+        printf("wc_HqcKey_SetLevel returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_HqcKey_MakeKey(&args->key, rng);
+    if (ret < 0) {
+        printf("wc_HqcKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_HqcKey_Encapsulate(&args->key, args->ct, args->ss, rng);
+    if (ret < 0) {
+        printf("wc_HqcKey_Encapsulate returned %d\n", ret);
+        exit(-1);
+    }
+    args->rng = rng;
+}
+
+static void hqc_encap(void *_args) {
+    struct hqc_args *args = (struct hqc_args *)_args;
+    int ret;
+    byte ct[PQCLEAN_HQC_MAX_CIPHERTEXT_SIZE];
+    byte ss[PQCLEAN_HQC_MAX_SHAREDSECRET_SIZE];
+    ret = wc_HqcKey_Encapsulate(&args->key, ct, ss, args->rng);
+    if (ret < 0) {
+        printf("wc_HqcKey_Encapsulate returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void hqc_decap(void *_args) {
+    struct hqc_args *args = (struct hqc_args *)_args;
+    int ret;
+    byte ss_cmp[PQCLEAN_HQC_MAX_SHAREDSECRET_SIZE];
+    word32 ctLen;
+    ret = wc_HqcKey_CipherTextSize(&args->key, &ctLen);
+    if (ret < 0) {
+        printf("wc_HqcKey_CipherTextSize returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_HqcKey_Decapsulate(&args->key, ss_cmp, args->ct, ctLen);
+    if (ret < 0) {
+        printf("wc_HqcKey_Decapsulate returned %d\n", ret);
+        exit(-1);
+    }
+    if (memcmp(args->ss, ss_cmp, sizeof(ss_cmp)) != 0) {
+        printf("ML-KEM decap incorrect\n");
+        exit(-1);
+    }
+}
+
+struct otmlkem_args {
+    WC_RNG *rng;
+    OtMlKemKey key;
+    byte ct[PQCLEAN_OTMLKEM_MAX_CIPHERTEXT_SIZE];
+    byte ss[PQCLEAN_OTMLKEM_MAX_SHAREDSECRET_SIZE];
+};
+
+static void otmlkem512_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    OtMlKemKey key;
+    wc_OtMlKemKey_Init(&key);
+    wc_OtMlKemKey_SetLevel(&key, 1);
+    int ret = wc_OtMlKemKey_MakeKey(&key, rng);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void otmlkem768_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    OtMlKemKey key;
+    wc_OtMlKemKey_Init(&key);
+    wc_OtMlKemKey_SetLevel(&key, 3);
+    int ret = wc_OtMlKemKey_MakeKey(&key, rng);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void otmlkem1024_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    OtMlKemKey key;
+    wc_OtMlKemKey_Init(&key);
+    wc_OtMlKemKey_SetLevel(&key, 5);
+    int ret = wc_OtMlKemKey_MakeKey(&key, rng);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void otmlkem_setup(struct otmlkem_args *args, int level, WC_RNG *rng) {
+    int ret;
+    ret = wc_OtMlKemKey_Init(&args->key);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_Init returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_OtMlKemKey_SetLevel(&args->key, level);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_SetLevel returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_OtMlKemKey_MakeKey(&args->key, rng);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_MakeKey returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_OtMlKemKey_Encapsulate(&args->key, args->ct, args->ss, rng);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_Encapsulate returned %d\n", ret);
+        exit(-1);
+    }
+    args->rng = rng;
+}
+
+static void otmlkem_encap(void *_args) {
+    struct otmlkem_args *args = (struct otmlkem_args *)_args;
+    int ret;
+    byte ct[PQCLEAN_OTMLKEM_MAX_CIPHERTEXT_SIZE];
+    byte ss[PQCLEAN_OTMLKEM_MAX_SHAREDSECRET_SIZE];
+    ret = wc_OtMlKemKey_Encapsulate(&args->key, ct, ss, args->rng);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_Encapsulate returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void otmlkem_decap(void *_args) {
+    struct otmlkem_args *args = (struct otmlkem_args *)_args;
+    int ret;
+    byte ss_cmp[PQCLEAN_OTMLKEM_MAX_SHAREDSECRET_SIZE];
+    word32 ctLen;
+    ret = wc_OtMlKemKey_CipherTextSize(&args->key, &ctLen);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_CipherTextSize returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_OtMlKemKey_Decapsulate(&args->key, ss_cmp, args->ct, ctLen);
+    if (ret < 0) {
+        printf("wc_OtMlKemKey_Decapsulate returned %d\n", ret);
+        exit(-1);
+    }
+    if (memcmp(args->ss, ss_cmp, sizeof(ss_cmp)) != 0) {
+        printf("ML-KEM decap incorrect\n");
         exit(-1);
     }
 }
@@ -349,9 +591,21 @@ int main(void) {
     struct x448_args x448_agree_args;
     x448_setup(&x448_agree_args, &rng);
     struct ecdhe_args ecdhe256_args, ecdhe384_args, ecdhe521_args;
-    ecdhe256_setup(&ecdhe256_args, &rng);
-    ecdhe384_setup(&ecdhe384_args, &rng);
-    ecdhe521_setup(&ecdhe521_args, &rng);
+    ecdhe_setup(&ecdhe256_args, &rng, ECC_SECP256R1);
+    ecdhe_setup(&ecdhe384_args, &rng, ECC_SECP384R1);
+    ecdhe_setup(&ecdhe521_args, &rng, ECC_SECP521R1);
+    struct mlkem_args mlkem512_args, mlkem768_args, mlkem1024_args;
+    mlkem_setup(&mlkem512_args, 1, &rng);
+    mlkem_setup(&mlkem768_args, 3, &rng);
+    mlkem_setup(&mlkem1024_args, 5, &rng);
+    struct hqc_args hqc128_args, hqc192_args, hqc256_args;
+    hqc_setup(&hqc128_args, 1, &rng);
+    hqc_setup(&hqc192_args, 3, &rng);
+    hqc_setup(&hqc256_args, 5, &rng);
+    struct otmlkem_args otmlkem512_args, otmlkem768_args, otmlkem1024_args;
+    otmlkem_setup(&otmlkem512_args, 1, &rng);
+    otmlkem_setup(&otmlkem768_args, 3, &rng);
+    otmlkem_setup(&otmlkem1024_args, 5, &rng);
 
     /* bench */
     printf("name,op,median,p90,p99\n");
@@ -361,32 +615,90 @@ int main(void) {
 
         bench_black_box(x25519_keygen, &rng, durs, len);
         print_results(durs, len, "x25519,keygen");
-
         bench_black_box(x25519_agree, &x25519_agree_args, durs, len);
         print_results(durs, len, "x25519,agree");
 
         bench_black_box(x448_keygen, &rng, durs, len);
         print_results(durs, len, "x448,keygen");
-
         bench_black_box(x448_agree, &x448_agree_args, durs, len);
         print_results(durs, len, "x448,agree");
 
         bench_black_box(ecdhe256_keygen, &rng, durs, len);
         print_results(durs, len, "ECDHE (P-256),keygen");
-
-        bench_black_box(ecdhe256_agree, &ecdhe256_args, durs, len);
+        bench_black_box(ecdhe_agree, &ecdhe256_args, durs, len);
         print_results(durs, len, "ECDHE (P-256),agree");
 
         bench_black_box(ecdhe384_keygen, &rng, durs, len);
         print_results(durs, len, "ECDHE (P-384),keygen");
-
-        bench_black_box(ecdhe384_agree, &ecdhe384_args, durs, len);
+        bench_black_box(ecdhe_agree, &ecdhe384_args, durs, len);
         print_results(durs, len, "ECDHE (P-384),agree");
 
         bench_black_box(ecdhe521_keygen, &rng, durs, len);
         print_results(durs, len, "ECDHE (P-521),keygen");
-
-        bench_black_box(ecdhe521_agree, &ecdhe521_args, durs, len);
+        bench_black_box(ecdhe_agree, &ecdhe521_args, durs, len);
         print_results(durs, len, "ECDHE (P-521),agree");
+
+        bench_black_box(mlkem512_keygen, &rng, durs, len);
+        print_results(durs, len, "ML-KEM-512,keygen");
+        bench_black_box(mlkem_encap, &mlkem512_args, durs, len);
+        print_results(durs, len, "ML-KEM-512,encap");
+        bench_black_box(mlkem_decap, &mlkem512_args, durs, len);
+        print_results(durs, len, "ML-KEM-512,decap");
+
+        bench_black_box(mlkem768_keygen, &rng, durs, len);
+        print_results(durs, len, "ML-KEM-768,keygen");
+        bench_black_box(mlkem_encap, &mlkem768_args, durs, len);
+        print_results(durs, len, "ML-KEM-768,encap");
+        bench_black_box(mlkem_decap, &mlkem768_args, durs, len);
+        print_results(durs, len, "ML-KEM-768,decap");
+
+        bench_black_box(mlkem1024_keygen, &rng, durs, len);
+        print_results(durs, len, "ML-KEM-1024,keygen");
+        bench_black_box(mlkem_encap, &mlkem1024_args, durs, len);
+        print_results(durs, len, "ML-KEM-1024,encap");
+        bench_black_box(mlkem_decap, &mlkem1024_args, durs, len);
+        print_results(durs, len, "ML-KEM-1024,decap");
+
+        bench_black_box(hqc128_keygen, &rng, durs, len);
+        print_results(durs, len, "HQC-128,keygen");
+        bench_black_box(hqc_encap, &hqc128_args, durs, len);
+        print_results(durs, len, "HQC-128,encap");
+        bench_black_box(hqc_decap, &hqc128_args, durs, len);
+        print_results(durs, len, "HQC-128,decap");
+
+        bench_black_box(hqc192_keygen, &rng, durs, len);
+        print_results(durs, len, "HQC-192,keygen");
+        bench_black_box(hqc_encap, &hqc192_args, durs, len);
+        print_results(durs, len, "HQC-192,encap");
+        bench_black_box(hqc_decap, &hqc192_args, durs, len);
+        print_results(durs, len, "HQC-192,decap");
+
+        bench_black_box(hqc256_keygen, &rng, durs, len);
+        print_results(durs, len, "HQC-256,keygen");
+        bench_black_box(hqc_encap, &hqc256_args, durs, len);
+        print_results(durs, len, "HQC-256,encap");
+        bench_black_box(hqc_decap, &hqc256_args, durs, len);
+        print_results(durs, len, "HQC-256,decap");
+
+        bench_black_box(otmlkem512_keygen, &rng, durs, len);
+        print_results(durs, len, "OT-ML-KEM-512,keygen");
+        bench_black_box(otmlkem_encap, &otmlkem512_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-512,encap");
+        bench_black_box(otmlkem_decap, &otmlkem512_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-512,decap");
+
+        bench_black_box(otmlkem768_keygen, &rng, durs, len);
+        print_results(durs, len, "OT-ML-KEM-768,keygen");
+        bench_black_box(otmlkem_encap, &otmlkem768_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-768,encap");
+        bench_black_box(otmlkem_decap, &otmlkem768_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-768,decap");
+
+        bench_black_box(otmlkem1024_keygen, &rng, durs, len);
+        print_results(durs, len, "OT-ML-KEM-1024,keygen");
+        bench_black_box(otmlkem_encap, &otmlkem1024_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-1024,encap");
+        bench_black_box(otmlkem_decap, &otmlkem1024_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-1024,decap");
     }
 }
