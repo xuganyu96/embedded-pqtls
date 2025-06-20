@@ -121,6 +121,37 @@
 % although it's supposed to be in both the TeX Live and MikTeX distributions. There are also documentation and 
 % installation instructions there.
 
+% GYX: my packages
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usetikzlibrary{positioning}
+
+% GYX: custom commands
+\newcommand{\pke}{\texttt{PKE}}
+\newcommand{\keygen}{\texttt{KeyGen}}
+\newcommand{\encrypt}{\texttt{Enc}}
+\newcommand{\decrypt}{\texttt{Dec}}
+\newcommand{\kem}{\texttt{KEM}}
+\newcommand{\encap}{\texttt{Encap}}
+\newcommand{\decap}{\texttt{Decap}}
+\newcommand{\etm}{{\texttt{ETM}}}  % encrypt-then-mac
+\newcommand{\mac}{\texttt{\texttt{MAC}}}
+\newcommand{\sign}{\texttt{Sign}}
+\newcommand{\verify}{\texttt{Verify}}
+\newcommand{\pk}{\texttt{pk}}
+\newcommand{\sk}{\texttt{sk}}
+\newcommand{\pco}{\texttt{PCO}}
+\newcommand{\cvo}{\texttt{CVO}}
+\newcommand{\leftsample}{\stackrel{\$}{\leftarrow}}
+\newcommand{\llbrack}{[\![}
+\newcommand{\rrbrack}{]\!]}
+\newcommand{\norm}[1]{\left\lvert #1 \right\rvert}
+\newcommand{\adv}{\texttt{Adv}}
+\newcommand{\fotplus}{\texttt{FOT+}}
+\newcommand{\us}{\mu s}
+\Urlmuskip=0mu  plus 10mu  % fix underfull hbox for URL in footnote
+
 % Setting up the page margins...
 % uWaterloo thesis requirements specify a minimum of 1 inch (72pt) margin at the
 % top, bottom, and outside page edges and a 1.125 in. (81pt) gutter margin (on binding side). 
@@ -394,50 +425,285 @@ This is dedicated to the one I love.
 % Change page numbering back to Arabic numerals
 \pagenumbering{arabic}
 
-% %----------------------------------------------------------------------
-% % MAIN BODY
-% % We suggest using a separate file for each chapter of your thesis.
-% % Start each chapter file with the \chapter command.
-% % Only use \documentclass or \begin{document} and \end{document} commands in this master document.
-% % Tip: Putting each sentence on a new line is a way to simplify later editing.
-% %----------------------------------------------------------------------
-% %======================================================================
-% \chapter{Introduction}
-% %======================================================================
-% In the beginning, there was $\pi$:
+\chapter{Post-quantum TLS on embedded systems}
+\section{An overview of TLS 1.3}
+Transport Layer Security (TLS) is a communication protocol with which two parties can securely exchange data over an insecure transport layer.
+It was first developed at Netscape in 1994 and went through many iterations.
+The latest revision is TLS 1.3, formally standardized by IETF in RFC8446 \cite{DBLP:journals/rfc/rfc8446} in 2018.
+TLS 1.3 made significant improvements over TLS 1.2 \cite{DBLP:journals/rfc/rfc5246} and prior versions, including deprecating weak symmetric cipher suites, removing static key exchange schemes that do not provide forward secrecy, and restructuring the handshake state machine in order to simplify the handshake workflow.
+According to Cloudflare \cite{Westerbaan_2024}, TLS 1.3 reached more than 93\% adoption on the Internet.
+Given TLS 1.3's superior design and nearly universal adoption over other versions of TLS, this work will focus on this version unless otherwise specified.
 
-% \begin{equation}
-%    e^{\pi i} + 1 = 0  \label{eqn_pi}
-% \end{equation}
-% A \gls{computer} could compute $\pi$ all day long. In fact, subsets of digits of $\pi$'s decimal approximation would make a good source for psuedo-random vectors, \gls{rvec} . 
+A new TLS 1.3 connection begins with a handshake in which the two parties exchange a specific sequence of messages to negotiate cryptographic parameters, establish shared secrets, and authenticate each other.
+If the handshake is successful, then the connection transitions to exchanging application data using the encryption scheme and secret keys obtained from the handshake phase.
+In TLS 1.3, the handshake can be further divided into two phases \footnote{We omitted parameter negotiation messages like \texttt{HelloRetryRequest} and \texttt{EncryptedExtensions}. They are either optional or inconsequential to our argument}: \begin{enumerate}
+    \item \textbf{Key exchange} \begin{enumerate}
+        \item \texttt{ClientHello}: client publishes its supported symmetric cipher suites (AEAD, hash functions), signature algorithms, a random nonce, and key exchange public keys.
+        \item \texttt{ServerHello}: server chooses its preferred symmetric cipher suite, as well as publishes its own random nonce and key exchange public keys.
+    \end{enumerate}
+    \item \textbf{Authentication} \begin{enumerate}
+        \item \texttt{Certificates}: server sends a chain of X.509 certificates that bind its identity to a digital signature public key; optionally, server can request client authentication (\texttt{CertificateRequest}), in which case the client must also send a chain of certificates.
+        \item \texttt{CertificatesVerify}: server proves ownership fo the corresponding digital signature secret key by producing a signature over the handshake transcript; client will do the same upon server's request
+        \item \texttt{Finished}: both parties prove to each other the integrity of the handshake by producing an HMAC over the handshake transcript
+    \end{enumerate}
+\end{enumerate}
 
-% %----------------------------------------------------------------------
-% \section{State of the Art}
-% %----------------------------------------------------------------------
+Figure \ref{fig:classical-tls13-handshake} illustrates a simple TLS 1.3 handshake:
 
-% See equation \ref{eqn_pi} on page \pageref{eqn_pi}.\footnote{A famous equation.}
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[node distance=2em and 2.5cm, font=\footnotesize]
+        \tikzset{
+            mynode/.style = {draw, rectangle}
+        }
+    
+        \node[draw,rectangle] (client) at (0,0) {Client[$\pk^\text{SIG}_\text{root}$]};
+        \node[draw,rectangle] (server) at (10,0) {
+            Server[Certs,$\sk_s$]
+        };
 
-% \section{Some Meaningless Stuff}
+        \node[below of=client] (tcpc) {}; % invisible nodes help draw TCP connection
+        \node[below of=server] (tcps) {};
+        \draw[<->] (tcpc) -- (tcps) node[midway,above]{TCP SYN} node[midway,below]{TCP SYN-ACK};
 
-% The credo of the \gls{aaaaz} was, for several years, several paragraphs of gibberish, until the \gls{dingledorf} responsible for the \gls{aaaaz} Web site realized his mistake:
+        % construct ClientHello
+        \node[below of=tcpc,align=left] (ch) {
+            $(G, g) \leftarrow \texttt{supported\_groups}$ \\
+            $x \leftsample \mathbb{Z}_q,\pk^\text{DHE}_c\leftarrow g^x,r_c \leftsample \{0,1\}^{256}$ \\
+        };
+        \node[below of=tcps] (ch_wait) {}; % server is waiting for client hello
 
-% "Velit dolor illum facilisis zzril ipsum, augue odio, accumsan ea augue molestie lobortis zzril laoreet ex ad, adipiscing nulla. Veniam dolore, vel te in dolor te, feugait dolore ex vel erat duis nostrud diam commodo ad eu in consequat esse in ut wisi. Consectetuer dolore feugiat wisi eum dignissim tincidunt vel, nostrud, at vulputate eum euismod, diam minim eros consequat lorem aliquam et ad. Feugait illum sit suscipit ut, tation in dolore euismod et iusto nulla amet wisi odio quis nisl feugiat adipiscing luptatum minim nisl, quis, erat, dolore. Elit quis sit dolor veniam blandit ullamcorper ex, vero nonummy, duis exerci delenit ullamcorper at feugiat ullamcorper, ullamcorper elit vulputate iusto esse luptatum duis autem. Nulla nulla qui, te praesent et at nisl ut in consequat blandit vel augue ut.
+        % send ClientHello
+        \node[below of=ch] (ch_sent) {};
+        \node[below of=ch_wait] (ch_recved) {};
+        \draw[->] (ch_sent) -- (ch_recved) node[midway,above] {\texttt{ClientHello}[$\pk^\text{DHE}_c,r_c$]};
 
-% Illum suscipit delenit commodo augue exerci magna veniam hendrerit dignissim duis ut feugait amet dolor dolor suscipit iriure veniam. Vel quis enim vulputate nulla facilisis volutpat vel in, suscipit facilisis dolore ut veniam, duis facilisi wisi nulla aliquip vero praesent nibh molestie consectetuer nulla. Wisi nibh exerci hendrerit consequat, nostrud lobortis ut praesent dignissim tincidunt enim eum accumsan. Lorem, nonummy duis iriure autem feugait praesent, duis, accumsan tation enim facilisi qui te dolore magna velit, iusto esse eu, zzril. Feugiat enim zzril, te vel illum, lobortis ut tation, elit luptatum ipsum, aliquam dolor sed. Ex consectetuer aliquip in, tation delenit dignissim accumsan consequat, vero, et ad eu velit ut duis ea ea odio.
+        % process client hello, construct server hello
+        \node[below of=ch_sent] (sh_wait) {};
+        \node[align=left,below of=ch_recved] (sh) {
+            $y\leftsample \mathbb{Z}_q,\pk^\text{DHE}_s\leftarrow g^y$ \\
+            $r_s\leftsample\{0,1\}^{256}$
+        };
 
-% Vero qui, te praesent et at nisl ut in consequat blandit vel augue ut dolor illum facilisis zzril ipsum. Exerci odio, accumsan ea augue molestie lobortis zzril laoreet ex ad, adipiscing nulla, et dolore, vel te in dolor te, feugait dolore ex vel erat duis. Ut diam commodo ad eu in consequat esse in ut wisi aliquip dolore feugiat wisi eum dignissim tincidunt vel, nostrud. Ut vulputate eum euismod, diam minim eros consequat lorem aliquam et ad luptatum illum sit suscipit ut, tation in dolore euismod et iusto nulla. Iusto wisi odio quis nisl feugiat adipiscing luptatum minim. Illum, quis, erat, dolore qui quis sit dolor veniam blandit ullamcorper ex, vero nonummy, duis exerci delenit ullamcorper at feugiat. Et, ullamcorper elit vulputate iusto esse luptatum duis autem esse nulla qui.
+        % send server hello
+        \node[below of=sh_wait] (sh_recved) {};
+        \node[below of=sh] (sh_sent) {};
+        \draw[->] (sh_sent) -- (sh_recved) node[midway,above] {
+            \texttt{ServerHello}[$\pk^\text{DHE}_s, r_s$]
+        };
 
-% Praesent dolore et, delenit, laoreet dolore sed eros hendrerit consequat lobortis. Dolor nulla suscipit delenit commodo augue exerci magna veniam hendrerit dignissim duis ut feugait amet. Ad dolor suscipit iriure veniam blandit quis enim vulputate nulla facilisis volutpat vel in. Erat facilisis dolore ut veniam, duis facilisi wisi nulla aliquip vero praesent nibh molestie consectetuer nulla, iriure nibh exerci hendrerit. Vel, nostrud lobortis ut praesent dignissim tincidunt enim eum accumsan ea, nonummy duis. Ad autem feugait praesent, duis, accumsan tation enim facilisi qui te dolore magna velit, iusto esse eu, zzril vel enim zzril, te. Nisl illum, lobortis ut tation, elit luptatum ipsum, aliquam dolor sed minim consectetuer aliquip.
+        % derive stage 1/2 keys: handshake traffic keys
+        \node[align=left,below=0em of sh_recved] (dhe_ss_c) {$g^{xy}\leftarrow (\pk^\text{DHE}_s)^x$};
+        \node[below=0em of sh_sent] (dhe_ss_s) {$g^{xy}\leftarrow (\pk^\text{DHE}_c)^y$};
+        \node[below=2em of dhe_ss_c] (stage12_c) {};
+        \node[below=2em of dhe_ss_s] (stage12_s) {};
+        \draw[dashed] (stage12_c) -- (stage12_s) node[midway,above,align=center] {
+            $\texttt{HS}\leftarrow\texttt{HKDF.Extract}(\text{dES}, g^{xy})$ \\
+            $\texttt{\color{blue} CHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS,"c hs traffic",CH..SH})$ \\
+            $\texttt{\color{blue} SHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS,"s hs traffic",CH..SH})$
+        };
 
-% Tation exerci delenit ullamcorper at feugiat ullamcorper, ullamcorper elit vulputate iusto esse luptatum duis autem esse nulla qui. Volutpat praesent et at nisl ut in consequat blandit vel augue ut dolor illum facilisis zzril ipsum, augue odio, accumsan ea augue molestie lobortis zzril laoreet. Ex duis, te velit illum odio, nisl qui consequat aliquip qui blandit hendrerit. Ea dolor nonummy ullamcorper nulla lorem tation laoreet in ea, ullamcorper vel consequat zzril delenit quis dignissim, vulputate tincidunt ut."
+        % encrypted extensions, aka server parameters
+        \node[below=1em of stage12_c] (serverparams_c) {};
+        \node[below=1em of stage12_s] (serverparams_s) {};
+        \draw[->] (serverparams_s) -- (serverparams_c) node[midway,above] {\color{blue}
+            $\{\texttt{EncryptedExtensions}\}_\texttt{SHTS}$
+        };
 
-\chapter{Implementation and benchmarking}\label{sec:implementation-and-benchmarking}
+        % certificates
+        \node[below=1em of serverparams_c] (certs_recv) {};
+        \node[below=1em of serverparams_s] (certs_send) {};
+        \draw[->] (certs_send) -- (certs_recv) node[midway,above,align=center] {\color{blue}
+            $\{\texttt{Certificate}\}_\texttt{SHTS}$
+        };
+
+        % construct CertificateVerify
+        \node[below=0em of certs_recv] (cv_wait) {
+            Verify $\pk^\text{SIG}_s$ using 
+            $\pk^\text{SIG}_\text{root}$
+        };
+        \node[below=0em of certs_send] (cv) {
+            $\sigma \leftsample \sign(\sk^\text{SIG}_s, \texttt{CH..CERT})$
+        };
+
+        % send CertificateVerify
+        \node[below=1em of cv_wait] (cv_recv) {
+        };
+        \node[below=1em of cv] (cv_send) {
+        };
+        \draw[->] (cv_send) -- (cv_recv) node[midway,above] {\color{blue}
+            $\{\texttt{CertificateVerify}[\sigma]\}_\texttt{SHTS}$
+        };
+
+        % derive finished keys
+        \node[below=2em of cv_recv] (finkey_c) {};
+        \node[below=2em of cv_send] (finkey_s) {};
+        \draw[dashed] (finkey_c) -- (finkey_s) node[midway,above,align=center] {
+            $\texttt{FKey}_s \leftarrow \texttt{HKDF.Expand(SHTS, "finished", "")}$ \\
+            $\texttt{FKey}_c \leftarrow \texttt{HKDF.Expand(CHTS, "finished", "")}$
+        };
+
+        % construct server finished
+        \node[below=0em of finkey_c] (sfin_wait) {
+            $\verify(\pk^\text{SIG}_s, \texttt{CH..CERT}, \sigma) \stackrel{?}{=} 1$
+        };
+        \node[below=0em of finkey_s] (sfin) {
+            $t_s \leftarrow \texttt{HMAC}(\texttt{FKey}_s, \texttt{CH..CV})$
+        };
+
+        % send server finished
+        \node[below=1em of sfin_wait] (sfin_recv) {};
+        \node[below=1em of sfin] (sfin_send) {};
+        \draw[->] (sfin_send) -- (sfin_recv) node[midway,above] {\color{blue}
+            $\{\texttt{Finished}[t_s]\}_\texttt{SHTS}$
+        };
+
+        % client verified ServerFinished
+        \node[below=0em of sfin_recv] (sfin_verify) {
+            $\texttt{HMAC}(\texttt{FKey}_s, \texttt{CH..CV}) \stackrel{?}{=} t_s$
+        };
+
+        % derive MS, app traffic keys
+        \node[below=6em of sfin_recv] (stage34_c) {};
+        \node[below=6em of sfin_send] (stage34_s) {};
+        \draw[dashed] (stage34_s) -- (stage34_c) node[midway,above,align=center] {
+            $\texttt{dHS} \leftarrow \texttt{HKDF.Expand(HS, "derived", "")}$ \\
+            $\texttt{MS} \leftarrow \texttt{HKDF.Extract(0,dHS)}$ \\
+            $\texttt{\color{red} SATS} \leftarrow \texttt{HKDF.Expand(MS, "s ap traffic", CH..SF)}$ \\
+            $\texttt{\color{red} CATS} \leftarrow \texttt{HKDF.Expand(MS, "c ap traffic", CH..SF)}$
+        };
+
+        % early app traffic from server
+        \node[below=1em of stage34_c] (early_app_c) {};
+        \node[below=1em of stage34_s] (early_app_s) {};
+        \draw[->] (early_app_s) -- (early_app_c) node[midway,above]{\color{red}
+            $\{\texttt{application data}\}_\texttt{SATS}$
+        };
+
+        % client constructs finished
+        \node[below=0em of early_app_c] (cfin) {
+            $t_c \leftarrow \texttt{HMAC}(\texttt{FKey}_c, \texttt{CH..CV})$
+        };
+        \node[align=left,below=0em of early_app_s] (cfin_wait) {\\};
+
+        % client sends finished
+        \node[below=0em of cfin] (cfin_send) {};
+        \node[below=0em of cfin_wait] (cfin_recv) {};
+        \draw[->] (cfin_send) -- (cfin_recv) node[midway,above] {\color{blue}
+            $\{\texttt{Finished}[t_c]\}_\texttt{CHTS}$
+        };
+
+        % server verifies client's Finished
+        \node[align=left,below=0em of cfin_send] (cfin_verify_wait) {\\};
+        \node[below=0em of cfin_recv] (cfin_verify) {
+            $\texttt{HMAC}(\texttt{FKey}_c, \texttt{CH..CV}) \stackrel{?}{=} t_c$
+        };
+
+        % TODO: actual application data
+        \node[below=0em of cfin_verify_wait] (app_c_send) {};
+        \node[below=0em of cfin_verify] (app_c_recv) {};
+        \draw[->] (app_c_send) -- (app_c_recv) node[midway,above] {\color{red}
+            $\{\texttt{application data}\}_\texttt{CATS}$
+        };
+        \node[below=1em of app_c_send] (app_s_recv) {};
+        \node[below=1em of app_c_recv] (app_s_send) {};
+        \draw[->] (app_s_send) -- (app_s_recv) node[midway,above] {\color{red}
+            $\{\texttt{application data}\}_\texttt{SATS}$
+        };
+
+        % \node[draw, rectangle, align=left, below of=client] (sendclienthello) {
+        %     \textbf{ClientHello}:\\
+        %     Pick $G = \langle g \rangle$ of order $q$\\
+        %     $x\leftsample \mathbb{Z}_q, \pk^\text{DHE}_c \leftarrow g^x$
+        % };
+
+        % \node[below of=server] (waitclienthello) {};
+
+        % \node[draw, rectangle, align=left, below of=waitclienthello] (processclienthello) {
+        %     $y\leftsample\mathbb{Z}_q, \pk^{\text{ECDHE}}_s \leftarrow g^y$ \\
+        %     $g^{xy} \leftarrow (g^x)^y$ \\
+        %     $\text{HS} \leftarrow \texttt{HKDF\_extract}(g^{xy}, \ldots)$ \\
+        %     $\text{SHTS} \leftarrow \texttt{HKDF\_expand}(\texttt{HS}, \text{})$
+        % };
+
+        % \draw[->] (sendclienthello) -- (processclienthello) node[midway,above]{
+        %     \textbf{ClientHello}[$(G, g), \pk^\text{DHE}_c$]
+        % };
+
+        % TODO: need to finish this diagram
+    
+        % \node (ch) at (0,-0.5) {
+        %     $(\pk^{\kem}_e, \sk^{\kem}_e)\leftsample\keygen^{\kem}()$
+        % };
+        % \draw[->] (0,-1) -- (8,-1) node[midway, above] {\texttt{ClientHello}[$\pk^{\kem}_e, r_c$]};
+        % \node (sh) at (8, -1.5) {
+        %     $(\texttt{ct}_e, \texttt{ss}_e) \leftsample \encap(\pk^{\kem}_e)$
+        % };
+        % \draw[<-] (0,-2) -- (8,-2) node[midway, above] {\texttt{ServerHello}[$\texttt{ct}_e, r_s$]};
+        % \node (decap) at (0,-2.4) {
+        %     $\texttt{ss}_e \leftarrow \decap(\sk_e^{\kem}, \texttt{ct}_e)$
+        % };
+        % \node (hs) at (4,-2.4) {
+        %     ${\color{blue} k_\text{hs}}
+        %         \leftarrow\texttt{HKDF}(\texttt{ss}_e, r_c, r_s)$
+        % };
+        % \draw[<-] (0,-3.3) -- (8,-3.3) node[midway, above] {\color{blue}
+        %     \texttt{Certificate}[$\texttt{pk}^{\text{Sig}}_{s}$]
+        % };
+        % \draw[<-] (0,-3.9) -- (8,-3.9) node[midway, above] {\color{blue}
+        %     \texttt{CertificateVerify}[
+        %         $\sigma_s \leftsample \sign(\sk_s^\text{Sig}, \texttt{CH..CERT})$
+        %     ]
+        % };
+        % \draw[<-] (0,-4.5) -- (8,-4.5) node[midway, above] {\color{blue}
+        %     \texttt{Finished}[$t_s\leftarrow\texttt{HMAC}(k_\text{Finish}, \texttt{CH..CV})$]
+        % };
+        % \draw[<-] (0,-5.1) -- (8,-5.1) node[midway, above] {\color{purple}
+        %     Application data
+        % };
+        % \draw[->] (0,-5.8) -- (8,-5.8) node[midway, above] {\color{blue}
+        %     \texttt{Finished}[$t_s\leftarrow\texttt{HMAC}(k_\text{Finish}, \texttt{CH..F})$]
+        % };
+        % \draw[->] (0,-6.5) -- (8,-6.5) node[midway, above] {\color{purple}
+        %     Application data
+        % };
+    \end{tikzpicture}
+    \caption{TLS 1.3 handshake with (EC)DHE and signature-based authentication}
+    \label{fig:classical-tls13-handshake}
+\end{figure}
+
+\subsection{Certificate-based authentication}
+
+\subsection{Key schedule and HKDF}
+
+\subsection{Transition to post-quantum}
+
+\section{Embedded device security}
+\subsection{Implementing (post-quantum) TLS on embedded device}
+
+\subsection{Authenticating the embedded device}
+Prior works \cite{cryptoeprint:2021/1553,DBLP:conf/ccs/Burstinghaus-Steinbach20,DBLP:conf/space/GonzalezW22} evaluating post-quantum TLS on embedded systems primarily focused on configurations in which the constrained device is an anonymous TLS client who does not need to authenticate itself to the server. 
+While the TLS 1.3 (and KEMTLS) supports mutual authentication, implementing it on an embedded device posts unique challenges. 
+The same set of challenges also apply to using embedded device as TLS server.
+
+The primary obstacle to implementing authentication on embedded device is the threat of physical intrusion. 
+For example, servers in a data center are physically secured within a building guarded by human with guns, so they often do not require extra hardware security measures. 
+In some critical use cases where extra security is required (e.g. banking), a hardware security module (HSM) can be deployed on premise. 
+By comparison, embedded devices are commonly deployed in unprotected if not hostile environments, where adversaries can easily capture the device and execute sophisticated physical attacks.
+
+There are numerous hardware and software measures that can be deployed to protect secrets on an embedded devices, including but not limited to physical unclonable functions (PUF), trusted platform modules (TPM), cryptocoprocessors, and secure boot. 
+In addition to cost and power consumption concerns, however, the existence of a ``secure storage'' means one can simply deploy a 256-bit symmetric key and use symmetric primitives (i.e. HMAC) to authenticate the device. 
+In fact, TLS 1.3 supports handshake using pre-shared key (PSK)\cite{DBLP:journals/rfc/rfc8446} in environments with no public key infrastructure (PKI).
+PSK automatically provides mutual authentication and also offers vastly superior performance by eliminating all asymmetric cryptographic operations.
+In other words, regardless of whether private keys can be securely stored or not, there is no scenario in which authenticating an embedded device using public-key cryptography makes sense.
+
+\chapter{Implementation and performance measurements}\label{sec:implementation-and-performance-measurements}
 To evaluate post-quantum TLS 1.3 and KEMTLS on constrained devices, we implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL, a TLS library written in the C programming language. We then implemented a minimal TLS client on the Raspberry Pi Pico 2 W, a microcontroller with two ARM Cortex-M33 cores \footnote{The Pico 2 W also has 2 RISC-V cores, though we did not use them in this project.} and 512kB of SRAM, and measures the time it takes for the Pico client to complete a TLS 1.3 or KEMTLS handshake with a server. This chapter describes some of the implementation details, the benchmarking methodology, and the performance measurements.
 
 \section{WolfSSL}\label{sec:wolfssl}
 WolfSSL is a modern open-source TLS library written in C. In addition to a complete TLS stack, WolfSSL also includes its own cryptography library called WolfCrypt. Both WolfSSL and WolfCrypt are optimized for code size, speed, and memory footprint, and it portability and ease of configuration greatly simplifies managing multiple build targets using a single code base.
 
-\subsection{Integrating post-quantum algorithms}\label{sec:integrating-post-quantum-algorithms}
+\subsection{Integrating additional post-quantum algorithms}\label{sec:integrating-post-quantum-algorithms}
 As of June 2025, WolfCrypt contains an in-house implementation of ML-KEM and ML-DSA. Both implementation are skillfully optimized, achieving at least 2x speedup on the Pico compared to the reference implementation \footnote{The Keccak implementation in WolfCrypt is only roughly 10\% faster than PQClean's implementation, so the optimization must have come elsewhere}. Unfortunately, this makes the comparison across different schemes unfair. Instead, I chose to integrate with PQClean's clean implementations.
 
 While PQClean is not specifically optimized for embedded system builds, all of its clean implementations are trivially portable to ARM. One non-trivial challenge is adapting the \texttt{randombytes} API in PQClean to am embedded system build with no operating system. Fortunately, WolfCrypt's \texttt{WC\_RNG} API provides a common abstraction that works on both a desktop build (where random bits can be sourced from \texttt{/dev/urandom}) and Pico (where random bits are collected from various peripherals by the SDK). In the end, we expanded the \texttt{randombytes} API so it can be told to source random bits from user specified instance of \texttt{WC\_RNG}.
@@ -557,59 +823,406 @@ We appreciate the many thoughtful design choices made in both WolfSSL and WolfCr
 
 Another difficulty with WolfSSL comes from the need for manual memory management. This is especially the case when building for the Pico, which has only 512kB SRAM and can be easily overwhelmed by memory leaks since post-quantum keys, ciphertexts, and signatures all consume 1-10 kilobytes of memories each. Fortunately, there are only a handful of places where WolfSSL requires dynamic memory allocations, and they are either freed within the function scope or freed at the end of the handshake as part of \texttt{wolfSSL\_shutdown} or \texttt{wolfSSL\_free}. Other instances of dynamic memory allocation were flawlessly managed in WolfSSL's existing source code, allowing the Pico to continuously perform thousands of handshakes without exhausting its SRAM or needing assistance from an RTOS.
 
-\section{Raspberry Pi Pico}
+\section{Hardware setup}
+We chose to test TLS 1.3 and KEMTLS performance on a Raspberry Pi Pico 2 W and a Linux desktop. 
+The Raspberry Pi Pico 2 W is a microcontroller developed by the Raspberry Pi Foundation and released in late 2024. 
+At the heart of the Pico 2 W is the RP2350 chip, which contains two ARM Cortex-M33 cores and two Hazard3 RISC-V cores, though only one architecture can be enabled at boot time.
+The chip is clocked at 150MHz.
+The Pico 2 W also has 520KB of SRAM and 4MB of flash storage.
+For connectivity, the Pico 2 W has a CYW43439 module that supports 2.4 GHz Wifi and Bluetooth 5.4.
 
+For developing on the Pico 2 W, we used the GNU ARM toolchain (\texttt{arm-none-eabi-gcc} version 8.5.0) and the Pico-SDK, which comes with a standard library as well as integration with third-party open source projects, most notably \texttt{lwip} (lightweight IP).
+\texttt{lwip} is a TCP/IP library designed for embedded system, and the Pico-SDK provided tight integration between \texttt{lwip} and the \texttt{cyw43} driver, which allowed us to implement a simple TCP stream on top of the raw TCP API.
+We also used \texttt{lwip} to implement DNS and time synchronization over NTP, the latter being necessary for WolfSSL to validate the expiration dates of peer's certificates.
 
-% %======================================================================
-% \chapter{Observations}
-% %======================================================================
+Because of the lack of a file system, certificates must be baked into the firmware at compilation. 
+While it is possible to define certificates as raw bytes in C preprocessing macro, we found it much easier to encode the certificates in PEM format, which consists entirely of ASCII characters.
+On the other hand, while private keys can also be encoded in DER or PEM format and included into the firmware at compilation, without further protection they can be easily extracted from the devices via a firmware dump.
+The Pico 2 W features a one-time programmable (OTP) ROM that, once enabled and written to, will permanently be protected by secure boot.
+In December 2024, Raspberry Pi Ltd. launched a hacking challenge\footnote{https://github.com/raspberrypi/rp2350\_hacking\_challenge} in which the participants try to extract a secret from a secure-boot-enaled Pico 2 W.
+While some participants have successfully extracted the secret, all publicly known winners used intrusive methods that required extensive physical access and non-trivial external hardware.
+Another issue with using the OTP for private key is size, since on RP2350 the OTP has a limited capacity of 8KB, although it is possible to store a seed that can then be expanded into the private key at bootup.
+Embedded devices that need to store private keys should consider using a peripheral device, such as a trusted platform module (TPM) or secure hardware module (HSM).
 
-% This would be a good place for some figures and tables.
+The Linux desktop has an 8-core AMD Ryzen 7 1700X with 12GB of RAM, running Ubuntu 24.04 LTS, and compiling with \texttt{GCC 13.3.0}.
 
-% Some notes on figures and photographs\ldots
+Our network setup takes advantage of Pico 2 W's wireless capabilities. 
+We used a netowrk router that is connected to University of Waterloo's internal network via Ethernet, then connect the Pico 2 W to the router via Wifi.
+The Linux desktop was connected to the internal network via Ethernet as well.
+\textbf{\color{red} I need more metrics on the network :(}
 
-% \begin{itemize}
-% \item A well-prepared PDF should be 
-%   \begin{enumerate}
-%     \item Of reasonable size, {\it i.e.} photos cropped and compressed.
-%     \item Scalable, to allow enlargment of text and drawings. 
-%   \end{enumerate} 
-% \item Photos must be bit maps, and so are not scaleable by definition. TIFF and
-% BMP are uncompressed formats, while JPEG is compressed. Most photos can be
-% compressed without losing their illustrative value.
-% \item Drawings that you make should be scalable vector graphics, \emph{not} 
-% bit maps. Some scalable vector file formats are: EPS, SVG, PNG, WMF. These can
-% all be converted into PNG or PDF, that pdflatex recognizes. Your drawing 
-% package can probably export to one of these formats directly. Otherwise, a 
-% common procedure is to print-to-file through a Postscript printer driver to 
-% create a PS file, then convert that to EPS (encapsulated PS, which has a 
-% bounding box to describe its exact size rather than a whole page). 
-% Programs such as GSView (a Ghostscript GUI) can create both EPS and PDF from PS files.
-% Appendix~\ref{AppendixA} shows how to generate properly sized Matlab plots and save them as PDF.
-% \item It's important to crop your photos and draw your figures to the size that
-% you want to appear in your thesis. Scaling photos with the 
-% includegraphics command will cause loss of resolution. And scaling down 
-% drawings may cause any text annotations to become too small.
-% \end{itemize}
+\section{Performance of TLS 1.3 and KEMTLS}
+In this section we will compare the performance of post-quantum TLS 1.3, KEMTLS, and classical TLS 1.3.
 
-% For more information on \LaTeX\, see these  \href{https://uwaterloo.ca/information-systems-technology/services/electronic-thesis-preparation-and-submission-support/ethesis-guide/creating-pdf-version-your-thesis/creating-pdf-files-using-latex/latex-ethesis-and-large-documents}{course notes}. 
-% \footnote{
-% Note that while it is possible to include hyperlinks to external documents,
-% it is not wise to do so, since anything you can't control may change over time. 
-% It \emph{would} be appropriate and necessary to provide external links to 
-% additional resources that you provide for a multimedia ``enhanced'' thesis. 
-% But also note that if the \package{hyperref} package is not included, 
-% as for the print-optimized option in this thesis template, any \cmmd{href} 
-% commands in your logical document are no longer defined.
-% A work-around employed by this thesis template is to define a dummy \cmmd{href} 
-% command (which does nothing) in the preamble of the document, 
-% before the \package{hyperref} package is included. 
-% The dummy definition is then redifined by the
-% \package{hyperref} package when it is included.
-% }
+\subsection{Communication cost}
+TLS 1.3 recommended ephemeral elliptic curve Diffie-Hellman key agreement (ECDHE) to be the default scheme for key exchange in \texttt{ClientHello} and \texttt{ServerHello}.
+Using ECDHE, the client and the server each sends the other an element from the agreed group of points on an elliptic curve, so round-trip communication cost is the sum of two group points.
+When using a post-quantum KEM, the client sends to the server an encapsulation key, and the server sends back a ciphertext obtained under said encapsulation key.
+The round-trip communication cost of a KEM key agreemnt is thus the sum of a public key and a ciphertext.
+Table \ref{tab:kex-traffic-sizes} lists the costs of each key agreement scheme.
 
-% The classic book by Leslie Lamport \cite{lamport.book}, author of \LaTeX , is worth a look too, and the many available add-on packages are described by 
-% Goossens \textit{et al} \cite{goossens.book}.
+\begin{table}[h]
+\centering
+\caption{Key agreement communication costs (bytes). 
+For NIST curves we include the costs for compressed and uncompressed forms.
+}
+\vspace{1em}
+\label{tab:kex-traffic-sizes}
+\footnotesize\begin{tabular}{llrrr}
+\toprule
+    \textbf{Category} 
+    & \textbf{Scheme} 
+    & \textbf{Public key} 
+    & \textbf{Ciphertext}
+    & \textbf{Total} \\
+\midrule
+\textbf{ECDHE}
+& SECP256R1                 & 33/65    &        & 66/130  \\
+& SECP384R1                 & 49/97    &        & 98/194  \\
+& SECP521R1                 & 67/133   &        & 134/266 \\
+& X25519                    & 32    &        & 64  \\
+& X448                      & 56    &        & 112 \\
+\midrule
+\textbf{PQC}
+& ML-KEM-512                & 800   & 768    & 1568 \\
+& ML-KEM-768                & 1184  & 1088   & 2272 \\
+& ML-KEM-1024               & 1568  & 1568   & 3136 \\
+& HQC-128                   & 2249  & 4433   & 6682 \\
+& HQC-192                   & 4522  & 9029   & 13551 \\
+& HQC-256                   & 7245  & 14469  & 21714 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Post-quantum digital signature schemes also have larger sizes than elliptic-curve signatures and RSA-signatures. 
+Table \ref{tab:sig-sizes} compares the sizes of public key and signature across the chosen set of signature schemes.
+
+\begin{table}[h]
+\centering
+\caption{Digital signatures communication costs (bytes)}
+\vspace{1em}
+\label{tab:sig-sizes}
+\footnotesize\begin{tabular}{llrrr}
+\toprule
+    \textbf{Category} 
+    & \textbf{Scheme} 
+    & \textbf{Public key} 
+    & \textbf{Signature}
+    & \textbf{Total} \\
+\midrule
+\textbf{Classical}
+% TODO: need to verify these numbers!
+& RSA-2048 (PKCS\#1 v1.5)  & 256   & 256   & 512   \\
+& ECDSA SECP256R1          & 64    & 64    & 128   \\
+& ECDSA SECP384R1          & 96    & 96    & 192   \\
+& ECDSA SECP521R1          & 132   & 132   & 264   \\
+& Ed25519                  & 32    & 64    & 96    \\
+& Ed448                    & 57    & 114   & 171   \\
+\midrule
+\textbf{PQC}
+
+& ML-DSA-44                & 1312  & 2420  & 3732  \\
+& ML-DSA-65                & 1952  & 3309  & 5261  \\
+& ML-DSA-87                & 2592  & 4627  & 7219  \\
+& Falcon-512               & 897   & 666   & 1563  \\
+& Falcon-1024              & 1793  & 1280  & 3073  \\
+
+& SPHINCS+-128f            & 32    & 17088 & 17120 \\
+& SPHINCS+-192f            & 48    & 35664 & 35712 \\
+& SPHINCS+-256f            & 64    & 49856 & 49920 \\
+
+& SPHINCS+-128s            & 32    & 7856  & 7888  \\
+& SPHINCS+-192s            & 48    & 16224 & 16272 \\
+& SPHINCS+-256s            & 64    & 29792 & 29856 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In our handshake setup, server's public key sits at the top of a chain of three certificates (root, intermediate, and leaf).
+However, the root certificate is compiled into the client's firmware, so it is not transmitted in the handshake.
+Table \ref{tab:cert-chain-sizes} compares the sizes of certificate chain.
+
+\begin{table}[p]
+\centering
+\caption{
+    Server certificate chain size (bytes).
+    % TODO: PEM format sizes are not exactly right; Certificate message contains certificates encoded in DER,
+    %       while PEM is the base64 encoding of DER plus header and footer
+    Each certificate is encoded in PEM format.
+    For rows with one name, there are still three certificates, but they use the same scheme for all three keys.
+}
+\vspace{1em}
+\label{tab:cert-chain-sizes}
+\footnotesize\begin{tabular}{llllr}
+\toprule
+    \textbf{Category} 
+    & \textbf{Root} 
+    & \textbf{Intermediate} 
+    & \textbf{Leaf} 
+    & \textbf{Size} 
+    \\
+\midrule
+% TODO: include more realistic chain, such as mldsa65-mldsa65-mldsa44
+\textbf{Classical}
+    & RSA2048           &&                 & 2506 \\
+    & ECDSA SECP256R1   &&         & 1429 \\
+    & ECDSA SECP384R1   &&         & 1429 \\
+    & ECDSA SECP521R1   &&         & 1429 \\
+    & Ed25519           &&                 & 1893 \\
+    & Ed448             &&                 & 1893 \\
+\midrule
+\textbf{PQ-TLS}
+    & ML-DSA-44 &&               & 16763 \\
+    & ML-DSA-65 &&               & ??? \\
+    & ML-DSA-87 &&               & ??? \\
+    & SPHINCS-128f  & ML-DSA-44 & ML-DSA-44 & 54734 \\
+    & SPHINCS-128s  & ML-DSA-44 & ML-DSA-44 & ?? \\
+    & Falcon-512  & ML-DSA-44 & ML-DSA-44 & ?? \\
+    & SPHINCS-192f  & ML-DSA-65 & ML-DSA-65 & ?? \\
+    & SPHINCS-192s  & ML-DSA-65 & ML-DSA-65 & ?? \\
+    & SPHINCS-256f  & ML-DSA-87 & ML-DSA-87 & ?? \\
+    & SPHINCS-256s  & ML-DSA-87 & ML-DSA-87 & ?? \\
+    & Falcon-1024  & ML-DSA-87 & ML-DSA-87 & ?? \\
+\midrule
+\textbf{PQ-KEMTLS}
+    & ML-DSA-44 & ML-DSA-44 & ML-KEM-512 & ??? \\
+    & ML-DSA-65 & ML-DSA-65 & ML-KEM-768 & ??? \\
+    & ML-DSA-87 & ML-DSA-87 & ML-KEM-1024 & ??? \\
+    & ML-DSA-44 & ML-DSA-44 & HQC-128 & ??? \\
+    & ML-DSA-65 & ML-DSA-65 & HQC-192 & ??? \\
+    & ML-DSA-87 & ML-DSA-87 & HQC-256 & ??? \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Cryptographic operations performance}
+We benchmarked the speed of relevant cryptographic operations on the Pico 2 W.
+Table \ref{tab:pico2w-crypto-speed} summarizes the results.
+
+\begin{table}[p]
+\centering
+\caption{
+    Cryptographic operations on RP2350 (ARM Cortex-M33 at 150MHz).
+}
+\vspace{1em}
+\label{tab:pico2w-crypto-speed}
+
+\footnotesize\begin{tabular}{lrrrrrr}
+\toprule
+
+\bottomrule
+\end{tabular}\vspace{1em}
+
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+\multicolumn{10}{c}{\textbf{ECDHE}} \\
+\midrule
+\textbf{Name} & \multicolumn{3}{c}{\texttt{KeyGen}} & \multicolumn{3}{c}{\texttt{Agree}} \\
+\cmidrule(lr){2-4}
+\cmidrule(lr){5-7}
+& Medium & P90 & P99 & Medium & P90 & P99 \\
+\midrule
+X25519 \\
+X448 \\
+SECP256R1 \\
+SECP384R1 \\
+SECP521R1 \\
+\midrule
+\multicolumn{10}{c}{\textbf{Post-quantum KEM}} \\
+\midrule
+    & \multicolumn{3}{c}{\texttt{KeyGen}} 
+    & \multicolumn{3}{c}{\texttt{Encap}} 
+    & \multicolumn{3}{c}{\texttt{Decap}} \\
+\cmidrule(lr){2-4}
+\cmidrule(lr){5-7}
+\cmidrule(lr){8-10}
+    & Medium & P90 & P99 
+    & Medium & P90 & P99 
+    & Medium & P90 & P99 \\
+\midrule
+ML-KEM-512 \\
+ML-KEM-768 \\
+ML-KEM-1024 \\
+OT-ML-KEM-512 \\
+OT-ML-KEM-768 \\
+OT-ML-KEM-1024 \\
+HQC-128 \\
+HQC-192 \\
+HQC-256 \\
+\midrule
+\multicolumn{10}{c}{\textbf{Digital signature}} \\
+\midrule
+& \multicolumn{3}{c}{\texttt{Sign}} & \multicolumn{3}{c}{\texttt{Verify}} \\
+\cmidrule(lr){2-4}
+\cmidrule(lr){5-7}
+& Medium & P90 & P99 & Medium & P90 & P99 \\
+\midrule
+RSA-2048 \\
+Ed25519 \\
+ECDSA (P-256) \\
+ECDSA (P-384) \\
+ECDSA (P-521) \\
+ML-DSA-44 \\
+ML-DSA-65 \\
+ML-DSA-87 \\
+SPHINCS+-128f \\
+SPHINCS+-128s \\
+SPHINCS+-192f \\
+SPHINCS+-192s \\
+SPHINCS+-256f \\
+SPHINCS+-256s \\
+Falcon-512 \\
+Falcon-1024 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Handshake performance}
+TLS 1.3 and KEMLS handshake can be divided into two distinct phases.
+The first phase is key agreement, which starts at the beginning at the handshake and ends when client finishes processing \texttt{ServerHello}.
+The second phase is authentication, which starts at the end of the key agreement phase and ends when the handshake is completed.
+We collected the timestamps at key moments from the client side: \begin{enumerate}
+    \item \texttt{ch\_start}: when the handshake starts
+    \item \texttt{ch\_sent}: when \texttt{ClientHello} is sent
+    \item \texttt{sh\_start}: when \texttt{ServerHello} is received
+    \item \texttt{sh\_done}: when \texttt{ServerHello} is processed
+    \item \texttt{auth\_start}: when \texttt{Certificate} is received
+    \item \texttt{auth\_done}: when the handshake finishes
+\end{enumerate}
+
+Using these timestamps we can clearly define the boundaries of the two phases from the client's perspective: key agreement duration is time delta between \texttt{sh\_done} and \texttt{ch\_start}, while authentication duration is the interval from \texttt{auth\_start} to \texttt{auth\_done}.
+These detailed timestamps also allow us to observe the impact of communication cost on handshake.
+For example, the interval from \texttt{sh\_done} to \texttt{auth\_start} reflects the time it takes for server to transmit the certificate chain.
+
+% TODO: analyze data, present graph and analysis in the main body, present table in appendix.
+\paragraph{Key agreement.}
+We define the total key agreement time to be the length of interval from the start of the handshake to the end of processing \texttt{ServerHello}. 
+In addition, we also track the length of time for which the Pico is doing active work: the time spent constructing \texttt{ClientHello} plus the time spent processing \texttt{ServerHello}.
+Table \ref{tab:ka-performance-comparison} compares the performance of various key exchange scheme using these two metrics. 
+Figure \ref{fig:ka-performance-comparison} illustrates the distribution of data points.
+
+\begin{table}[h]
+\footnotesize
+\centering
+\begin{tabular}{llrrrr}
+\toprule
+    \textbf{Category}
+    & \textbf{Key agreement}
+    & \multicolumn{2}{c}{\textbf{Total time}}
+    & \multicolumn{2}{c}{\textbf{CPU time}} \\
+    \cmidrule(lr){3-4}
+    \cmidrule(lr){5-6}
+    & & Median & Std & Median & Std \\
+\midrule
+    \textbf{Classical} 
+    & ECDHE (P-256) & 445096.0 & 195745.12 & 438639.0 & 182.35 \\
+    & X25519 & 36322.5 & 713456.00 & 28813.0 & 31.68 \\
+    & ECDHE (P-384) \\
+    & ECDHE (P-521) \\
+    & X448 \\
+\midrule
+    \textbf{PQC}
+    & ML-KEM-512 & 27254.0 & 284903.41 & 19443.0 & 85.32\\
+    & ML-KEM-768 \\
+    & ML-KEM-1024 \\
+    & OT-ML-KEM-512 & 16938.0 & 5573.21 & 14025.0 & 41.26 \\
+    & OT-ML-KEM-768 \\
+    & OT-ML-KEM-1024 \\
+    & HQC-128 & 1341054.5 & 303532.68 & 1321492.0 & 80.01 \\
+    & HQC-192 \\
+    & HQC-256 \\
+\bottomrule
+\end{tabular}
+\caption{Comparing key agreement performance (microseconds).}
+\label{tab:ka-performance-comparison}
+\end{table}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/imgs/ka_tot_dur.png}
+    \includegraphics[width=\linewidth]{benchmarks/imgs/ka_cpu_dur.png}
+    \caption{Key agreement performance (microseconds).}
+    \label{fig:ka-performance-comparison}
+\end{figure}
+
+\paragraph{Authentication.}
+We define the \textit{certificate transmission time} to be the length of interval from the end of key agreement to the start of processing server's certificates,
+\textit{authentication time} to be from start of processing certificates to the end of the handshake.
+Table \ref{tab:auth-performance-comparison} summarizes these metrics. Figure \ref{fig:auth-performance-comparison} illustrates the distribution of data points.
+
+Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-performance} summarize the performance of the handshake as a whole.
+
+\begin{table}[h]
+\footnotesize
+\centering
+\begin{tabular}{llllrr}
+\toprule
+    \textbf{Category}
+    & \multicolumn{3}{c}{\textbf{Certificate chain}}
+    & \textbf{Cert TX time}
+    & \textbf{Auth time} \\
+    \cmidrule(lr){2-4}
+    & Root & Int & Leaf \\
+\midrule
+    \textbf{Classical} 
+    & RSA-2048 \\
+    & ECDSA (P-256) \\
+    & Ed25519 \\
+\midrule
+    \textbf{PQC}
+    & ML-DSA-44 \\
+    & SPHINCS+ 128f & ML-DSA-44 & ML-DSA-44 \\
+    & ML-DSA-44 & ML-DSA-44 & ML-KEM-512 \\
+\bottomrule
+\end{tabular}
+\caption{Medium authentication durations (microseconds).}
+\label{tab:auth-performance-comparison}
+\end{table}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/imgs/cert_tx_time.png}
+    \includegraphics[width=\linewidth]{benchmarks/imgs/auth_time.png}
+    \caption{Authentication durations (microseconds).}
+    \label{fig:auth-performance-comparison}
+\end{figure}
+
+\begin{table}[h]
+\footnotesize
+\centering
+\begin{tabular}{lllllr}
+\toprule
+    \textbf{Category}
+    & \textbf{KA}
+    & \multicolumn{3}{c}{\textbf{Auth}}
+    & \multicolumn{1}{c}{\textbf{Handshake time}} \\
+    \cmidrule{3-5}
+    & & Root & Int & Leaf \\
+\midrule
+    \textbf{Classical}
+    & ECDHE (P-256) & RSA-2048 & & & \\
+    & ECDHE (P-256) & ECDSA (P-256) & & & \\
+    & X25519 & Ed25519 & & & \\
+\midrule
+    \textbf{PQC}
+    & ML-KEM-512 & ML-DSA-44 & & & \\
+    & ML-KEM-512 & SPHINCS+ 128f & ML-DSA-44 & ML-DSA-44 & \\
+    & ML-KEM-512 & ML-DSA-44 & ML-DSA-44 & ML-KEM-512 & \\
+\bottomrule
+\end{tabular}
+\caption{Medium handshake durations (microseconds).}
+\label{tab:handshake-performance}
+\end{table}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/imgs/handshake_time.png}
+    \caption{Handshake durations (microseconds).}
+    \label{fig:handshake-performance}
+\end{figure}
+
+\subsection{Discussion}
+
 
 %----------------------------------------------------------------------
 % END MATERIAL
