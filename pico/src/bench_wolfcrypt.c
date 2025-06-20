@@ -30,9 +30,11 @@
 #include <wolfssl/wolfcrypt/otmlkem.h>
 #include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #include <wolfssl/wolfcrypt/random.h>
+#include <wolfssl/wolfcrypt/rsa.h>
 
 #include "pico-pqtls/utils.h"
 
+#define SIG_MSG_SIZE 48
 #define WARMUP_ROUNDS 10
 #define BENCH_ROUNDS 10
 
@@ -569,6 +571,56 @@ static void otmlkem_decap(void *_args) {
         printf("ML-KEM decap incorrect\n");
         exit(-1);
     }
+}
+
+/* Benchmarking digital signatures
+ *
+ * For each digital signature schemes we will bench three operations: keygen, sign, verify
+ * Keygen can be benched with only the RNG. Benching sign requires a ready-made key, and
+ * benching verify requires ready-made key, message, and signature.
+ *
+ * For benching sign/verify, the message size will be 48 bytes. This is because the highest
+ * level TLS 1.3 cipher suite uses SHA384.
+ */
+
+static void rsa2048_keygen(void *args) {
+    WC_RNG *rng = (WC_RNG *)args;
+    RsaKey key;
+    int ret;
+
+    ret = wc_InitRsaKey(&key, NULL);
+    if (ret < 0) {
+        printf("wc_InitRsaKey returned %d\n", ret);
+        exit(-1);
+    }
+    ret = wc_MakeRsaKey(&key, RSA_MIN_SIZE, WC_RSA_EXPONENT, rng);
+    if (ret < 0) {
+        printf("wc_MakeRsaKey returned %d\n", ret);
+    }
+}
+
+struct rsa_args {
+    WC_RNG *rng;
+    RsaKey key;
+    byte msg[SIG_MSG_SIZE];
+    byte sig[RSA_MAX_SIZE / 8];
+};
+
+static void rsa2048_setup(struct rsa_args *args, WC_RNG *rng) {
+    int ret;
+    if ((ret = wc_InitRsaKey(&args->key, NULL)) < 0) {
+        printf("wc_InitRsaKey returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_MakeRsaKey(&args->key, RSA_MIN_SIZE, WC_RSA_EXPONENT, rng)) < 0) {
+        printf("wc_MakeRsaKey returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg))) < 0) {
+        printf("wc_RNG_GenerateBlock returned %d\n", ret);
+        exit(-1);
+    }
+    // TODO: finish this
 }
 
 int main(void) {
