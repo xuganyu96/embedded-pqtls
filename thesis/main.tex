@@ -126,6 +126,11 @@
 \usepackage{tikz}
 \usetikzlibrary{calc}
 \usetikzlibrary{positioning}
+\usepackage{color,soul}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+\newtheorem{lemma}[theorem]{Lemma}
 
 % GYX: custom commands
 \newcommand{\pke}{\texttt{PKE}}
@@ -425,18 +430,20 @@ This is dedicated to the one I love.
 % Change page numbering back to Arabic numerals
 \pagenumbering{arabic}
 
+\chapter{Introduction}
+
 \chapter{Post-quantum TLS on embedded systems}
 \section{An overview of TLS 1.3}
-Transport Layer Security (TLS) is a communication protocol with which two parties can securely exchange data over an insecure transport layer.
+Transport Layer Security (TLS) is a communication protocol with which two parties can exchange data in the presence of passive or active adversaries while preserving \textbf{confidentiality, integrity, and authenticity}.
 It was first developed at Netscape in 1994 and went through many iterations.
-The latest revision is TLS 1.3, formally standardized by IETF in RFC8446 \cite{DBLP:journals/rfc/rfc8446} in 2018.
-TLS 1.3 made significant improvements over TLS 1.2 \cite{DBLP:journals/rfc/rfc5246} and prior versions, including deprecating weak symmetric cipher suites, removing static key exchange schemes that do not provide forward secrecy, and restructuring the handshake state machine in order to simplify the handshake workflow.
+The latest revision is TLS 1.3, formally standardized by IETF in RFC 8446 \cite{DBLP:journals/rfc/rfc8446} in 2018.
+TLS 1.3 made significant improvements over TLS 1.2 \cite{DBLP:journals/rfc/rfc5246} and prior versions, including deprecating weak symmetric cipher suites, requiring forward secrecy at all times, and restructuring the handshake state machine in order to simplify the handshake workflow.
 According to Cloudflare \cite{Westerbaan_2024}, TLS 1.3 reached more than 93\% adoption on the Internet.
 Given TLS 1.3's superior design and nearly universal adoption over other versions of TLS, this work will focus on this version unless otherwise specified.
 
-A new TLS 1.3 connection begins with a handshake in which the two parties exchange a specific sequence of messages to negotiate cryptographic parameters, establish shared secrets, and authenticate each other.
+Figure \ref{fig:classical-tls13-handshake} illustrates a simple TLS 1.3 handshake over TCP. A new TLS 1.3 connection begins with a handshake in which the two parties exchange a specific sequence of messages to negotiate cryptographic parameters, establish shared secrets, and authenticate each other.
 If the handshake is successful, then the connection transitions to exchanging application data using the encryption scheme and secret keys obtained from the handshake phase.
-In TLS 1.3, the handshake can be further divided into two phases \footnote{We omitted parameter negotiation messages like \texttt{HelloRetryRequest} and \texttt{EncryptedExtensions}. They are either optional or inconsequential to our argument}: \begin{enumerate}
+In TLS 1.3, the handshake can be further divided into two phases: \begin{enumerate}
     \item \textbf{Key exchange} \begin{enumerate}
         \item \texttt{ClientHello}: client publishes its supported symmetric cipher suites (AEAD, hash functions), signature algorithms, a random nonce, and key exchange public keys.
         \item \texttt{ServerHello}: server chooses its preferred symmetric cipher suite, as well as publishes its own random nonce and key exchange public keys.
@@ -447,8 +454,6 @@ In TLS 1.3, the handshake can be further divided into two phases \footnote{We om
         \item \texttt{Finished}: both parties prove to each other the integrity of the handshake by producing an HMAC over the handshake transcript
     \end{enumerate}
 \end{enumerate}
-
-Figure \ref{fig:classical-tls13-handshake} illustrates a simple TLS 1.3 handshake:
 
 \begin{figure}[htbp]
     \centering
@@ -673,10 +678,124 @@ Figure \ref{fig:classical-tls13-handshake} illustrates a simple TLS 1.3 handshak
 \end{figure}
 
 \subsection{Certificate-based authentication}
+Authentication in TLS 1.3 relies on digital signatures and X.509 certificates. Figure \ref{fig:certificate-chain-and-pki} illustrates a certificate chain.
+
+\begin{figure}[h]
+    \centering
+    \begin{tikzpicture}[node distance=2em and 2.5cm, font=\footnotesize]
+        \node[draw,rectangle,align=left] (leaf_key) {
+            {\bf Server}[$\sk_s$]
+        };
+        \node[draw,rectangle,align=left,right=5em of leaf_key] (int_key) {
+            {\bf Intermediate CA}[$\sk^\text{SIG}_\text{IntCA}$]
+        };
+        \node[draw,rectangle,align=left,right=5em of int_key] (root_key) {
+            {\bf Root CA}[$\sk^\text{SIG}_\text{RootCA}$]
+        };
+        \node[draw,rectangle,align=left,below=5em of leaf_key] (leaf_cert) {
+            \textbf{Leaf Certificate} \\
+            $\texttt{Id}_\text{Leaf}$[Subj,Issuer,...] \\
+            $\pk_s$ \\
+            $\sigma_\text{Leaf}$
+        };
+        \node[draw,rectangle,align=left,below=5em of int_key] (int_cert) {
+            \textbf{Int CA Certificate} \\
+            $\texttt{Id}_\text{IntCA}$[Subj,Issuer,...] \\
+            $\pk_\text{IntCA}^\text{SIG}$ \\
+            $\sigma_\text{IntCA}$
+        };
+        \node[draw,rectangle,align=left,below=5em of root_key] (root_cert) {
+            \textbf{Root CA Certificate} \\
+            $\texttt{Id}_\text{RootCA}$[Subj,Issuer,...] \\
+            $\pk_\text{RootCA}^\text{SIG}$ \\
+            $\sigma_\text{RootCA}$
+        };
+        \draw[->] (int_key) -- (leaf_cert) node[midway,above] {Signs};
+        \draw[->] (int_cert) -- (leaf_cert) node[midway,above] {Verifies};
+        \draw[->] (root_key) -- (int_cert) node[midway,above] {Signs};
+        \draw[->] (root_cert) -- (int_cert) node[midway,above] {Verifies};
+        \draw[->] (root_key) -- (root_cert) node[midway,left] {Signs};
+        \path[<->] (root_cert)
+            % edge (below)
+            edge [loop below] node {Verifies} ()
+        ;
+        
+    \end{tikzpicture}
+    \caption{Certificate chain and PKI}
+    \label{fig:certificate-chain-and-pki}
+\end{figure}
+
+Each X.509 certificate encodes three pieces of information: identities of the issuer and the subject, a cryptographic public key, and a cryptographic signature over the identity and the public key. 
+Through this signature, the issuer testifies the subject's ownership of the public key and binds the public key to the identity.
+The signature of the issuer is verified using the issuer's public key, which is usually presented via another certificate of identical format.
+This creates a chain of trust in which each certificate is verified by the public key in another certificate, up to the root of trust, which is usually a self-signed certificate whose signature is verified by the public key on the same certificate.
+
+The \textit{Public Key Infrastructure (PKI)} consists of entities that play different roles in this chain of trust.
+The server (and optionally client) is the leaf node of the chain, and the entities issuing certificates are called \textit{Certificate Authorities (CA)}.
+The root of this chain is thus referred to as \textit{root CA}, while other issuers between the leaf and the root are referred to as intermediate CAs.
+A selection of trusted root CA certificates are typically pre-installed in client devices by the vendors (e.g. Google, Mozilla, Apple, Microsoft, etc.).
 
 \subsection{Key schedule and HKDF}
 
+\begin{figure}[h]
+    \centering
+     \begin{tikzpicture}[node distance=2em and 2.5cm, font=\footnotesize]
+         \node[] (gxy) {$g^{xy}$};
+         \node[below=1em of gxy] (hs) {
+            $\texttt{HS} \leftarrow \texttt{HKDF.Extract}(\ldots,g^{xy})$
+         };
+         \node[right=3.5em of hs,align=left] (chts) {
+            $\texttt{\color{blue}CHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS, "c hs traffic", ...})$ \\
+            $\texttt{FKey}_c \leftarrow \texttt{HKDF.Expand(CHTS, "finished", "")}$ \\
+            $\texttt{\color{blue}SHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS, "s hs traffic", ...})$ \\
+            $\texttt{FKey}_s \leftarrow \texttt{HKDF.Expand(SHTS, "finished", "")}$
+         };
+         \node[align=left,below=4em of hs] (dhs) {
+            $\texttt{dHS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS, "derived",...})$ \\
+            $\texttt{MS} \leftarrow \texttt{HKDF.Extract(dHS, 0)}$
+         };
+         \node[align=left,right=1em of dhs] (ats) {
+            $\texttt{\color{red} SATS} \leftarrow \texttt{HKDF.Expand(MS, "s ap traffic", CH..SF)}$ \\
+            $\texttt{\color{red} CATS} \leftarrow \texttt{HKDF.Expand(MS, "c ap traffic", CH..SF)}$
+         };
+         \draw[->] (gxy) -- (hs);
+         \draw[->] (hs) -- (chts);
+         \draw[->] (hs) -- (dhs);
+         \draw[->] (dhs) -- (ats);
+    \end{tikzpicture}
+    \caption{HKDF in TLS 1.3 key schedule}
+    \label{fig:tls13-key-schedule}
+\end{figure}
+
+TLS 1.3 uses the HMAC-based Key Derivation Function (HKDF) \cite{DBLP:journals/rfc/rfc5869} to derive cryptographic keys from input keying material (Figure \ref{fig:tls13-key-schedule}).
+Using an extract-and-expand KDF is necessary because the $n$-bit shared secret obtained from public-key cryptography (e.g. $g^{xy}$ in a Diffie-Hellman key exchange) is not a uniformly random $n$-bit string \cite{DBLP:conf/crypto/Krawczyk10}. 
+Instead, it typically contains fewer bits of computational entropy.
+\footnote{As stated in \cite{DBLP:conf/crypto/Krawczyk10}, an adversary with knowledge of $g^x$ and $g^y$ can deterministically compute $g^{xy}$, implying that the statistical entropy of $g^{xy}$ given $g^x$ and $g^y$ is zero.}
+
+In TLS 1.3, the function \texttt{HKDF.Extract} serves as an entropy extractor that concentrates the available randomness in the input keying material. 
+Another critical function of HKDF in TLS 1.3 is to derive computationally independent keys via \texttt{HKDF.Expand}.
+As illustrated in Figure~\ref{fig:classical-tls13-handshake}, all handshake messages following \texttt{ServerHello}, as well as all application data, are encrypted using different symmetric keys.
+Specifically, handshake messages are protected using a pair of handshake traffic keys—client handshake traffic secret (CHTS) and server handshake traffic secret (SHTS)—while application data is encrypted under a separate pair of application traffic keys—client application traffic secret (CATS) and server application traffic secret (SATS).
+Additionally, there is a unique symmetric key for each party to produce the HMAC tag used in their respective \texttt{Finished} messages.
+According to the HKDF model described in \cite{DBLP:conf/eurosp/KrawczykW16,DBLP:conf/crypto/Krawczyk10}, each of these keys—CATS, SATS, CHTS, SHTS, the client finished key, and the server finished key—is computationally independent from all others.
+
 \subsection{Transition to post-quantum}
+The security of TLS 1.3 was thoroughly analyzed from a theoretical perspect through a long line of work \cite{DBLP:conf/ccs/DowlingFGS15,DBLP:journals/iacr/DowlingFGS16,DBLP:conf/crypto/BellareR93,DBLP:conf/ccs/FischlinG14,DBLP:journals/joc/DowlingFGS21}.
+From a high level, TLS 1.3 aims to achieve confidentiality, integrity, authenticity, forward secrecy, and resistance to replay attacks in the presence of an adversary who controls the network, can passively eavesdrop and/or actively alter the communication, can compromise long-term asymmetric private keys, and can compromise some derived session keys\footnote{The security model does not permit the adversary to directly compromise certain critical secrets and randomness, such as the Diffie-Hellman shared secret, since TLS 1.3 is not designed to be secure if these secrets are compromised}, all across multiple sessions.
+The protocol's ability to achieve this goal depends on the strength of the various cryptographic primitives: the entropy of the nonces (client and server's \texttt{random} in the \texttt{Hello} messages), the collision resistance of the hash function (used for maintaining handshake transcript), the order of the ephemeral Diffie-Hellman group, the EUF-CMA security of the signature, the PRF security of the HKDF, the IND-CCA security of the AEAD, etc.
+
+The advent of large-scale quantum computers affects all cryptographic aspects of the TLS 1.3 protocol.
+For example, Grover's quantum search algorithm \cite{DBLP:conf/stoc/Grover96} would half the number of steps required to search through a key space, thereby halving the security of symmetric ciphers.
+Brassard et al. \cite{DBLP:journals/sigact/BrassardHT97} presented a quantum algorithm that finds hash function collisions in $O(2^{\frac{n}{3}})$ hash queries instead of $O(2^{\frac{n}{2}})$ queries in the classical setting.
+Fortunately, the asymptotic security of symmetric primitives remains unchanged to this day, so the quantum threat can be straightforwardly mitigated by adopting ``bigger'' parameters, such as upgrading AES-128 to AES-256, and upgrading SHA256 to SHA512.
+On the other hand, all asymmetric primitives used in TLS 1.3 (ECDHE, RSA, ECDSA, and EdDSA) are based on hard number-theoretic problems, which Peter Shor's quantum algorithm \cite{DBLP:conf/focs/Shor94,DBLP:journals/siamcomp/Shor97} can solve with polynomial complexity.
+Therefore, using bigger parameters is not sufficient for making the public-key primitives of TLS 1.3 quantum resistant; instead, entirely new classes of cryptographic schemes for which no efficient quantum algorithm is known are required.
+Due to the ``harvest-now-decrypt-later'' attacks, adopting quantum-resistant key exchange algorithms takes the highest urgency, although due to the need for proven security in real-world usage, the transition to entirely post-quantum cryptography must start as soon as possible.
+
+At the time of writing this thesis, the NIST post-quantum cryptography standardization project has standardized one key encapsulation mechanism based on hard lattice problems (ML-KEM) and two digital signature algorithms, one based on lattice problems (ML-DSA) and one based on hash functions (SLH-DSA). 
+There are two more algorithms (Falcon and HQC) that are currently going through the standardization process.
+
+% TODO: what else can I talk about?
 
 \section{Embedded device security}
 \subsection{Implementing (post-quantum) TLS on embedded device}
@@ -696,6 +815,12 @@ In addition to cost and power consumption concerns, however, the existence of a 
 In fact, TLS 1.3 supports handshake using pre-shared key (PSK)\cite{DBLP:journals/rfc/rfc8446} in environments with no public key infrastructure (PKI).
 PSK automatically provides mutual authentication and also offers vastly superior performance by eliminating all asymmetric cryptographic operations.
 In other words, regardless of whether private keys can be securely stored or not, there is no scenario in which authenticating an embedded device using public-key cryptography makes sense.
+
+\chapter{Optimizing post-quantum TLS}
+\section{KEMTLS}
+
+\section{IND-1CCA KEM}
+
 
 \chapter{Implementation and performance measurements}\label{sec:implementation-and-performance-measurements}
 To evaluate post-quantum TLS 1.3 and KEMTLS on constrained devices, we implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL, a TLS library written in the C programming language. We then implemented a minimal TLS client on the Raspberry Pi Pico 2 W, a microcontroller with two ARM Cortex-M33 cores \footnote{The Pico 2 W also has 2 RISC-V cores, though we did not use them in this project.} and 512kB of SRAM, and measures the time it takes for the Pico client to complete a TLS 1.3 or KEMTLS handshake with a server. This chapter describes some of the implementation details, the benchmarking methodology, and the performance measurements.
@@ -1223,6 +1348,7 @@ Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-per
 
 \subsection{Discussion}
 
+\chapter{Conclusion and future works}
 
 %----------------------------------------------------------------------
 % END MATERIAL
@@ -1245,7 +1371,7 @@ Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-per
 % Add the References to the Table of Contents
 \addcontentsline{toc}{chapter}{\textbf{References}}
 
-\bibliography{uw-ethesis.bib}
+\bibliography{references}
 % Tip: You can create multiple .bib files to organize your references. 
 % Just list them all in the \bibliogaphy command, separated by commas (no spaces).
 
