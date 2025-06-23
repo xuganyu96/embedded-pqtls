@@ -431,8 +431,6 @@ This is dedicated to the one I love.
 \pagenumbering{arabic}
 
 \chapter{Introduction}
-
-\chapter{Post-quantum TLS on embedded systems}
 \section{An overview of TLS 1.3}
 Transport Layer Security (TLS) is a communication protocol with which two parties can exchange data in the presence of passive or active adversaries while preserving \textbf{confidentiality, integrity, and authenticity}.
 It was first developed at Netscape in 1994 and went through many iterations.
@@ -797,8 +795,26 @@ There are two more algorithms (Falcon and HQC) that are currently going through 
 
 % TODO: what else can I talk about?
 
-\section{Embedded device security}
-\subsection{Implementing (post-quantum) TLS on embedded device}
+\section{Post-quantum IoT security}
+\subsection{Software optimization}
+pqm4 \cite{DBLP:journals/iacr/KannwischerRSS19}.
+
+\subsection{Hardware accelerations}
+Because embedded devices have limited computing capacity compared to desktop processors, hardware acceleration is a popular strategy for implementing cryptographic protocols on embedded devices.
+In this section we briefly describe some popular strategies for accelerating cryptographic operations in constrained environments.
+
+\paragraph{Accelerating symmetric operations.}
+Hardware acceleration for symmetric primitives has been widely available to modern processors.
+Dedicated AES instructions were first brought to Intel processors with the Westmere microarchitecture in 2010 \footnote{Citation needed}.
+On embedded devices, ARMv8's Cryptography Extensions included hardware-accelerated AES/SHA256 instructions in 2011 \footnote{\url{http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0500e/CJHDEBAF.html}}.
+The widespread availability of hardware-accelerated symmetric primitives motivated many post-quantum cryptographic schemes to include variants that use AES/SHA256 as alternative to Keccak for implementing pseudorandom functions (PRF) and pseudorandom generators (PRG).
+For example, Kyber's round 2 submission included a ``90s-variant'' that used AES in counter mode and SHA2 instead of Keccak, and optimized implementation of the 90s-variant offered significant performance improvements over the optimized implementation of ``standard'' variant using Keccak \cite{}.
+Similarly, hash-based signature SPHINCS+ also offered variants that used SHA2 instead of Keccak \cite{}.
+
+\paragraph{Accelerating modular arithmetics.}
+A second strategy for accelerating post-quantum cryptography is to target the modular arithmetics.
+Besides hardware accelerations dedicated to specific PQC scheme \cite{DBLP:journals/tches/HoweOKG18,DBLP:journals/tc/KozielAK18,DBLP:journals/tches/AmietCZ18}, there are also active efforts at re-purposing RSA/ECC hardware accelerators \cite{DBLP:journals/tches/AlbrechtHHPVW19}.
+Banerjee et al. \cite{DBLP:conf/iscas/BanerjeeDC20} combined hardware acceleration for both symmetric primitives and modular arithmetics and achieved order-of-magnitude speed and energy efficiency improvements over software-only implementations.
 
 \subsection{Authenticating the embedded device}
 Prior works \cite{cryptoeprint:2021/1553,DBLP:conf/ccs/Burstinghaus-Steinbach20,DBLP:conf/space/GonzalezW22} evaluating post-quantum TLS on embedded systems primarily focused on configurations in which the constrained device is an anonymous TLS client who does not need to authenticate itself to the server. 
@@ -817,9 +833,183 @@ PSK automatically provides mutual authentication and also offers vastly superior
 In other words, regardless of whether private keys can be securely stored or not, there is no scenario in which authenticating an embedded device using public-key cryptography makes sense.
 
 \chapter{Optimizing post-quantum TLS}
-\section{KEMTLS}
+This section, we introduce two optimization on post-quantum TLS: Section \ref{sec:kemtls} introduces KEMTLS, and Section \ref{sec:ind-1cca-kem} introduces IND-1CCA KEM for ephemeral key exchange.
 
-\section{IND-1CCA KEM}
+\section{KEMTLS}\label{sec:kemtls}
+KEMTLS \cite{DBLP:conf/ccs/SchwabeSW20}, first proposed by Schwabe, Stebila, and Wiggers in 2020, is a variation on TLS 1.3 that uses key encapsulation mechanism (KEM) instead of digital signature for peer authentication.
+KEMTLS is motivatd by the observation that post-quantum signature candidates generally have larger public key and signature than post-quantum KEM candidates' public key and ciphertext, so by using KEMs instead of signatures, one can obtain significant savings in communication sizes.
+
+Section \ref{sec:kemtls-handshake} will introduce the KEMTLS handshake workflow. Section \ref{sec:kemtls-security} will review the security properties of KEMTLS and compare them with TLS 1.3. Finally, Section \ref{sec:kemtls-performance} will review the performance benchmarks from existing literature and discuss further optimizations in specific use cases.
+
+\subsection{KEMTLS Handshake}\label{sec:kemtls-handshake}
+{\color{red} Draw a diagram of the KEMTLS handshake, describe the workflow verbally, compare with TLS 1.3}
+
+An overview of a unilaterally authenticated KEMTLS handshake is illustrated on Figure \ref{fig:kemtls-handshake}.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[node distance=2em, font=\footnotesize]
+        \node[draw,rectangle] (client) {Client};
+        \node[draw,rectangle] (server) at (10,0) {Server};
+
+        \draw[<->] (client) -- (server) node[midway,above] {TCP-SYN} node[midway,below] {TCP SYN-ACK};
+
+        % Making ClientHello, waiting for ClientHello
+        \node[align=left,below=0em of client] (ch) {
+            $(\pk_e, \sk_e) \leftsample {\kem_e}\texttt{.KeyGen}()$ \\
+            $r_c \leftsample \{0,1\}^{256}$
+        };
+        \node[below=2.5em of server,align=left] (ch_wait) {};
+
+        % Sending ClientHello, receiving ClientHello
+        \node[below=-0.5em of ch] (ch_send) {};
+        \node[below=-0.5em of ch_wait] (ch_recv) {};
+        \draw[->] (ch_send) -- (ch_recv) node[midway,above] {
+            $\texttt{ClientHello}[\pk_e, r_c]$
+        };
+
+        % Making ServerHello, waiting for ServerHello
+        \node[below=2.5em of ch_send] (sh_wait) {};
+        \node[align=left,below=0em of ch_recv] (sh) {
+            $(\texttt{ct}_e, \texttt{ss}_e) \leftsample \kem_e\texttt{.Encap}(\pk_e)$ \\
+            $r_s \leftsample \{0,1\}^{256}$
+        };
+
+        % Send ServerHello, receive ServerHello
+        \node[below=0em of sh_wait] (sh_recv) {};
+        \node[below=0em of sh] (sh_send) {};
+        \draw[->] (sh_send) -- (sh_recv) node[midway,above] {$\texttt{ServerHello}[\texttt{ct}_e, r_s]$};
+
+        % Derive handshake traffic keys
+        \node[below=0em of sh_recv] (sh_process) {$\texttt{ss}_e\leftarrow\kem_e\texttt{.Decap}(\sk_e, \texttt{ct}_e)$};
+        \node[below=5.5em of sh_recv] (stage12_c) {};
+        \node[below=5.5em of sh_send] (stage12_s) {};
+        \draw[dashed] (stage12_c) -- (stage12_s) node[midway,above,align=center] {
+            $\text{HS} \leftarrow \texttt{HKDF.Extract}(\text{...}, \texttt{ss}_e)$ \\
+            $\text{\color{blue} CHTS} \leftarrow \texttt{HKDF.Expand}(\text{HS}, \texttt{"c hs traffic"}, \texttt{CH..SH})$ \\
+            $\text{\color{blue} SHTS} \leftarrow \texttt{HKDF.Expand}(\text{HS}, \texttt{"s hs traffic"}, \texttt{CH..SH})$ \\
+            $\text{dHS} \leftarrow \texttt{HKDF.Expand}(\text{HS}, \texttt{"derived"}, \texttt{NULL})$
+        };
+
+        % Send/receive EncryptedExtensions
+        % \node[below=1em of stage12_c] (encrypted_extensions_recv) {};
+        % \node[below=1em of stage12_s] (encrypted_extensions_send) {};
+        % \draw[->] (encrypted_extensions_send) -- (encrypted_extensions_recv) node[midway,above] {\color{blue}
+            
+        % };
+
+        % send/receive Certificate
+        \node[below=1em of stage12_c] (cert_recv) {};
+        \node[below=1em of stage12_s] (cert_send) {};
+        \draw[->] (cert_send) -- (cert_recv) node[midway,above] {\color{blue}
+            $\{\texttt{EncryptedExtensions}\}_\text{SHTS}$, $\{\texttt{Certificate}[\pk_s]\}_\text{SHTS}$
+        };
+
+        % make/wait for KemCiphertext
+        \node[below=0em of cert_recv,align=left] (kemct) {
+            $(\texttt{ss}_s, \texttt{ct}_s)\leftsample\kem_s\texttt{.Encap}(\pk_s)$
+        };
+        \node[below=1.2em of cert_send] (kemct_wait) {};
+
+        % send/recv KemCiphertext
+        \node[below=0em of kemct] (kemct_send) {};
+        \node[below=0em of kemct_wait] (kemct_recv) {};
+        \draw[->] (kemct_send) -- (kemct_recv) node[midway,above] {\color{blue}
+        $\{\texttt{KemCiphertext}[\texttt{ct}_s]\}_\text{CHTS}$}
+        ;
+
+        % process KemCiphertext
+        \node[below=0em of kemct_recv] (kemct_proc) {
+            $\texttt{ss}_s\leftarrow\kem_s\texttt{.Decap}(\sk_s,\texttt{ct}_s)$
+        };
+
+        % derive authenticated handshake traffic secrets
+        \node[below=8.5em of kemct_send] (stage34_c) {};
+        \node[below=8.5em of kemct_recv] (stage34_s) {};
+        \draw[dashed] (stage34_c) -- (stage34_s) node[midway,above,align=center] {
+            $\text{AHS}\leftarrow\texttt{HKDF.Extract}(\text{dHS},\texttt{ss}_s)$ \\
+            $\text{\color{orange} CAHTS} \leftarrow \texttt{HKDF.Expand}(\text{AHS}, \texttt{"c ahs traffic"}, \texttt{CH..CKC})$ \\
+            $\text{\color{orange} SAHTS} \leftarrow \texttt{HKDF.Expand}(\text{AHS}, \texttt{"s ahs traffic"}, \texttt{CH..CKC})$ \\
+            $\text{dAHS}\leftarrow\texttt{HKDF.Expand}(\text{AHS}, \texttt{"derived"}, \texttt{NULL})$ \\
+            $\text{MS}\leftarrow \texttt{HKDF.Extract}(\text{dAHS},0)$ \\
+            $\text{fk}_c\leftarrow\texttt{HKDF.Expand}(\text{MS}, \texttt{"c finished"},\texttt{CH..CKC})$ \\
+            $\text{fk}_s\leftarrow\texttt{HKDF.Expand}(\text{MS}, \texttt{"s finished"},\texttt{CH..CKC})$
+        };
+
+        % make client's Finished
+        \node[below=0em of stage34_c] (cfin) {
+            $t_c \leftarrow \texttt{HMAC}(\text{fk}_c, \texttt{CH..CKC})$
+        };
+        \node[below=0.8em of stage34_s] (cfin_wait) {};
+
+        % send/recv client's Finished
+        \node[below=0em of cfin] (cfin_send) {};
+        \node[below=0em of cfin_wait] (cfin_recv) {};
+        \draw[->] (cfin_send) -- (cfin_recv) node[above,midway] {\color{orange}
+            $\{\texttt{Finished}[t_c]\}_\text{CAHTS}$
+        };
+
+        % process client's Finished
+        \node[below=0em of cfin_recv] (cfin_proc) {
+            accept iff $t_c = \texttt{HMAC}(\text{fk}_c,\texttt{CH..CKC})$
+        };
+
+        % client can start sending application traffic data
+        \node[below=2.5em of cfin_send] (stage5_c) {};
+        \node[below=2.5em of cfin_recv] (stage5_s) {};
+        \draw[dashed] (stage5_c) -- (stage5_s) node[midway,above] {
+            $\text{\color{red}CATS}\leftarrow\texttt{HKDF.Expand}(\text{MS}, \texttt{"c ap traffic"},\texttt{CH..CF})$
+        };
+        \node[below=1em of stage5_c] (c_app_send) {};
+        \node[below=1em of stage5_s] (c_app_recv) {};
+        \draw[->] (c_app_send) -- (c_app_recv) node[midway,above]{\color{red}
+            $\{\text{application data}\}_\text{CATS}$
+        };
+
+        % make/wait for server finished
+        \node[below=0.8em of c_app_send] (sfin_wait) {};
+        \node[below=0em of c_app_recv] (sfin) {
+            $t_s \leftarrow \texttt{HMAC}(\text{fk}_s, \texttt{CH..CF})$
+        };
+
+        % send/recv server finished
+        \node[below=0em of sfin_wait] (sfin_recv) {};
+        \node[below=0em of sfin] (sfin_send) {};
+        \draw[->] (sfin_send) -- (sfin_recv) node[midway,above] {\color{orange}
+            $\{\texttt{Finished}[t_s]\}_\text{SAHTS}$
+        };
+        \node[below=0em of sfin_recv] (sfin_proc) {
+            accept iff $t_s = \texttt{HMAC}(\text{fk}_s,\texttt{CH..CF})$
+        };
+
+        % server can start sending application traffic data
+        \node[below=2.5em of sfin_send] (stage6_c) {};
+        \node[below=2.5em of sfin_recv] (stage6_s) {};
+        \draw[dashed] (stage6_c) -- (stage6_s) node[midway,above] {
+            $\text{\color{red}SATS}\leftarrow\texttt{HKDF.Expand}(\text{MS}, \texttt{"s ap traffic"},\texttt{CH..SF})$
+        };
+        \node[below=1em of stage6_c] (s_app_recv) {};
+        \node[below=1em of stage6_s] (s_app_send) {};
+        \draw[->] (s_app_recv) -- (s_app_send) node[midway,above]{\color{red}
+            $\{\text{application data}\}_\text{SATS}$
+        };
+        
+    \end{tikzpicture}
+    \caption{KEMTLS handshake with unilateral authentication}
+    \label{fig:kemtls-handshake}
+\end{figure}
+
+\subsection{KEMTLS security}\label{sec:kemtls-security}
+{\color{red}
+KEMTLS and TLS 1.3 have identical security goals but achieve them in different ways, formal analysis first presented in which paper, a machine-assisted proof presented in which other paper.
+
+Subtle security difference: implicit authentication, downgrade resilience, anonymity, deniability vs non-repudiation
+}
+
+\subsection{KEMTLS performance}\label{sec:kemtls-performance}
+{\color{red} present performance data from prior results: desktop, PDK, IoT}
+
+\section{IND-1CCA KEM}\label{sec:ind-1cca-kem}
 
 
 \chapter{Implementation and performance measurements}\label{sec:implementation-and-performance-measurements}
@@ -1122,15 +1312,15 @@ Table \ref{tab:cert-chain-sizes} compares the sizes of certificate chain.
 
 \subsection{Cryptographic operations performance}
 We benchmarked the speed of relevant cryptographic operations on the Pico 2 W.
-Table \ref{tab:pico2w-crypto-speed} summarizes the results.
+Table \ref{tab:kex-performance-rp2350} and \ref{tab:digital-signature-performance-rp2350} summarizes the results.
 
-\begin{table}[p]
+\begin{table}[htbp]
 \centering
 \caption{
-    Cryptographic operations on RP2350 (ARM Cortex-M33 at 150MHz).
+    Key exchange performance on RP2350
 }
 \vspace{1em}
-\label{tab:pico2w-crypto-speed}
+\label{tab:kex-performance-rp2350}
 
 \footnotesize\begin{tabular}{lrrrrrr}
 \toprule
@@ -1174,32 +1364,46 @@ OT-ML-KEM-1024 \\
 HQC-128 \\
 HQC-192 \\
 HQC-256 \\
-\midrule
-\multicolumn{10}{c}{\textbf{Digital signature}} \\
-\midrule
-& \multicolumn{3}{c}{\texttt{Sign}} & \multicolumn{3}{c}{\texttt{Verify}} \\
-\cmidrule(lr){2-4}
-\cmidrule(lr){5-7}
-& Medium & P90 & P99 & Medium & P90 & P99 \\
-\midrule
-RSA-2048 \\
-Ed25519 \\
-ECDSA (P-256) \\
-ECDSA (P-384) \\
-ECDSA (P-521) \\
-ML-DSA-44 \\
-ML-DSA-65 \\
-ML-DSA-87 \\
-SPHINCS+-128f \\
-SPHINCS+-128s \\
-SPHINCS+-192f \\
-SPHINCS+-192s \\
-SPHINCS+-256f \\
-SPHINCS+-256s \\
-Falcon-512 \\
-Falcon-1024 \\
 \bottomrule
 \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Digital signature performance on RP2350}\vspace{1em}
+    \label{tab:digital-signature-performance-rp2350}
+    \footnotesize\begin{tabular}{lrrrrrr}
+        \toprule
+        \multicolumn{7}{c}{\textbf{Digital signature}} \\
+        \midrule
+        & \multicolumn{3}{c}{\texttt{Sign}} & \multicolumn{3}{c}{\texttt{Verify}} \\
+        \cmidrule(lr){2-4}
+        \cmidrule(lr){5-7}
+        & Medium & P90 & P99 & Medium & P90 & P99 \\
+        \midrule
+        \multicolumn{7}{c}{Classical signatures} \\
+        \midrule
+        RSA-2048 \\
+        Ed25519 \\
+        ECDSA (P-256) \\
+        ECDSA (P-384) \\
+        ECDSA (P-521) \\
+        \midrule
+        \multicolumn{7}{c}{Post-quantum signatures} \\
+        \midrule
+        ML-DSA-44 \\
+        ML-DSA-65 \\
+        ML-DSA-87 \\
+        SPHINCS+-128f \\
+        SPHINCS+-128s \\
+        SPHINCS+-192f \\
+        SPHINCS+-192s \\
+        SPHINCS+-256f \\
+        SPHINCS+-256s \\
+        Falcon-512 \\
+        Falcon-1024 \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
 \subsection{Handshake performance}
