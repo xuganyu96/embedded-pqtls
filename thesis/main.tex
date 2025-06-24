@@ -127,6 +127,10 @@
 \usetikzlibrary{calc}
 \usetikzlibrary{positioning}
 \usepackage{color,soul}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{caption}
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
 
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{corollary}{Corollary}[theorem]
@@ -155,7 +159,7 @@
 \newcommand{\adv}{\texttt{Adv}}
 \newcommand{\fotplus}{\texttt{FOT+}}
 \newcommand{\us}{\mu s}
-\Urlmuskip=0mu  plus 10mu  % fix underfull hbox for URL in footnote
+% \Urlmuskip=0mu  plus 10mu  % fix underfull hbox for URL in footnote
 
 % Setting up the page margins...
 % uWaterloo thesis requirements specify a minimum of 1 inch (72pt) margin at the
@@ -439,7 +443,7 @@ TLS 1.3 made significant improvements over TLS 1.2 \cite{DBLP:journals/rfc/rfc52
 According to Cloudflare \cite{Westerbaan_2024}, TLS 1.3 reached more than 93\% adoption on the Internet.
 Given TLS 1.3's superior design and nearly universal adoption over other versions of TLS, this work will focus on this version unless otherwise specified.
 
-Figure \ref{fig:classical-tls13-handshake} illustrates a simple TLS 1.3 handshake over TCP. A new TLS 1.3 connection begins with a handshake in which the two parties exchange a specific sequence of messages to negotiate cryptographic parameters, establish shared secrets, and authenticate each other.
+Figure \ref{fig:tls13-handshake} illustrates a simple TLS 1.3 handshake over TCP. A new TLS 1.3 connection begins with a handshake in which the two parties exchange a specific sequence of messages to negotiate cryptographic parameters, establish shared secrets, and authenticate each other.
 If the handshake is successful, then the connection transitions to exchanging application data using the encryption scheme and secret keys obtained from the handshake phase.
 In TLS 1.3, the handshake can be further divided into two phases: \begin{enumerate}
     \item \textbf{Key exchange} \begin{enumerate}
@@ -613,72 +617,15 @@ In TLS 1.3, the handshake can be further divided into two phases: \begin{enumera
         \draw[->] (app_s_send) -- (app_s_recv) node[midway,above] {\color{red}
             $\{\texttt{application data}\}_\texttt{SATS}$
         };
-
-        % \node[draw, rectangle, align=left, below of=client] (sendclienthello) {
-        %     \textbf{ClientHello}:\\
-        %     Pick $G = \langle g \rangle$ of order $q$\\
-        %     $x\leftsample \mathbb{Z}_q, \pk^\text{DHE}_c \leftarrow g^x$
-        % };
-
-        % \node[below of=server] (waitclienthello) {};
-
-        % \node[draw, rectangle, align=left, below of=waitclienthello] (processclienthello) {
-        %     $y\leftsample\mathbb{Z}_q, \pk^{\text{ECDHE}}_s \leftarrow g^y$ \\
-        %     $g^{xy} \leftarrow (g^x)^y$ \\
-        %     $\text{HS} \leftarrow \texttt{HKDF\_extract}(g^{xy}, \ldots)$ \\
-        %     $\text{SHTS} \leftarrow \texttt{HKDF\_expand}(\texttt{HS}, \text{})$
-        % };
-
-        % \draw[->] (sendclienthello) -- (processclienthello) node[midway,above]{
-        %     \textbf{ClientHello}[$(G, g), \pk^\text{DHE}_c$]
-        % };
-
-        % TODO: need to finish this diagram
-    
-        % \node (ch) at (0,-0.5) {
-        %     $(\pk^{\kem}_e, \sk^{\kem}_e)\leftsample\keygen^{\kem}()$
-        % };
-        % \draw[->] (0,-1) -- (8,-1) node[midway, above] {\texttt{ClientHello}[$\pk^{\kem}_e, r_c$]};
-        % \node (sh) at (8, -1.5) {
-        %     $(\texttt{ct}_e, \texttt{ss}_e) \leftsample \encap(\pk^{\kem}_e)$
-        % };
-        % \draw[<-] (0,-2) -- (8,-2) node[midway, above] {\texttt{ServerHello}[$\texttt{ct}_e, r_s$]};
-        % \node (decap) at (0,-2.4) {
-        %     $\texttt{ss}_e \leftarrow \decap(\sk_e^{\kem}, \texttt{ct}_e)$
-        % };
-        % \node (hs) at (4,-2.4) {
-        %     ${\color{blue} k_\text{hs}}
-        %         \leftarrow\texttt{HKDF}(\texttt{ss}_e, r_c, r_s)$
-        % };
-        % \draw[<-] (0,-3.3) -- (8,-3.3) node[midway, above] {\color{blue}
-        %     \texttt{Certificate}[$\texttt{pk}^{\text{Sig}}_{s}$]
-        % };
-        % \draw[<-] (0,-3.9) -- (8,-3.9) node[midway, above] {\color{blue}
-        %     \texttt{CertificateVerify}[
-        %         $\sigma_s \leftsample \sign(\sk_s^\text{Sig}, \texttt{CH..CERT})$
-        %     ]
-        % };
-        % \draw[<-] (0,-4.5) -- (8,-4.5) node[midway, above] {\color{blue}
-        %     \texttt{Finished}[$t_s\leftarrow\texttt{HMAC}(k_\text{Finish}, \texttt{CH..CV})$]
-        % };
-        % \draw[<-] (0,-5.1) -- (8,-5.1) node[midway, above] {\color{purple}
-        %     Application data
-        % };
-        % \draw[->] (0,-5.8) -- (8,-5.8) node[midway, above] {\color{blue}
-        %     \texttt{Finished}[$t_s\leftarrow\texttt{HMAC}(k_\text{Finish}, \texttt{CH..F})$]
-        % };
-        % \draw[->] (0,-6.5) -- (8,-6.5) node[midway, above] {\color{purple}
-        %     Application data
-        % };
     \end{tikzpicture}
-    \caption{TLS 1.3 handshake with (EC)DHE and signature-based authentication}
-    \label{fig:classical-tls13-handshake}
+    \caption{TLS 1.3 handshake with unilateral authentication}
+    \label{fig:tls13-handshake}
 \end{figure}
 
 \subsection{Certificate-based authentication}
 Authentication in TLS 1.3 relies on digital signatures and X.509 certificates. Figure \ref{fig:certificate-chain-and-pki} illustrates a certificate chain.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \begin{tikzpicture}[node distance=2em and 2.5cm, font=\footnotesize]
         \node[draw,rectangle,align=left] (leaf_key) {
@@ -734,8 +681,7 @@ The root of this chain is thus referred to as \textit{root CA}, while other issu
 A selection of trusted root CA certificates are typically pre-installed in client devices by the vendors (e.g. Google, Mozilla, Apple, Microsoft, etc.).
 
 \subsection{Key schedule and HKDF}
-
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
      \begin{tikzpicture}[node distance=2em and 2.5cm, font=\footnotesize]
          \node[] (gxy) {$g^{xy}$};
@@ -772,10 +718,15 @@ Instead, it typically contains fewer bits of computational entropy.
 
 In TLS 1.3, the function \texttt{HKDF.Extract} serves as an entropy extractor that concentrates the available randomness in the input keying material. 
 Another critical function of HKDF in TLS 1.3 is to derive computationally independent keys via \texttt{HKDF.Expand}.
-As illustrated in Figure~\ref{fig:classical-tls13-handshake}, all handshake messages following \texttt{ServerHello}, as well as all application data, are encrypted using different symmetric keys.
+As illustrated in Figure~\ref{fig:tls13-handshake}, all handshake messages following \texttt{ServerHello}, as well as all application data, are encrypted using different symmetric keys.
 Specifically, handshake messages are protected using a pair of handshake traffic keys—client handshake traffic secret (CHTS) and server handshake traffic secret (SHTS)—while application data is encrypted under a separate pair of application traffic keys—client application traffic secret (CATS) and server application traffic secret (SATS).
 Additionally, there is a unique symmetric key for each party to produce the HMAC tag used in their respective \texttt{Finished} messages.
 According to the HKDF model described in \cite{DBLP:conf/eurosp/KrawczykW16,DBLP:conf/crypto/Krawczyk10}, each of these keys—CATS, SATS, CHTS, SHTS, the client finished key, and the server finished key—is computationally independent from all others.
+
+\subsection{Security analysis}\label{sec:tls13-security-analysis}
+{\color{red} What are the security goals of TLS 1.3? How does TLS achieve them?
+Read and understand the formal analysis, summarize them here.
+}
 
 \subsection{Transition to post-quantum}
 The security of TLS 1.3 was thoroughly analyzed from a theoretical perspect through a long line of work \cite{DBLP:conf/ccs/DowlingFGS15,DBLP:journals/iacr/DowlingFGS16,DBLP:conf/crypto/BellareR93,DBLP:conf/ccs/FischlinG14,DBLP:journals/joc/DowlingFGS21}.
@@ -842,9 +793,7 @@ KEMTLS is motivatd by the observation that post-quantum signature candidates gen
 Section \ref{sec:kemtls-handshake} will introduce the KEMTLS handshake workflow. Section \ref{sec:kemtls-security} will review the security properties of KEMTLS and compare them with TLS 1.3. Finally, Section \ref{sec:kemtls-performance} will review the performance benchmarks from existing literature and discuss further optimizations in specific use cases.
 
 \subsection{KEMTLS Handshake}\label{sec:kemtls-handshake}
-{\color{red} Draw a diagram of the KEMTLS handshake, describe the workflow verbally, compare with TLS 1.3}
-
-An overview of a unilaterally authenticated KEMTLS handshake is illustrated on Figure \ref{fig:kemtls-handshake}.
+Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral authentication. Like TLS 1.3's handshake (Figure \ref{fig:tls13-handshake}), KEMTLS handshake can be cleanly divided into a key exchange phases where the two parties establish an ephemeral shared secret, and an authentication phase where the server proves its identity to the client. However, KEMTLS' authentication flow diverges significantly from TLS 1.3's authentication flow, and there are subtle downstream differences. We will discuss them in detail in this section.
 
 \begin{figure}[htbp]
     \centering
@@ -999,20 +948,443 @@ An overview of a unilaterally authenticated KEMTLS handshake is illustrated on F
     \label{fig:kemtls-handshake}
 \end{figure}
 
-\subsection{KEMTLS security}\label{sec:kemtls-security}
-{\color{red}
-KEMTLS and TLS 1.3 have identical security goals but achieve them in different ways, formal analysis first presented in which paper, a machine-assisted proof presented in which other paper.
+\paragraph{Ephemeral key exchange.} Like TLS 1.3, a KEMTLS handshake begins with establishing a TCP stream and client/server exchanging \texttt{ClientHello} and \texttt{ServerHello} in this order. Client first picks a KEM scheme $\kem_e$ for ephemeral key exchange, then generates the ephemeral keypair $(\pk_e, \sk_e)\leftsample\kem_e\texttt{.KeyGen}()$.
+The ephemeral public key $\pk_e$ is sent to the server in \texttt{ClientHello}, which also includes a 32-byte client nonce $r_c\in\{0,1\}^{256}$, client's supported cipher suites, and other parameters not crucial to the workflow of KEMTLS.
+If server accepts the parameters in \texttt{ClientHello}, then it encapsulates a random secret $(\texttt{ct}_e, \texttt{ss}_e)\leftsample\kem_e\texttt{.Encap}(\pk_e)$.
+The ciphertext $\texttt{ct}_e$ is included in \texttt{ServerHello} sent to the client, alongside server's random nonce $r_s\in\{0,1\}^{256}$ and other parameters.
+Finally, after receiving \texttt{ServerHello}, client recovers the ephemeral shared secret by decapsulating the ciphertext $\texttt{ss}_e\leftarrow\kem_e\texttt{.Decap}(\sk_e, \texttt{ct}_e)$.
 
-Subtle security difference: implicit authentication, downgrade resilience, anonymity, deniability vs non-repudiation
-}
+At this stage, client and server have established an ephemeral shared secret $\texttt{ss}_e$ and will update their key schedule synchronously.
+Specifically, each extracts a handshake secret (HS) from $\texttt{ss}_e$ using \texttt{HKDF.Extract}, then derive client handshake traffic secret ({\color{blue}CHTS}), server handshake traffic secret ({\color{blue}SHTS}), and derived handshake secret (dHS) using \texttt{HKDF.Expand} under different labels.
+CHTS and SHTS will be used to encrypt subsequent handshake messages from the client and the server respectively.
+dHS on the other hand serves as  the secret state of the key schedule and will participate in subsequent key schedule update.
+Figure \ref{fig:kemtls-handshake} used color-coding and subscripts to clarify which handshake message is encrypted and under which secret.
+
+\paragraph{(Implicit) Server authentication.} Like TLS 1.3, the authentication phase begins with server sending \texttt{Certificate}, but the workflow diverges afterwards.
+With KEMTLS, server's long-term public key $\pk_s$ is a KEM encapsulation key.
+To prove server's possession of the corresponding decapsulation key, client uses server's long-term public key to encapsulate a secret $(\texttt{ct}_s, \texttt{ss}_s)\leftsample\kem_s\texttt{.Encap}(\pk_s)$, then sends the ciphertext in a handshake message $\texttt{KemCiphertext}[\texttt{ct}_s]$.
+After receiving $\texttt{KemCiphertext}[\texttt{ct}_s]$, server recovers the authentication secret using its long-term secret key $\texttt{ss}_s\leftarrow\kem_s\texttt{.Decap}(\sk_s, \texttt{ct}_s)$.
+
+After this round of messages, the two parties have obtained another shared secret $\texttt{ss}_s$ and will perform a second update to the key schedule.
+First, the (unauthenticated) handshake secret (HS) will be upgraded to an authenticated handshake secret (AHS) by extracting randomness from dHS and $\texttt{ss}_s$.
+From AHS, the handshake traffic secrets will be upgraded to authenticated handshake traffic secrets (\text{\color{orange}CAHTS, SAHTS}).
+The key schedule's secret state is updated from AHS, then used to produce the Master Secret (MS).
+Last but not least, the \texttt{Finished} keys $\text{fk}_c, \text{fk}_s$ are derived from MS.
+
+\paragraph{Key confirmation/explicit authentication.} The final round of handshake message includes client and server exchanging \texttt{Finished}.
+Like TLS 1.3, the \texttt{Finished} message contains an HMAC tag over the handshake transcript up to the point when the message is sent.
+Also like TLS 1.3, each party can derive the appropriate application traffic keys ({\color{red}CATS, SATS}) and start sending application data right after sending its own \texttt{Finished}.
+On the other hand, unlike TLS 1.3, the order of ``who first sends \texttt{Finished} and application'' is flipped: where in TLS 1.3, server sends \texttt{Finished} before client, in KEMTLS, client sends \texttt{Finished} before server.
+This means that from client's perspective, TLS 1.3 and KEMTLS require the same one round trip (1-RTT) of handshake messages before client can start sending application data.
+From server's perspective, the number of round trips required before sending application data increased, but as \cite{DBLP:conf/ccs/SchwabeSW20} pointed out, in most TLS applications, client sends the first round of application data, so the increase of round trips for server is likely irrelevant to the latency of the application.
+The flipped order of \texttt{Finished} also has security implications, since client will be sending its first round of application data before having received server's \texttt{Finished}.
+We will discuss them in details in Section \ref{sec:kemtls-security}.
+
+
+\subsection{KEMTLS security}\label{sec:kemtls-security}
+KEMTLS has identical security goals to TLS 1.3.
+Analysis of KEMTLS' security thus follows the same framework as the formal analysis of TLS 1.3's security described in Section \ref{sec:tls13-security-analysis}.
+A ``pen-and-paper'' proof of KEMTLS security properties is first presented in \cite{DBLP:conf/ccs/SchwabeSW20}.
+Later, a computer-verified symbolic analysis of KEMTLS was conducted using Tamarin \cite{DBLP:conf/esorics/CeliHSW22,DBLP:conf/cav/MeierSCB13}.
+At a high level, KEMTLS achieves confidentiality, integrity, authenticity, forward secrecy, and resistance to replays if the client/server nonces are sufficiently large, the ephemeral key exchange KEM is IND-1CCA secure, the authentication KEM is IND-CCA secure, the chosen hash function is collision resistant, the HKDF is a secure PRF, and the AEAD is IND-CCA secure.
+These properties are formally stated by Theorem \ref{thm:multi-stage-sec-kemtls}:
+
+\begin{theorem}[Multi-stage security of KEMTLS \cite{DBLP:conf/ccs/SchwabeSW20}]\label{thm:multi-stage-sec-kemtls}
+    Let $n$ be the number of sessions and $U$ be the number of parties. The advantage of any probabilistic polynomial-time adversary $\mathcal{A}$ in breaking the multi-stage security of KEMTLS is bounded by:
+    \begin{equation*}\begin{aligned}
+        \adv(\mathcal{A}) \leq \frac{n^2}{2^{\vert r_c \vert}} + \epsilon_H^\text{COL}
+        + 6n\bigg(
+            &n(
+                \epsilon^{\text{IND-1CCA}}_{\kem_e}
+                + \epsilon^{\text{PRF}}_{\texttt{HKDF.Ext}}
+                + 2\epsilon^{\text{dual-PRF}}_{\texttt{HKDF.Ext}}
+                + 3\epsilon^{\text{PRF}}_{\texttt{HKDF.Exp}}
+                + \epsilon^{\text{EUF-CMA}}_{\text{HMAC}}
+            ) \\
+            &+ U(
+                \epsilon^{\text{IND-CCA}}_{\kem_s} + 2\epsilon^{\text{dual-PRF}}_{\texttt{HKDF.Ext}}
+                + 2\epsilon^{\text{PRF}}_{\texttt{HKDF.Exp}}
+                + \epsilon^{\text{EUF-CMA}}_{\text{HMAC}}
+            )
+        \bigg)
+    \end{aligned}\end{equation*}
+\end{theorem}
+
+\paragraph{Implicit authentication.} In TLS 1.3, client will not receive server's application data nor send its own application data until after it has received and validated server's \texttt{Finished}, which means that all application data exchanged are explicitly authenticated.
+In KEMTLS, however, client can start sending application data after sending its \texttt{Finished} but before receiving server's \texttt{Finished}.
+The application data sent before receiving server's \texttt{Finished} are encrypted under client's application traffic key, which contains entropy from the authentication secret $\texttt{ss}_s$.
+This means that, if $\kem_s$ is IND-CCA secure, then no party without the long-term seret key $\sk_s$ can correctly obtain the AEAD secret key.
+In other words, the early application data is \textbf{implicitly authenticated}.
+While this provides less security than explicitly authenticated application data, to this day there is no known attack exploiting the implicit authentication.
+In addition, explicit authentication can be achieved at one more round trip, at which time KEMTLS becomes as secure as TLS 1.3 using comparable cryptographic primitives.
 
 \subsection{KEMTLS performance}\label{sec:kemtls-performance}
-{\color{red} present performance data from prior results: desktop, PDK, IoT}
+{\color{red} present performance data from prior results: desktop, PDK, IoT {\bf but will other people's data contribute to this thesis? If not then maybe don't just copy-paste other people's data}}.
 
 \section{IND-1CCA KEM}\label{sec:ind-1cca-kem}
+{\bf\underline{IND}}istinguishability under (adaptive) {\bf\underline C}hosen {\bf\underline C}iphertext {\bf\underline A}ttacks (IND-CCA) is the desired level of security for a key encapsulation mechanism. 
+Intuitively, IND-CCA security requires that the shared secret from a random encapsulation cannot be distinguished from random bit string of equal length with non-negligible probability, even when the adversary has access to a decapsulation oracle.
+Theoretically speaking, the number of decapsulation queries is bounded by the requirement that the adversary is ``efficient'': that is, the adversary, classical or quantum, can only have polynomial time complexity.
+In practice, NIST's PQC standardization project evaluates a candidate KEM's CCA security under the upper bound of $2^{64}$ decapsulation queries\cite{nist-pqc-security-criteria}.
+
+However, within the context of an TLS 1.3 (and KEMTLS) key exchange, IND-CCA security is overkill.
+This is because TLS 1.3 is designed with forward secrecy, which requires that the keypair $(\pk_e, \sk_e)\leftsample\kem_e\texttt{.KeyGen}()$ exchanged in \texttt{ClientHello} and \texttt{ServerHello} be freshly generated at every session.
+Consequently, in a correct TLS 1.3 implementation, each private key will only be used to decapsulate at most one ciphertext.
+This naturally defines an alternative security definition called IND-1CCA, which is identical to IND-CCA except that the decapsulation oracle will answer at most one query.
+A similar notion of ``security under one query'' for Diffie-Hellman-style key exchange protocol called \texttt{snPRF-ODH} is defined in \cite{DBLP:journals/joc/DowlingFGS21} and used in the security reduction of TLS 1.3 handshake protocol.
+
+On the other hand, using IND-1CCA security brings meaningful performance improvements.
+A popular strategy for building an IND-CCA secure KEM is to start with an IND-CPA secure public key encryption scheme (PKE), then apply some variation of the Fujisaki-Okamoto transformation \cite{DBLP:conf/crypto/FujisakiO99,DBLP:journals/joc/FujisakiO13,DBLP:conf/tcc/HofheinzHK17}.
+The key techniques for achieving chosen-ciphertext security in are \textit{de-randomization} and \textit{re-encryption}.
+While there is some contention on whether \textit{de-randomiation} hurts security \cite{cryptoeprint:2021/912} (which indirectly hurts performance because the same security level may require larger set of parameters), there is no doubt that \textit{re-encryption} hurts performance.
+The performance penalty of re-encryption is especially pronounced with many lattice-based cryptosystems whose CPA-secure encryption sub-routine is much slower than the CPA-secure decryption sub-routine.
+As we will show in the following section, IND-1CCA constructions can preserve randomization of the underlying PKE while not requiring re-encryption.
+
+In Section \ref{sec:encrypt-then-mac-transformation} we will present an original IND-1CCA construction that transforms a CPA-secure PKE into an IND-1CCA secure KEM. Section \ref{sec:ind-1cca-discussion} then surveys and discusses other constructions.
+
+\subsection{The encrypt-then-MAC transformation}\label{sec:encrypt-then-mac-transformation}
+% TODO: Dumittan's T_CH transform derives SS from H(m) alone; I should do the same
+Let $\mathcal{B}^\ast$ denote the set of finite bit strings. Let $\mathcal{K}_\kem$ denote the set of all possible shared secrets. Let $(\keygen_\pke, \encrypt_\pke, \decrypt_\pke)$ be a PKE defined over message space $\mathcal{M}_\pke$ and ciphertext space $\mathcal{C}_\pke$. Let $\mac: \mathcal{K}_\mac \times \mathcal{B}^\ast \rightarrow \mathcal{T}$ be a MAC over key space $\mathcal{K}_\mac$ and tag space $\mathcal{T}$. Let $G: \mathcal{B}^\ast \rightarrow \mathcal{K}_\mac, H: \mathcal{B}^\ast \rightarrow \mathcal{K}_\kem$ be hash functions. The encrypt-then-MAC transformation $\etm[\pke,\mac,G,H]$ constructs a KEM $(\keygen_\etm, \encap_\etm, \decap_\etm)$ (Figure \ref{fig:etm-routines}).
+
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}[t]{0.32\textwidth}
+    \begin{algorithm}[H]
+        \caption*{$\keygen_\etm()$}
+        \begin{algorithmic}[1]
+            \State $(\pk,  \sk) \leftsample \keygen_\pke()$
+            \State $s \leftsample \mathcal{M}_\pke$
+            \State $\sk \leftarrow (\sk, s)$
+            \State \Return $(\pk, \sk)$
+        \end{algorithmic}
+    \end{algorithm}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.3\textwidth}
+    \begin{algorithm}[H]
+        \caption*{$\encap_\etm(\pk)$}
+        \begin{algorithmic}[1]
+            \State $m \leftsample \mathcal{M}_\pke$
+            \State $k \leftarrow G(m)$
+            \State $c^\prime \leftsample \encrypt_\pke(\pk, m)$
+            \State $t \leftarrow \mac(k, c^\prime)$
+            \State $c \leftarrow (c^\prime, t)$
+            \State $K \leftarrow H(m, c)$
+            \State \Return $(c, K)$
+        \end{algorithmic}
+    \end{algorithm}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.33\textwidth}
+    \begin{algorithm}[H]
+        \caption*{$\decap_\etm(\sk, c)$}
+        \begin{algorithmic}[1]
+            \Require $c = (c^\prime, t)$
+            \Require $\sk = (\sk^\prime, s)$
+            \State $\hat{m} \leftarrow \decrypt_\pke(\sk^\prime, c^\prime)$
+            \State $\hat{k} \leftarrow G(\hat{m})$
+            \If{$\mac(\hat{k}, c^\prime) = t$}
+                \State $K \leftarrow H(\hat{m}, c)$
+            \Else 
+                \State $K \leftarrow H(s, c)$
+            \EndIf
+            \State \Return $K$
+        \end{algorithmic}
+    \end{algorithm}
+    \end{minipage}
+    \caption{The encrypt-then-MAC KEM routines}\label{fig:etm-routines}
+\end{figure}
+
+We chose to construct $\kem_\etm$ using implicit rejection $K \leftarrow H(s, c)$: on invalid ciphertexts, the decapsulation routine returns a fake shared secret that depends on the ciphertext and some secret values, though choosing to use explicit rejection should not impact the security of the KEM. In addition, because the underlying PKE can be randomized, the shared secret $K \leftarrow H(m, c)$ must depend on both the plaintext and the ciphertext. According to \cite{DBLP:conf/ima/Dent03,DBLP:conf/tcc/HofheinzHK17}, if the input PKE is \textit{rigid} (i.e. $m = \decrypt(\sk, c)$ if and only if $c = \encrypt(\pk, m)$, such as with RSA), then the shared secret may be derived from the plaintext alone $K \leftarrow H(m)$.
+
+The CCA security of $\kem_\etm$ can be intuitively argued through an adversary's inability to learn additional information from the decapsulation oracle. For an adversary $A$ to produce a valid tag for some unauthenticated ciphertext $c^\prime$, it must either know the correct symmetric key or produce a forgery. Under the Random Oracle Model (ROM), $A$ cannot know the symmetric key without knowing its pre-image under the hash function $G$, so $A$ must either produced $c^\prime$ honestly, or have broken the one-wayness of the underlying PKE. This means that the decapsulation oracle will not leak information on decryption that the adversary does not already know. We formalize the security in Theorem \ref{thm:etm-is-ind-qcca-secure}
+
+\begin{theorem}\label{thm:etm-is-ind-qcca-secure}
+    For every IND-qCCA adversary $A$ against $\kem_\etm$ making $q$ decapsulation queries, there exists a OW-PCA adversary $B$ against the underlying PKE making at least $q$ decapsulation queries, and an existential forgery adversary $C$ against the underlying MAC such that:
+
+    \begin{equation*}
+        \texttt{Adv}^\texttt{IND-CCA}_{\kem_\etm}(A) \leq q \cdot \texttt{Adv}_{\mac}(C) + 2 \cdot \texttt{Adv}^\texttt{OW-PCA}_{\pke}(B)
+    \end{equation*}
+\end{theorem}
+
+From here, we can reduce OW-PCA security to OW-CPA security using a guessing argument: a CPA adversary can simulate a PCA oracle simply by randomly sampling from $\{0,1\}$ as response to every plaintext-checking query.
+Thus, the probability that all guesses are correct and PCA adversary retains its advantage is at most $2^{-q}$. In other words:
+
+\begin{lemma}\label{lem:pca-to-cpa-reduction}
+    For every efficient q-query OW-PCA adversary $A$ against some PKE, there exists some OW-CPA adversary $B$ such that
+
+    \begin{equation*}
+        \adv_\pke^{\text{OW-PCA}}(A) \leq 2^q\cdot \adv_\pke^{\text{OW-CPA}}(B)
+    \end{equation*}
+\end{lemma}
 
 
-\chapter{Implementation and performance measurements}\label{sec:implementation-and-performance-measurements}
+
+\subsubsection{Proof of Theorem \ref{thm:etm-is-ind-qcca-secure}}\label{sec:proof-of-etm-theorem}
+We will prove Theorem \ref{thm:etm-is-ind-qcca-secure} using a sequence of game. A summary of the the sequence of games can be found in Figure \ref{fig:etm-ind-cc2-sequence-of-games} and \ref{fig:ow-pca-simulates-game-3}. From a high level we made three incremental modifications to the IND-CCA game for $\kem_\etm$: \begin{enumerate}
+    \item Replace the true decapsulation oracle with a simulated decapsulation oracle. The simulated decapsulation oracle does not directly decrypt the queried ciphertext. Instead it searches through the hash oracle and looks for matching queries using the plaintext-checking oracle. The true decapsulation oracle and the simulated decapsulation oracle disagree if and only if the adversary queries with a ciphertext that contains a forged MAC tag, so the adversary cannot distinguish the two games more than it can perform existential forgery against the underlying MAC.
+    \item Replace the pseudorandom MAC key $k^\ast \leftarrow G(m^\ast)$ with a uniformly random MAC key $k^\ast \leftsample \mathcal{K}_\mac$. Under ROM, the adversary cannot distinguish this game from the previous one unless it queries the hash oracle with $m^\ast$, in which case a second adversary with access to a plaintext-checking oracle can win the OW-PCA game against the underlying PKE.
+    \item Replace the pseudorandom shared secret $K_0 \leftarrow H(m^\ast, c)$ with a truly random shared secret $K_0 \leftsample \mathcal{K}_\kem$. Similar to the point above, the adversary cannot distinguish the change more than it can break the one-wayness of the underlying PKE. Furthermore, since both $K_0$ and $K_1$ are uniformly random, no adversary can have any advantage.
+\end{enumerate}
+
+A OW-PCA adversary can then simulate the modified IND-CCA game for the KEM adversary, and the advantage of the OW-PCA adversary is associated with the probability of certain behaviors of the KEM adversary.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}[t]{0.46\textwidth}
+        \begin{algorithm}[H]
+            \caption*{\texttt{IND-CCA} game for $\kem_\etm$}
+            \begin{algorithmic}[1]
+                \State $(\pk, \sk) \leftsample \keygen_\etm()$
+                \State $m^\ast \leftsample \mathcal{M}$
+                \State $c^\prime \leftsample \encrypt_\pke(\pk, m^\ast)$
+                \State $k^\ast \leftarrow G(m^\ast)$
+                    \Comment{Game 0-1}
+                \State $k^\ast \leftsample \mathcal{K}_\mac$
+                    \Comment{Game 2-3}
+                \State $t \leftarrow \mac(k^\ast, c^\prime)$
+                \State $c^\ast \leftarrow (c^\prime, t)$
+                \State $K_0 \leftarrow H(m^\ast, c^\ast)$
+                    \Comment{Game 0-2}
+                \State $K_0 \leftsample \mathcal{K}_\kem$
+                    \Comment{Game 3}
+                \State $K_1 \leftsample \mathcal{K}_\kem$
+                \State $b \leftsample \{0,1\}$
+                \State $\hat{b} \leftarrow A^{\mathcal{O}^\decap}(\pk, c^\ast, K_b)$
+                    \Comment{Game 0}
+                \State $\hat{b} \leftarrow A^{\mathcal{O}^\decap_1}(\pk, c^\ast, K_b)$
+                    \Comment{Game 1-3}
+                \State \Return $\llbrack \hat{b} = b \rrbrack$
+            \end{algorithmic}
+        \end{algorithm}\vspace{-0em}
+        \begin{algorithm}[H]
+            \caption*{Hash oracle $\mathcal{O}^G(m)$}
+            \begin{algorithmic}[1]
+                \If{$\exists (\tilde{m}, \tilde{k}) \in \mathcal{L}^G : \tilde{m} = m$}
+                    \State \Return $\tilde{k}$
+                \EndIf
+                \State $k \leftsample \mathcal{K}_\mac$
+                \State $\mathcal{L}^G \leftarrow \mathcal{L}^G \cup \{(m, k)\}$
+                \State \Return $k$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+    \begin{minipage}[t]{0.53\textwidth}
+        \begin{algorithm}[H]
+            \caption*{Decap oracle $\mathcal{O}^\decap(c)$}
+            \begin{algorithmic}[1]
+                \State $(c^\prime, t) \leftarrow c$
+                \State $\hat{m} = \decrypt_\pke(\sk^\prime, c^\prime)$
+                \State $\hat{k} \leftarrow G(\hat{m})$
+                \If{$\mac(\hat{k}, c^\prime) = t$}
+                    \State $K \leftarrow H(\hat{m}, c)$
+                \Else 
+                    \State $K \leftarrow H(z, c)$
+                \EndIf 
+                \State \Return $K$
+            \end{algorithmic}
+        \end{algorithm}\vspace{-0em}
+        \begin{algorithm}[H]
+            \caption*{$\mathcal{O}^\decap_1(c)$}
+            \begin{algorithmic}[1]
+                \State $(c^\prime, t) \leftarrow c$
+                \If{$
+                    \exists (\tilde{m}, \tilde{k}) \in \mathcal{L}^G : 
+                    \tilde{m} = \decrypt_\pke(\sk^\prime, c^\prime)
+                    \land \mac(\tilde{k}, c^\prime) = t
+                $}
+                    \State $K \leftarrow H(\tilde{m}, c)$
+                \Else
+                    \State $K \leftarrow H(z, c)$
+                \EndIf
+                \State \Return $K$
+            \end{algorithmic}
+        \end{algorithm}\vspace{-0em}
+        \begin{algorithm}[H]
+            \caption*{$\mathcal{O}^H(m, c)$}
+            \begin{algorithmic}[1]
+                \If{$\exists (\tilde{m}, \tilde{c}, \tilde{K}) \in \mathcal{L}^H : \tilde{m} = m \land \tilde{c} = c$}
+                    \State \Return $\tilde{K}$
+                \EndIf
+                \State $K \leftsample \mathcal{K}_\kem$
+                \State $\mathcal{L}^H \leftarrow \mathcal{L}^H \cup \{(m, c, K)\}$
+                \State \Return $K$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+    \caption{Sequence of games in the proof of Theorem \ref{thm:etm-is-ind-qcca-secure}}\label{fig:etm-ind-cc2-sequence-of-games}
+\end{figure}
+\begin{figure}[htbp]
+    \begin{minipage}[t]{0.49\textwidth}
+        \begin{algorithm}[H]
+            \caption*{$B(\pk, {c^\prime}^\ast)$}
+            \begin{algorithmic}[1]
+                \State $z \leftsample \mathcal{M}$
+                \State $k \leftsample \mathcal{K}_\mac$
+                \State $t \leftarrow \mac(k, {c^\prime}^\ast)$
+                \State $c^\ast \leftarrow ({c^\prime}^\ast, t)$
+                \State $K \leftsample \mathcal{K}_\kem$
+                \State $\hat{b} \leftarrow A^{
+                    \mathcal{O}^\decap_B, \mathcal{O}^G_B, \mathcal{O}^H_B
+                }(\pk, c^\ast, K)$
+                \If{$\texttt{ABORT}(m)$}
+                    \State \Return $m$
+                \EndIf
+            \end{algorithmic}
+        \end{algorithm}\vspace{-0em}
+        \begin{algorithm}[H]
+            \caption*{$\mathcal{O}^H_B(m, c)$}
+            \begin{algorithmic}
+                \If{$\mathcal{O}^\pco(m, {c^\prime}^\ast) = 1$}
+                    \State $\texttt{ABORT}(m)$
+                \EndIf
+                \If{$
+                    \exists (\tilde{m}, \tilde{c}, \tilde{K}) \in \mathcal{L}^H 
+                    : \tilde{m} = m \land \tilde{c} = c
+                $}
+                    \State \Return $\tilde{K}$
+                \EndIf
+                \State $K \leftsample \mathcal{K}_\kem$
+                \State $\mathcal{L}^H \leftarrow \mathcal{L}^H \cup \{(m, c, K)\}$
+                \State \Return $K$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.49\textwidth}
+        \begin{algorithm}[H]
+            \caption*{$\mathcal{O}^\decap_B(c)$}
+            \begin{algorithmic}[1]
+                \State $(c^\prime, t) \leftarrow c$
+                \If{$\exists (\tilde{m}, \tilde{k}) \in \mathcal{L}^G : 
+                    % \tilde{m} = \decrypt(\sk^\prime, c^\prime)
+                    \mathcal{O}^\pco(\tilde{m}, c^\prime) = 1
+                    \land \mac(\tilde{k}, c^\prime) = t
+                $}
+                    \State $K \leftarrow H(\tilde{m}, c)$
+                \Else
+                    \State $K \leftarrow H(z, c)$
+                \EndIf
+                \State \Return $K$
+            \end{algorithmic}
+        \end{algorithm}\vspace{-0em}
+        \begin{algorithm}[H]
+            \caption*{$\mathcal{O}^G_B(m)$}
+            \begin{algorithmic}[1]
+                \If{$\mathcal{O}^\pco(m, {c^\prime}^\ast) = 1$}
+                    \State $\texttt{ABORT}(m)$
+                \EndIf
+                \If{$\exists (\tilde{m}, \tilde{k}) \in \mathcal{L}^G : \tilde{m} = m$}
+                    \State \Return $\tilde{k}$
+                \EndIf
+                \State $k \leftsample \mathcal{K}_\mac$
+                \State $\mathcal{L}^G \leftarrow \mathcal{L}^G \cup \{(m, k)\}$
+                \State \Return $k$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+    \caption{OW-PCA adversary $B$ simulates game 3 for IND-CCA adversary $A$ in the proof for Theorem \ref{thm:etm-is-ind-qcca-secure}}\label{fig:ow-pca-simulates-game-3}
+\end{figure}
+
+
+\begin{proof}
+    \emph{Game 0} is the standard KEM IND-CCA game. The decapsulation oracle $\mathcal{O}^\decap$ executes the decapsulation routine using the challenge keypair and return the results faithfully. The queries made to the hash oracles $\mathcal{O}^G, \mathcal{O}^H$ are recorded to their respective tapes $\mathcal{L}^G, \mathcal{L}^H$.
+
+    \emph{Game 1} is identical to game 0 except that the true decapsulation oracle $\mathcal{O}^\decap$ is replaced with a simulated oracle $\mathcal{O}^\decap_1$. Instead of directly decrypting $c^\prime$ as in the decapsulation routine, the simulated oracle searches through the tape $\mathcal{L}^G$ to find a matching query $(\tilde{m}, \tilde{k})$ such that $\tilde{m}$ is the decryption of $c^\prime$. The simulated oracle then uses $\tilde{k}$ to validate the tag $t$ against $c^\prime$.
+
+    If the simulated oracle accepts the queried ciphertext as valid, then there is a matching query that also validates the tag, which means that the queried ciphertext is honestly generated. Therefore, the true oracle must also accept the queried ciphertext. On the other hand, if the true oracle rejects the queried ciphertext, then the tag is simply invalid under the MAC key $k = G(\decrypt(\sk^\prime, c^\prime))$. Therefore, there could not have been a matching query that also validates the tag, and the simulated oracle must also rejects the queried ciphertext.
+
+    This means that from the adversary $A$'s perspective, game 1 and game 0 differ only when the true oracle accepts while the simulated oracle rejects, which means that $t$ is a valid tag for $c^\prime$ under $k = G(\decrypt(\sk^\prime, c^\prime))$, but $k$ has never been queried. Under the random oracle model, such $k$ is a uniformly random sample of $\mathcal{K}_\mac$ that the adversary does not know, so for $A$ to produce a valid tag is to produce a forgery against the $\mac$ under an unknown and uniformly random key. Therefore, we can bound the probability that the true decapsulation oracle disagrees with the simulated oracle by the probability that some MAC adversary produces a forgery:
+
+    \begin{equation*}
+        P\left[\mathcal{O}^\decap(c) \neq \mathcal{O}^\decap_1(c)\right]
+        \leq \adv_\texttt{MAC}(C).
+    \end{equation*}
+
+    Across all $q$ decapsulation queries, the probability that at least one query is a forgery is thus at most $q \cdot P\left[\mathcal{O}^\decap(c) \neq \mathcal{O}^\decap_1(c)\right]$. By the difference lemma:
+
+    \begin{equation*}
+        \left\vert \adv_{G_0}(A) - \adv_{G_1}(A) \right\vert\leq q\cdot  \adv_\texttt{MAC}(C).
+    \end{equation*}
+
+    \emph{Game 2} is identical to game 1, except that the challenger samples a uniformly random MAC key $k^\ast \leftsample \mathcal{K}_\mac$ instead of deriving it from $m^\ast$. From $A$'s perspective the two games are indistinguishable, unless $A$ queries $G$ with the value of $m^\ast$. Denote the probability that $A$ queries $G$ with $m^\ast$ by $P[\texttt{QUERY G}]$, then:
+
+    \begin{equation*}
+        \left\vert \adv_{G_1}(A) - \adv_{G_2}(A) \right\vert \leq P\left[\texttt{QUERY G}\right].
+    \end{equation*}
+
+    \emph{Game 3} is identical to game 2, except that the challenger samples a uniformly random shared secret $K_0 \leftsample \mathcal{K}_\kem$ instead of deriving it from $m^\ast$ and $t$. From $A$'s perspective the two games are indistinguishable, unless $A$ queries $H$ with $(m^\ast, \cdot)$. Denote the probability that $A$ queries $H$ with $(m^\ast, \cdot)$ by $P[\texttt{QUERY H}]$, then:
+
+    \begin{equation*}
+        \left\vert \adv_{G_2}(A) - \adv_{G_3}(A) \right\vert \leq P\left[\texttt{QUERY H}\right].
+    \end{equation*}
+
+    Since in game 3, both $K_0$ and $K_1$ are uniformly random and independent of all other variables, no adversary can have any advantage: $\adv_{G_3}(A) = 0$.
+
+    We will bound $P[\texttt{QUERY G}]$ and $P[\texttt{QUERY H}]$ by constructing a OW-PCA adversary $B$ against the underlying PKE that uses $A$ as a sub-routine. $B$'s behaviors are summarized in Figure \ref{fig:ow-pca-simulates-game-3}.
+
+    $B$ simulates game 3 for $A$: upon receiving the public key $\pk$ and challenge encryption ${c^\prime}^\ast$, $B$ samples random MAC key and session key to produce the challenge encapsulation, then feeds it to $A$. When simulating the decapsulation oracle, $B$ uses the plaintext-checking oracle to look for matching queries in $\mathcal{L}^G$. When simulating the hash oracles, $B$ uses the plaintext-checking oracle to detect when $m^\ast = \decrypt(\sk^\prime, {c^\prime}^\star)$ has been queried. When $m^\ast$ is queried, $B$ terminates $A$ and returns $m^\ast$ to win the OW-PCA game. In other words:
+
+    \begin{equation*}
+        \begin{aligned}
+            P\left[\texttt{QUERY G}\right] &\leq \adv^\texttt{OW-PCA}_\pke(B), \\
+            P\left[\texttt{QUERY H}\right] &\leq \adv^\texttt{OW-PCA}_\pke(B). \\
+        \end{aligned}
+    \end{equation*}
+
+    Combining all equations above produce the desired security bound.
+\end{proof}
+
+\subsection{Related works}\label{sec:ind-1cca-discussion}
+To our knowledge, the concept of IND-qCCA security is first published by Cramer et al.\cite{DBLP:conf/asiacrypt/CramerHHIKPSV07}, whose proposed a generic black-box IND-qCCA PKE construction whose security reduces to the IND-CPA security of the underlying PKE and the existential unforgeability of the underlying one-time signature \cite{lamport1979constructing}.
+It is particularly remarkable how this reduction is proved in the standard model instead of the random oracle model, although this came at the cost of computational efficiency.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}[t]{0.33\textwidth}
+        \begin{algorithm}[H]
+            \caption*{\keygen}
+            \begin{algorithmic}[1]
+                \State $(\pk, \sk) \leftsample \keygen^\pke()$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.3\textwidth}
+        \begin{algorithm}[H]
+            \caption*{$\encap(\pk)$}
+            \begin{algorithmic}[1]
+                \State $m \leftsample \mathcal{M}^\pke$
+                \State $c \leftsample \encrypt^\pke(\pk, m)$
+                \State $K \leftarrow H(m, c)$
+                \State \Return $(c, K)$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.33\textwidth}
+        \begin{algorithm}[H]
+            \caption*{$\decap(\sk, c)$}
+            \begin{algorithmic}[1]
+                \State $\hat{m} \leftarrow \decrypt^\pke(\sk, c)$
+                \If{$\hat{m} = \bot$}
+                    \State\Return $\bot$
+                \EndIf
+                \State \Return $H(\hat{m}, c)$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+    \caption{$T_H$ transformation}
+    \label{fig:dumittan-th-transform}
+\end{figure}
+
+Huguenin-Dumittan and Vaudenay \cite{DBLP:conf/eurocrypt/Huguenin-Dumittan22} extended this line of work to the post-quantum setting by proposing two IND-qCCA KEM constructions (respectively denoted by $T_\text{CH}$ and $T_H$) from CPA-secure PKEs. 
+$T_\text{CH}$ achieves qCCA security using a ``confirmation hash'': the KEM ciphertext includes the PKE ciphertext and a hash of the PKE plaintext, and the KEM shared secret is derived from hashing the PKE plaintext ({\color{red} the encrypt-then-MAC transformatino can be seen as a special case of the $T_\text{CH}$ transformation \bf{not sure if we should mention this similarity}}).
+The security reduction is loose by a factor of $2^q$ where $q$ is the number of decapsulation queries.
+$T_H$ achieves qCCA security by deriving the shared secret from hashing both the PKE plaintext and ciphertext (Figure \ref{fig:dumittan-th-transform}), so decapsulation queries with modified ciphertext will be answered with independent random values under the rancom oracle model.
+$T_H$'s construction is simpler than $T_\text{CH}$ and retains the original ciphertext length, but on the other hand, the security reduction is looser, with a factor of $q_H^{2q}$, where $q_H$ is the number of hash oracle queries, and $q$ is the number of decapsulation queries.
+The authors also proved qCCA security of both transformations under quantum random oracle model (QROM).
+
+In the same paper, the two authors also observed that in TLS 1.3, the handshake secret (and thus all subsequent secrets and keys) is derived with input from the handshake transcript, which means that the KEM public key and ciphertext, embedded in \texttt{ClientHello} and \texttt{ServerHello} respectively, are already hashed into the handshake secret.
+This is similar to the $T_H$ construction where the shared secret is hashed from PKE plaintext and ciphertext, and indeed the authors proved that TLS 1.3 remains multi-stage secure even if the KEM is only CPA secure.
+The initial proof presented by the authors had a looseness factor of $O(q^6)$, which was later improved by Zhou et al.\cite{DBLP:conf/asiacrypt/ZhouJZ24} to $O(q)$ for randomized PKEs, and $O(1)$ for rigid PKEs.
+
+\chapter{Implementation}\label{sec:implementation-and-performance-measurements}
 To evaluate post-quantum TLS 1.3 and KEMTLS on constrained devices, we implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL, a TLS library written in the C programming language. We then implemented a minimal TLS client on the Raspberry Pi Pico 2 W, a microcontroller with two ARM Cortex-M33 cores \footnote{The Pico 2 W also has 2 RISC-V cores, though we did not use them in this project.} and 512kB of SRAM, and measures the time it takes for the Pico client to complete a TLS 1.3 or KEMTLS handshake with a server. This chapter describes some of the implementation details, the benchmarking methodology, and the performance measurements.
 
 \section{WolfSSL}\label{sec:wolfssl}
@@ -1166,21 +1538,19 @@ We used a netowrk router that is connected to University of Waterloo's internal 
 The Linux desktop was connected to the internal network via Ethernet as well.
 \textbf{\color{red} I need more metrics on the network :(}
 
-\section{Performance of TLS 1.3 and KEMTLS}
+\chapter{Performance of post-quantum TLS 1.3 and KEMTLS}
 In this section we will compare the performance of post-quantum TLS 1.3, KEMTLS, and classical TLS 1.3.
 
-\subsection{Communication cost}
+\section{Communication cost}
 TLS 1.3 recommended ephemeral elliptic curve Diffie-Hellman key agreement (ECDHE) to be the default scheme for key exchange in \texttt{ClientHello} and \texttt{ServerHello}.
 Using ECDHE, the client and the server each sends the other an element from the agreed group of points on an elliptic curve, so round-trip communication cost is the sum of two group points.
 When using a post-quantum KEM, the client sends to the server an encapsulation key, and the server sends back a ciphertext obtained under said encapsulation key.
 The round-trip communication cost of a KEM key agreemnt is thus the sum of a public key and a ciphertext.
 Table \ref{tab:kex-traffic-sizes} lists the costs of each key agreement scheme.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
-\caption{Key agreement communication costs (bytes). 
-For NIST curves we include the costs for compressed and uncompressed forms.
-}
+\caption{Key agreement communication costs (bytes).}
 \vspace{1em}
 \label{tab:kex-traffic-sizes}
 \footnotesize\begin{tabular}{llrrr}
@@ -1212,7 +1582,7 @@ For NIST curves we include the costs for compressed and uncompressed forms.
 Post-quantum digital signature schemes also have larger sizes than elliptic-curve signatures and RSA-signatures. 
 Table \ref{tab:sig-sizes} compares the sizes of public key and signature across the chosen set of signature schemes.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
 \caption{Digital signatures communication costs (bytes)}
 \vspace{1em}
@@ -1310,7 +1680,7 @@ Table \ref{tab:cert-chain-sizes} compares the sizes of certificate chain.
 \end{tabular}
 \end{table}
 
-\subsection{Cryptographic operations performance}
+\section{Cryptographic operations performance}
 We benchmarked the speed of relevant cryptographic operations on the Pico 2 W.
 Table \ref{tab:kex-performance-rp2350} and \ref{tab:digital-signature-performance-rp2350} summarizes the results.
 
@@ -1406,7 +1776,7 @@ HQC-256 \\
     \end{tabular}
 \end{table}
 
-\subsection{Handshake performance}
+\section{Handshake latency}
 TLS 1.3 and KEMLS handshake can be divided into two distinct phases.
 The first phase is key agreement, which starts at the beginning at the handshake and ends when client finishes processing \texttt{ServerHello}.
 The second phase is authentication, which starts at the end of the key agreement phase and ends when the handshake is completed.
@@ -1430,7 +1800,7 @@ In addition, we also track the length of time for which the Pico is doing active
 Table \ref{tab:ka-performance-comparison} compares the performance of various key exchange scheme using these two metrics. 
 Figure \ref{fig:ka-performance-comparison} illustrates the distribution of data points.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \footnotesize
 \centering
 \begin{tabular}{llrrrr}
@@ -1466,7 +1836,7 @@ Figure \ref{fig:ka-performance-comparison} illustrates the distribution of data 
 \label{tab:ka-performance-comparison}
 \end{table}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=\linewidth]{benchmarks/imgs/ka_tot_dur.png}
     \includegraphics[width=\linewidth]{benchmarks/imgs/ka_cpu_dur.png}
@@ -1481,7 +1851,7 @@ Table \ref{tab:auth-performance-comparison} summarizes these metrics. Figure \re
 
 Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-performance} summarize the performance of the handshake as a whole.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \footnotesize
 \centering
 \begin{tabular}{llllrr}
@@ -1508,7 +1878,7 @@ Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-per
 \label{tab:auth-performance-comparison}
 \end{table}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=\linewidth]{benchmarks/imgs/cert_tx_time.png}
     \includegraphics[width=\linewidth]{benchmarks/imgs/auth_time.png}
@@ -1516,7 +1886,7 @@ Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-per
     \label{fig:auth-performance-comparison}
 \end{figure}
 
-\begin{table}[h]
+\begin{table}[htbp]
 \footnotesize
 \centering
 \begin{tabular}{lllllr}
@@ -1543,7 +1913,7 @@ Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-per
 \label{tab:handshake-performance}
 \end{table}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=\linewidth]{benchmarks/imgs/handshake_time.png}
     \caption{Handshake durations (microseconds).}
