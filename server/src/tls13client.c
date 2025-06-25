@@ -4,6 +4,7 @@
  * client will verify peer and abort handshake accordingly. If client
  * authentication is needed, then --certs and --key must be supplied together.
  */
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -348,9 +349,10 @@ int main(int argc, char *argv[]) {
         if (wolfSSL_telemetry_ts_to_durs(ssl, &kex_cpu_dur, &kex_crypto_cpu_dur,
                                          &kex_dur, &auth_crypto_dur, &auth_dur,
                                          &hs_dur) == 0) {
-            printf("%llu,%llu,%llu,%llu,%llu,%llu\n", kex_cpu_dur,
-                   kex_crypto_cpu_dur, kex_dur, auth_crypto_dur, auth_dur,
-                   hs_dur);
+            printf("%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
+                   ",%" PRIu64 "\n",
+                   kex_cpu_dur, kex_crypto_cpu_dur, kex_dur, auth_crypto_dur,
+                   auth_dur, hs_dur);
         } else {
             printf("ERROR: Telemetry incomplete\n");
         }
