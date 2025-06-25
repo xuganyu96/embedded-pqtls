@@ -30,6 +30,12 @@ server side: server-side metrics will be collected and analyzed separatedly from
 - from timestamps:
     - **Certificate transmission time**: time to run `SendTls13Certificate`
 
+Testing:
+- [x] keygen/decap timestamp in ECC
+- [x] keygen/decap timestamp in X25519
+- [x] keygen/decap timestamp in PQC
+- [x] auth timestamps in signature auth
+- [] auth timestamps in KEMTLS
 
 # June 24, 2025
 I want to be able to authenticate server with SPHINCS-128f. Here are some constraints:

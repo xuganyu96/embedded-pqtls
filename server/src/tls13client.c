@@ -37,20 +37,23 @@
     "Usage: tls13client [--cafile root.crt] [--certs client-chain.crt] "       \
     "[--key client.key] <hostname> <port>"
 
-static int kex_pqonly = 1;
-static int kex_groups_pqonly[] = {
-    /* GYX: OT_ML_KEM_512 works, but 768/1024 does not */
-    // OT_ML_KEM_512,
-    // OT_ML_KEM_768,
-    OT_ML_KEM_1024,
-    // WOLFSSL_ML_KEM_512,
+static int kex_groups[] = {
+    // WOLFSSL_ECC_SECP256R1,
+    // WOLFSSL_ECC_SECP384R1,
+    // WOLFSSL_ECC_SECP521R1,
+    // WOLFSSL_ECC_X25519,
+    // WOLFSSL_ECC_X448,
+    WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
-    // WOLFSSL_ML_KEM_1024,
+    // WOLFSSL_ML_KEM_1024
     // HQC_128,
     // HQC_192,
     // HQC_256,
+    // OT_ML_KEM_512,
+    // OT_ML_KEM_768,
+    // OT_ML_KEM_1024,
 };
-static int kex_groups_nelems = sizeof(kex_groups_pqonly) / sizeof(int);
+static int kex_groups_nelems = sizeof(kex_groups) / sizeof(int);
 
 typedef struct cli_args {
     // if --help is provided then print help string
@@ -251,6 +254,9 @@ int main(int argc, char *argv[]) {
     args.debug ? wolfSSL_Debugging_ON() : wolfSSL_Debugging_OFF();
     wolfSSL_Init();
 
+#ifdef WOLFSSL_HAVE_TELEMETRY
+    printf("%s\n", WOLFSSL_TELEMETRY_CSV_HEADER);
+#endif
     for (int round = 0; round < TEST_ROUNDS; round++) {
         ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method());
         if (!ctx) {
@@ -293,16 +299,12 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
         }
-        if (kex_pqonly) {
-            ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups_pqonly,
-                                             kex_groups_nelems);
-            if (ssl_err != WOLFSSL_SUCCESS) {
-                fprintf(stderr, "Failed to set key exchange groups (err %d)\n",
-                        ssl_err);
-                wolfSSL_CTX_free(ctx);
-                exit(EXIT_FAILURE);
-            }
-            fprintf(stderr, "Only using PQ key exchange\n");
+        ssl_err = wolfSSL_CTX_set_groups(ctx, kex_groups, kex_groups_nelems);
+        if (ssl_err != WOLFSSL_SUCCESS) {
+            fprintf(stderr, "Failed to set key exchange groups (err %d)\n",
+                    ssl_err);
+            wolfSSL_CTX_free(ctx);
+            exit(EXIT_FAILURE);
         }
 
         ssl = wolfSSL_new(ctx);
@@ -341,8 +343,16 @@ int main(int argc, char *argv[]) {
         }
         printf("Handshake succeeded %s\n", args.hostname);
 #ifdef WOLFSSL_HAVE_TELEMETRY
-        if (ssl->tel.ch_start_set) {
-            printf("ClientHello start %llu\n", ssl->tel.ch_start_ts);
+        uint64_t kex_cpu_dur, kex_crypto_cpu_dur, kex_dur, auth_crypto_dur,
+            auth_dur, hs_dur;
+        if (wolfSSL_telemetry_ts_to_durs(ssl, &kex_cpu_dur, &kex_crypto_cpu_dur,
+                                         &kex_dur, &auth_crypto_dur, &auth_dur,
+                                         &hs_dur) == 0) {
+            printf("%llu,%llu,%llu,%llu,%llu,%llu\n", kex_cpu_dur,
+                   kex_crypto_cpu_dur, kex_dur, auth_crypto_dur, auth_dur,
+                   hs_dur);
+        } else {
+            printf("ERROR: Telemetry incomplete\n");
         }
 #endif
         int echo_ret = test_echo(ssl);

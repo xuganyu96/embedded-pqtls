@@ -511,7 +511,7 @@ extern int my_rng_gen_block(unsigned char *output, unsigned int sz);
 #define HAVE_HQC
 #define PQCLEAN_HQC
 #define HAVE_OTMLKEM /* IND-1CCA MLKEM */
-#undef WOLFSSL_HAVE_TELEMETRY
+#define WOLFSSL_HAVE_TELEMETRY
 
 // #define KEEP_PEER_CERT
 // #define HAVE_COMP_KEY
