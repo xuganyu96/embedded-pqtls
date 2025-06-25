@@ -26,8 +26,6 @@
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
 #endif
-#define CSV_HEADER                                                             \
-    "kex,auth,ch_start,ch_sent,sh_start,sh_done,auth_start,auth_done"
 
 static ntp_client_t ntp_client;
 
@@ -193,7 +191,7 @@ int main(void) {
 
     // main loop
 #ifdef WOLFSSL_HAVE_TELEMETRY
-    printf("%s\n", CSV_HEADER);
+    printf("kex,auth,%s\n", WOLFSSL_TELEMETRY_CSV_HEADER);
 #endif
     while (1) {
         ensure_wifi_connection_blocking(WIFI_SSID, WIFI_PASSWORD,
@@ -279,36 +277,17 @@ int main(void) {
             INFO_printf("echo Ok.\n");
         }
 #ifdef WOLFSSL_HAVE_TELEMETRY
-        printf("%s,%s,", KEX_NAME, AUTH_SUITE);
-        if (ssl->tel.ch_start_set) {
-            printf("%" PRIu64 ",", ssl->tel.ch_start_ts);
+        uint64_t kex_cpu_dur, kex_crypto_cpu_dur, kex_dur, auth_crypto_dur,
+            auth_dur, hs_dur;
+        if (wolfSSL_telemetry_ts_to_durs(ssl, &kex_cpu_dur, &kex_crypto_cpu_dur,
+                                         &kex_dur, &auth_crypto_dur, &auth_dur,
+                                         &hs_dur) == 0) {
+            printf("%s,%s,%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
+                   ",%" PRIu64 ",%" PRIu64 "\n",
+                   KEX_NAME, AUTH_SUITE, kex_cpu_dur, kex_crypto_cpu_dur,
+                   kex_dur, auth_crypto_dur, auth_dur, hs_dur);
         } else {
-            printf("-1,");
-        }
-        if (ssl->tel.ch_sent_set) {
-            printf("%" PRIu64 ",", ssl->tel.ch_sent_ts);
-        } else {
-            printf("-1,");
-        }
-        if (ssl->tel.sh_start_set) {
-            printf("%" PRIu64 ",", ssl->tel.sh_start_ts);
-        } else {
-            printf("-1,");
-        }
-        if (ssl->tel.sh_done_set) {
-            printf("%" PRIu64 ",", ssl->tel.sh_done_ts);
-        } else {
-            printf("-1,");
-        }
-        if (ssl->tel.cert_start_set) {
-            printf("%" PRIu64 ",", ssl->tel.cert_start_ts);
-        } else {
-            printf("-1,");
-        }
-        if (ssl->tel.hs_done_set) {
-            printf("%" PRIu64 "\n", ssl->tel.hs_done_ts);
-        } else {
-            printf("-1\n");
+            printf("ERROR: Telemetry incomplete\n");
         }
 #endif
 
