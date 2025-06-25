@@ -1,6 +1,52 @@
 TODO:
-- [ ] Can we send SPHINCS-128f in CertificateVerify?
 - [ ] Define and implement details telemetry
+- [ ] Can we send SPHINCS-128f in CertificateVerify? Yes but the work is not trivial, so leave until later.
+
+# June 25, 2025
+What telemetries do I want to add?
+client side:
+- timestamps for:
+    - `ch_start`: when handshake start
+    - `keygen_start`: when ephemeral key generation start
+    - `keygen_done`: when ephemeral key generation stops
+    - `ch_sent`: when `ClientHello` is sent
+    - `sh_start`: when `ServerHello` is received
+    - `decap_start`: when decapsulation start
+    - `decap_done`: when decapsulation stops
+    - `sh_done`: when `ServerHello` is processed
+    - `cert_start`: when `Certificate` is received
+    - `auth_start`: the start of `CertificateVerify` signature verification (TLS 1.3), or the start of encapsulating `KemCiphertext` (KEMTLS)
+    - `auth_done`: the end of `CertificateVerify` verification (TLS 1.3), or the end of encapsulating `KemCiphertext`
+    - `hs_done`: the end of the handshake, which is when client finishes verifying server's `Finished`
+- from these timestamps we have:
+    - **CPU time for key exchange**: `ch_sent - ch_start + sh_done - sh_start`
+    - **CPU time for KEM in key exchange**: `keygen_done - keygen_start + decap_done - decap_start`
+    - **total time for key exchange**: `sh_done - ch_start`
+    - **Auth time**: `hs_done - cert_start`
+    - **Auth crypto time**: `auth_done - auth_start`
+    - **Handshake latency**: `hs_done - ch_start`
+
+server side: server-side metrics will be collected and analyzed separatedly from client-side metrics. It is possible to "send server-side metrics to client as app data" but I find the complexity to not be worth it.
+- from timestamps:
+    - **Certificate transmission time**: time to run `SendTls13Certificate`
+
+
+# June 24, 2025
+I want to be able to authenticate server with SPHINCS-128f. Here are some constraints:
+- Record layer's fragment has a maximal size of `2**14 - 1`
+- `CertificateVerify` allows signature of size up to `2**16 - 1`
+- WolfSSL by default sets maximal signature size in `CertificateVerify` to `WC_MAX_CERT_VERIFY_SZ 6000`
+
+If I just increase `WC_MAX_CERT_VERIFY_SZ` to 50000:
+- `sphincs-128s` chain still works
+- `ed25519` chain still works
+- `mldsa44-mldsa44-mlkem512` still works
+
+So chains that already work will work just fine, but `sphincs-128f` chain will not work. Previous it will gracefully error with -132 (BUFFER_E), but after the size change the server just crashes.
+
+But how does `Certificate` get fragmented? Check `AddTls13FragHeaders`
+
+I am afraid that fragmenting CertificateVerify should not be trivial. Perhaps we will leave SPHINCS128f chain to later after the first draft is done.
 
 # Add signature scheme
 ## Load private key and certificates
