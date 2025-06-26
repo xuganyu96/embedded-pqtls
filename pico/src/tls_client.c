@@ -17,7 +17,8 @@
 // #include "pico-pqtls/cafiles/mldsa44.h"
 // #include "pico-pqtls/cafiles/falcon512.h"
 // #include "pico-pqtls/cafiles/sphincs128s.h"
-#include "pico-pqtls/cafiles/sphincs128s-sphincs128s-hqc128.h"
+// #include "pico-pqtls/cafiles/sphincs128s-sphincs128s-hqc128.h"
+#include "pico-pqtls/cafiles/sphincs256s-sphincs256s-hqc256.h"
 // #include "pico-pqtls/cafiles/sphincs128f-mldsa44-mldsa44-mldsa44.h"
 // #include "pico-pqtls/cafiles/falcon512-mldsa44-mldsa44-mldsa44.h"
 // #include "pico-pqtls/cafiles/sphincs128s-mldsa44-mldsa44.h"
@@ -29,7 +30,7 @@
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "hqc128"
+#define KEX_NAME "hqc256"
 static int kex_groups[] = {
     // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
@@ -38,13 +39,21 @@ static int kex_groups[] = {
     // WOLFSSL_ECC_X448,
     // WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
-    // WOLFSSL_ML_KEM_1024
-    HQC_128,
+    // WOLFSSL_ML_KEM_1024,
+    // HQC_128,
     // HQC_192,
-    // HQC_256,
+    HQC_256,
     // OT_ML_KEM_512,
     // OT_ML_KEM_768,
     // OT_ML_KEM_1024,
+    // WOLFSSL_P256_ML_KEM_512,
+    // WOLFSSL_P256_ML_KEM_768,
+    // WOLFSSL_X25519_ML_KEM_512,
+    // WOLFSSL_X25519_ML_KEM_768,
+    // WOLFSSL_P384_ML_KEM_768,
+    // WOLFSSL_X448_ML_KEM_768,
+    // WOLFSSL_P384_ML_KEM_1024,
+    // WOLFSSL_P521_ML_KEM_1024,
 };
 static int kex_groups_nelems = sizeof(kex_groups) / sizeof(int);
 
