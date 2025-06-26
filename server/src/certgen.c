@@ -61,9 +61,9 @@ static enum Ctc_SigType int_sig_type = CTC_SPHINCS_SMALL_LEVEL5;
 /* ML-KEM-512 OID: 2.16.840.1.101.3.4.4.1
  * HQC-128 OID: 2.16.840.1.101.3.4.4.4
  * ML-DSA-44 OID: 2.16.840.1.101.3.4.3.17 */
-static enum CertType leaf_key_type = HQC_LEVEL5_TYPE;
+static enum CertType leaf_key_type = ML_KEM_LEVEL5_TYPE;
 static enum Ctc_SigType leaf_sig_type = CTC_SPHINCS_SMALL_LEVEL1;
-static enum CertType client_key_type = HQC_LEVEL5_TYPE;
+static enum CertType client_key_type = ML_KEM_LEVEL5_TYPE;
 static enum Ctc_SigType client_sig_type = CTC_SPHINCS_SMALL_LEVEL1;
 
 static void set_certname(CertName *cert_name, const char *country,
