@@ -296,7 +296,9 @@ int main(void) {
                    KEX_NAME, AUTH_SUITE, kex_cpu_dur, kex_crypto_cpu_dur,
                    kex_dur, auth_crypto_dur, auth_dur, hs_dur);
         } else {
+#ifdef DEBUG_WOLFSSL
             printf("ERROR: Telemetry incomplete\n");
+#endif
         }
 #endif
 
