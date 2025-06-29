@@ -131,6 +131,31 @@
 \usepackage{algpseudocode}
 \usepackage{caption}
 \usepackage{amsmath,amsfonts,amssymb,amsthm}
+\usepackage{listings,listing-rust}
+\usepackage{xcolor}
+
+% \definecolor{gh-gray}{gray}{0.95}
+% \definecolor{gh-blue}{rgb}{0.0,0.0,0.6}
+% \definecolor{gh-green}{rgb}{0.0,0.5,0.0}
+% \definecolor{gh-orange}{rgb}{0.6,0.3,0.0}
+% \definecolor{gh-comment}{rgb}{0.5,0.5,0.5}
+% \definecolor{gh-string}{rgb}{0.8,0.1,0.1}
+% \lstdefinestyle{boxed}{
+%   language=C,
+%   basicstyle=\ttfamily\footnotesize,
+%   backgroundcolor=\color{gh-gray},
+%   keywordstyle=\color{gh-blue}\bfseries,
+%   commentstyle=\color{gh-comment}\itshape,
+%   stringstyle=\color{gh-string},
+%   numberstyle=\tiny\color{gray},
+%   numbers=left,
+%   numbersep=6pt,
+%   frame=single,
+%   breaklines=true,
+%   tabsize=2,
+%   showstringspaces=false,
+%   captionpos=b
+% }
 
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{corollary}{Corollary}[theorem]
@@ -790,7 +815,7 @@ This section, we introduce two optimization on post-quantum TLS: Section \ref{se
 KEMTLS \cite{DBLP:conf/ccs/SchwabeSW20}, first proposed by Schwabe, Stebila, and Wiggers in 2020, is a variation on TLS 1.3 that uses key encapsulation mechanism (KEM) instead of digital signature for peer authentication.
 KEMTLS is motivatd by the observation that post-quantum signature candidates generally have larger public key and signature than post-quantum KEM candidates' public key and ciphertext, so by using KEMs instead of signatures, one can obtain significant savings in communication sizes.
 
-Section \ref{sec:kemtls-handshake} will introduce the KEMTLS handshake workflow. Section \ref{sec:kemtls-security} will review the security properties of KEMTLS and compare them with TLS 1.3. Finally, Section \ref{sec:kemtls-performance} will review the performance benchmarks from existing literature and discuss further optimizations in specific use cases.
+Section \ref{sec:kemtls-handshake} will introduce the KEMTLS handshake workflow. Section \ref{sec:kemtls-security} will review the security properties of KEMTLS and compare them with TLS 1.3.
 
 \subsection{KEMTLS Handshake}\label{sec:kemtls-handshake}
 Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral authentication. Like TLS 1.3's handshake (Figure \ref{fig:tls13-handshake}), KEMTLS handshake can be cleanly divided into a key exchange phases where the two parties establish an ephemeral shared secret, and an authentication phase where the server proves its identity to the client. However, KEMTLS' authentication flow diverges significantly from TLS 1.3's authentication flow, and there are subtle downstream differences. We will discuss them in detail in this section.
@@ -1017,9 +1042,6 @@ This means that, if $\kem_s$ is IND-CCA secure, then no party without the long-t
 In other words, the early application data is \textbf{implicitly authenticated}.
 While this provides less security than explicitly authenticated application data, to this day there is no known attack exploiting the implicit authentication.
 In addition, explicit authentication can be achieved at one more round trip, at which time KEMTLS becomes as secure as TLS 1.3 using comparable cryptographic primitives.
-
-\subsection{KEMTLS performance}\label{sec:kemtls-performance}
-{\color{red} present performance data from prior results: desktop, PDK, IoT {\bf but will other people's data contribute to this thesis? If not then maybe don't just copy-paste other people's data}}.
 
 \section{IND-1CCA KEM}\label{sec:ind-1cca-kem}
 {\bf\underline{IND}}istinguishability under (adaptive) {\bf\underline C}hosen {\bf\underline C}iphertext {\bf\underline A}ttacks (IND-CCA) is the desired level of security for a key encapsulation mechanism. 
@@ -1384,84 +1406,300 @@ In the same paper, the two authors also observed that in TLS 1.3, the handshake 
 This is similar to the $T_H$ construction where the shared secret is hashed from PKE plaintext and ciphertext, and indeed the authors proved that TLS 1.3 remains multi-stage secure even if the KEM is only CPA secure.
 The initial proof presented by the authors had a looseness factor of $O(q^6)$, which was later improved by Zhou et al.\cite{DBLP:conf/asiacrypt/ZhouJZ24} to $O(q)$ for randomized PKEs, and $O(1)$ for rigid PKEs.
 
-\chapter{Implementation}\label{sec:implementation-and-performance-measurements}
-To evaluate post-quantum TLS 1.3 and KEMTLS on constrained devices, we implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL, a TLS library written in the C programming language. We then implemented a minimal TLS client on the Raspberry Pi Pico 2 W, a microcontroller with two ARM Cortex-M33 cores \footnote{The Pico 2 W also has 2 RISC-V cores, though we did not use them in this project.} and 512kB of SRAM, and measures the time it takes for the Pico client to complete a TLS 1.3 or KEMTLS handshake with a server. This chapter describes some of the implementation details, the benchmarking methodology, and the performance measurements.
+\chapter{Implementing PQ-TLS and KEMTLS on embedded client}\label{sec:implementing-pqtls-and-kemtls}
+To evaluate post-quantum TLS 1.3 and KEMTLS on embedded clients, we implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL\footnote{\url{https://www.wolfssl.com/}} and using cryptographic primitives from PQClean\footnote{\url{https://github.com/PQClean/PQClean/}}\cite{DBLP:conf/eurosp/KannwischerSSW22}. Source code for this project is available on GithHub\footnote{\url{https://github.com/xuganyu96/embedded-pqtls}}. This chapter describes how we implemented post-quantum TLS 1.3 and KEMTLS.
 
 \section{WolfSSL}\label{sec:wolfssl}
-WolfSSL is a modern open-source TLS library written in C. In addition to a complete TLS stack, WolfSSL also includes its own cryptography library called WolfCrypt. Both WolfSSL and WolfCrypt are optimized for code size, speed, and memory footprint, and it portability and ease of configuration greatly simplifies managing multiple build targets using a single code base.
+WolfSSL is a modern open-source TLS library written in the C programming language. 
+In addition to a complete TLS stack, WolfSSL also includes a robust cryptogrpahy library called WolfCrypt.
+WolfSSL is optimized for code size, memory footprint, and portability, and WolfCrypt received many industry/government certification including FIPS140-3 from the US federal government and DO-178C DAL-A for avionics.
+There are other TLS/SSL libraries with support for embedded devices. 
+For example, \cite{DBLP:conf/ccs/Burstinghaus-Steinbach20} evaluated post-quantum TLS 1.2 using the open-source mbedTLS library \footnote{\url{https://github.com/Mbed-TLS/mbedtls}}. Unfortunately mbedTLS did not support TLS 1.3 until December 2021.
+We chose to work with WolfSSL as it is the more popular choice amongst prior works \cite{DBLP:conf/ispec/GeorgeLFZSS22,cryptoeprint:2021/1553,DBLP:journals/iacr/GeorgeLFZSS21,DBLP:conf/space/GonzalezW22}, which makes it easier to compare reults.
 
-\subsection{Integrating additional post-quantum algorithms}\label{sec:integrating-post-quantum-algorithms}
-As of June 2025, WolfCrypt contains an in-house implementation of ML-KEM and ML-DSA. Both implementation are skillfully optimized, achieving at least 2x speedup on the Pico compared to the reference implementation \footnote{The Keccak implementation in WolfCrypt is only roughly 10\% faster than PQClean's implementation, so the optimization must have come elsewhere}. Unfortunately, this makes the comparison across different schemes unfair. Instead, I chose to integrate with PQClean's clean implementations.
+\subsection{Integrating PQC into WolfCrypt}\label{sec:integrating-pqc-wolfcrypt}
+PQClean is a repository of thoroughly tested, high-confidence C implementations of KEM and signature schemes submitted to NIST's PQC standardization project.
+The ``clean'' implementations ensure that C programming best practices such as memory safety and integer overflows are enforced and that the correctness and basic security defense such as avoiding branching on secret data are continuously tested.
+The project also improved developer ergonomics by applying consistent namespacing on exported symbols and a uniform set of APIs across all curated submissions.
 
-While PQClean is not specifically optimized for embedded system builds, all of its clean implementations are trivially portable to ARM. One non-trivial challenge is adapting the \texttt{randombytes} API in PQClean to am embedded system build with no operating system. Fortunately, WolfCrypt's \texttt{WC\_RNG} API provides a common abstraction that works on both a desktop build (where random bits can be sourced from \texttt{/dev/urandom}) and Pico (where random bits are collected from various peripherals by the SDK). In the end, we expanded the \texttt{randombytes} API so it can be told to source random bits from user specified instance of \texttt{WC\_RNG}.
+PQClean comes with ``batteries-included'': it contains reusable symmetric primitives (AES, SHA-2, and SHA-3) shared across downstream implementations.
+The inclusion of shared symmetric primitives made integrating PQClean into WolfCrypt easier, but unfortunately it duplicates existing functionalities from WolfCrypt, which inflates the size of the firmware.
+In addition, PQClean's symmetric primitives exhibit different performance characteristics from WolfCrypt: for example, WolfCrypt contains an in-house implementation of ML-KEM and ML-DSA, which uses an in-house implementation of Keccak/SHA-3.
+WolfCrypt's own benchmark showed that on the embedded client, WolfCrypt's SHA-3 to have approx. 10\% more throughput than PQClean's \texttt{fips202.c}, while WolfCrypt's ML-KEM is roughly twice as fast as the ``clean'' ML-KEM.
+In the end, we chose to disable WolfCrypt's ML-KEM/ML-DSA and use the ``clean'' implementations (using PQClean's symmetric primitives) across the entire project to ensure fair comparison across different schemes. 
+We leave it for future works to incorporate machine-optimized implementations such as from \texttt{pqm4}\footnote{\url{https://github.com/mupq/pqm4}} and \texttt{ml-kem-native}\footnote{\url{https://github.com/pq-code-package/mlkem-native}}.
 
-% \begin{figure}[h]
-%     \centering
-%     \begin{minipage}{0.7\textwidth}
-%     \begin{verbatim}
-% #include <wolfssl/wolfcrypt/random.h>
-% static WC_RNG *g_rng;
+While we kept PQClean's symmetric primitives, we had to modify its \texttt{randombytes} API for generating random number.
+PQClean's existing \texttt{randombytes} implementation is stateless and asssumes the existence of a filesystem on Linux, BSD, or Win32.
+While this works on a desktop environment, it does not work with baremetal embedded clients.
+In addition, most PQC implementations do not expose internal randomness through some \texttt{seed} parameter in the public API, so a wholesale replacement of \texttt{randombytes} by another RNG implementation will require extensive refactor of the entire project.
+Fortunately, WolfCrypt provides an abstraction \texttt{WC\_RNG} with ready-to-go backends on both Linux and baremetal via Pico-SDK.
+We adapted the stateless \texttt{randombytes} API to use the stateful \texttt{WC\_RNG} by adding a static \texttt{WC\_RNG *} pointer in PQClean and implementing a function that sets this static pointer to a user-specified instance of \texttt{WC\_RNG} (Listing \ref{lst:wc-rng-randombytes}).
+This also means that all PQClean schemes will source from the same randomness used throughout the TLS handshake.
 
-% void set_wc_rng(WC_RNG *input) {
-%     g_rng = input;
-% }
 
-% int randombytes(uint8_t *output, size_t n) {
-%     /* ... */
-%     #ifdef HAVE_WC_RNG
-%     (void)buf;
-%     return wc_RNG_GenerateBlock(g_rng, output, n);
-%     #elif defined(__EMSCRIPTEN__)
-%     /* ... */
-% }
-%     \end{verbatim}        
-%     \end{minipage}
-%     \caption{Adapting \texttt{WC\_RNG} to PQClean's \texttt{randombytes} API. User is responsible for making sure that the RNG is properly initialized and freed.}
-%     \label{fig:adapting-wc-rng-to-randombytes}
-% \end{figure}
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htb,
+    label={lst:wc-rng-randombytes}, 
+    caption={
+    Use \texttt{WC\_RNG} as backend for PQClean's \texttt{randombytes} API
+}]
+#ifdef HAVE_WC_RNG
+#include <wolfssl/wolfcrypt/random.h>
+static WC_RNG *g_rng; 
+void set_wc_rng(WC_RNG *input) {
+    g_rng = input;
+}
+#endif
 
-Expanding the selection of KEMs for the initial key exchange (i.e. \texttt{ClientHello} and \texttt{ServerHello}) is straightforward, thanks to the fact that WolfSSL already supports ML-KEM for key exchange. The \texttt{NamedGroup} enum is trivially captured using a single 16-bit integer, and the logic for branching into the correct KEM allows for a simple \texttt{switch-case} block.
+int randombytes(uint8_t *output, size_t n) {
+    void *buf = (void *)output;
+    #ifdef HAVE_WC_RNG
+    (void)buf;
+    return wc_RNG_GenerateBlock(g_rng, output, n);
+    #endif
+}
+\end{lstlisting}
 
-% \begin{figure}[h]
-%     \centering
-%     \begin{verbatim}
-% /* Create a key share entry using pqc parameters group on the client side.
-%  * Generates a key pair.
-%  */
-% int TLSX_KeyShare_GenPqcKeyClient(WOLFSSL *ssl, KeyShareEntry* kse) {
-%     WOLFSSL_ENTER("TLSX_KeyShare_GenPqcKeyClient");
-%     int ret = 0;
+\texttt{liboqs}\footnote{\url{https://github.com/open-quantum-safe/liboqs}} is another repository of high-quality PQC implementations that contain a wider selection of schemes, some of which are automatically integrated from PQClean.
+We considered using \texttt{liboqs}, but found the lack of documentation on baremetal systems (\texttt{arm-none-eabi-gcc} toolchain) and the complexity of the project difficult to navigate.
+PQClean's simple structure allowed us to easily use a single codebase and build for both server (\texttt{x86\_64} on Linux) and embedded client with no RTOS.
 
-%     switch (kse->group) {
-%         case WOLFSSL_ML_KEM_512:
-%         case WOLFSSL_ML_KEM_768:
-%         case WOLFSSL_ML_KEM_1024:
-%             ret = TLSX_KeyShare_GenMlKemKeyClient(ssl, kse);
-%             break;
-%         case HQC_128:
-%         case HQC_192:
-%         case HQC_256:
-%             ret = TLSX_KeyShare_GenHqcKeyClient(ssl, kse);
-%             break;
-%         default:
-%             ret = NOT_COMPILED_IN;
-%             break;
-%     }
-%     return ret;
-% }
-%     \end{verbatim}
-%     \caption{\texttt{NamedGroup} is a single 16-bit integer that can be easily plugged into a switch-case block}
-%     \label{fig:named-group-switch-case-block}
-% \end{figure}
+\subsection{Implementing post-quantum key exchange}\label{sec:implementing-pq-kex}
+\paragraph{Adding new KEM} Incorporating post-quantum KEMs into the key exchange flow of TLS 1.3 is relatively straightforward despite the API difference between a KEM and a Diffie-Hellman key exchange.
+In fact, WolfSSL already supports ML-KEM for the key exchange phase, which provides a template with which we can integrate HQC and IND-1CCA ML-KEM.
+RFC 8446 specified that each key exchange group (called \texttt{NamedGroup}) is identified with a 16-bit value, which is captured in an enum type \texttt{NamedGroup} in WolfSSL.
+The variants of this enum type are assigned their group point to be directly used in constructing the \texttt{key\_share} extension the hello messages.
+The TLS state machine then uses a case-switch block to call the correct lower-level subroutines based on the variant.
+Figure \ref{lst:tlsx_keyshare_genpqckeyclient} provides an example.
 
-Expanding the selection of post-quantum signatures is trivial thanks to previous efforts to integrate \texttt{liboqs} into WolfSSL. We only need to replace all uses of \texttt{liboqs} with their equivalents in PQClean.
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=!htb,
+    caption={
+    Use \texttt{NamedGroup} enum to direct \texttt{keygen} calls to the underlying primitive
+    }, 
+    label={lst:tlsx_keyshare_genpqckeyclient}
+]
+static int TLSX_KeyShare_GenPqcKeyClient(WOLFSSL *ssl, 
+                                         KeyShareEntry* kse) {
+    int ret = 0;
+    switch (kse->group) {
+        case WOLFSSL_ML_KEM_512:
+        case WOLFSSL_ML_KEM_768:
+        case WOLFSSL_ML_KEM_1024:
+            ret = TLSX_KeyShare_GenMlKemKeyClient(ssl, kse);
+            break;
+        case HQC_128:
+        case HQC_192:
+        case HQC_256:
+            ret = TLSX_KeyShare_GenHqcKeyClient(ssl, kse);
+            break;
+        case OT_ML_KEM_512:
+        case OT_ML_KEM_768:
+        case OT_ML_KEM_1024:
+            ret = TLSX_KeyShare_GenOtMlKemKeyClient(ssl, kse);
+            break;
+        default:
+            ret = NOT_COMPILED_IN;
+            break;
+    }
+    return ret;
+}
+\end{lstlisting}
+
+The explicit case-switch statement stands in contrast with TLS libraries implemented using languages with more sophisticated abstraction such as generics. 
+For example, \texttt{rustls}, a TLS library written in Rust, takes advantage of Rust's traits/generics syntax, which enabled user to provide its own cryptographic backend by implementing a \texttt{CryptoProvider} struct (Listing \ref{lst:rustls-cryptoprovider-struct}). 
+While the lack of ergonomic generics in the C programming language made much of WolfSSL's codebase verbose and sometimes difficult to read long case-switch or if-else blocks, however, the explicitness also made it easy to reason about the state machine logic.
+We especially appreciate this flat abstraction when using a visual debugger such as \texttt{lldb}.
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=!htb,
+    language=Rust,
+    label={lst:rustls-cryptoprovider-struct}, caption={
+    User can provide custom cryptographic backend to \texttt{rustls} through the \texttt{CryptoProvider} struct
+}]
+pub struct CryptoProvider {
+    pub cipher_suites: Vec<SupportedCipherSuite>,
+    pub kx_groups: Vec<&'static dyn SupportedKxGroup>,
+    pub signature_verification_algorithms: WebPkiSupportedAlgorithms,
+    pub secure_random: &'static dyn SecureRandom,
+    pub key_provider: &'static dyn KeyProvider,
+}
+\end{lstlisting}
+
+\paragraph{Memory management} Programming in C brings substantial challenge in memory management, especially on the embedded client, where memory leaks can quickly exhaust the meager amount of available RAM.
+Following best practices, we allocate memory for cryptographic operations on the stack wherever possible, and on the heap only when necessary, such as when data need to persist across multiple TLS messages.
+With the ephemeral key exchange, KEM public key and private key must be dynamically allocated because they need to live after the local frame exits.
+On the other hand, ciphertexts and shared secrets are short-lived and are thus allocated on the stack.
+Listing \ref{lst:TLSX_KeyShare_GenPQCleanMlKemKeyClient} provides an example of managing memories for KEM keys.
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htbp,
+    label={lst:TLSX_KeyShare_GenPQCleanMlKemKeyClient}, 
+    caption={
+    Managing memory for KEM key
+}]
+static int TLSX_KeyShare_GenPQCleanMlKemKeyClient(WOLFSSL *ssl,
+                                                  KeyShareEntry *kse) {
+    int ret = 0;
+    PQCleanMlKemKey kem;
+    byte *privKey = NULL;
+    word32 privKeyLen = 0;
+    /* ... fill in privKeyLen, kse->pubKeyLen ... */
+    if (ret == 0) {
+        privKey = XMALLOC(privKeyLen, ssl->heap, 
+                          DYNAMIC_TYPE_PRIVATE_KEY);
+        if (privKey == NULL) 
+            ret = MEMORY_ERROR;
+    }
+    if (ret == 0) {
+        kse->pubKey = XMALLOC(kse->pubKeyLen, ssl->heap, 
+                              DYNAMIC_TYPE_PUBLIC_KEY);
+        if (kse->pubKey == NULL)
+            ret = MEMORY_ERROR;
+    }
+    /* ... generate key pair ... */
+    if (ret != 0) {
+        if (privKey)
+            XFREE(privKey, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
+        if (kse->pubKey) {
+            XFREE(kse->pubKey, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
+            kse->pubKey = NULL;
+        }
+    } else {
+        kse->privKey = privKey;
+        kse->privKeyLen = privKeyLen;
+    }
+    return ret;
+}
+\end{lstlisting}
+
+\paragraph{Miscellaneous} One interesting design is a \texttt{static const word16 preferredGroup[]}.
+User can specify the key exchange groups using the \texttt{wolfSSL\_CTX\_set\_groups} API, but this user-specified list of groups is copmared with the internal static \texttt{preferredGroups} when constructing \texttt{ClientHello}.
+If the two lists do not match, then WolfSSL will send a \texttt{ClientHello} with an empty \texttt{key\_share} extension; per RFC 8446, this indicates that client is requesting group selection from the server, and will increase handshake latency by one round trip.
+We were unaware of this feature and had spent a lot of effort trying to find out why the client is sending \texttt{ClientHello} twice even though client and server both support the newly added KEM.
+
+Last but not least, WolfSSL included ECC+KEM hybrids for key exchange, but the integration with WolfCrypt's ML-KEM is too complex for us to modify in time.
+We included benchmark results from these hybrid key exchange groups in Section \ref{sec:handshake-performance} but they are not directly comparable with other ML-KEM-only key exchange.
+
+\subsection{Generating certificate chain and private keys}\label{sec:generate-certificates}
+Because we need to distribute related components of a public-key certificate chain to the server and the client separately, we need to generate the certificate and the private key files.
+X.509 is the standard format for encoding a public-key certificate.
+It is based on the Abstract Sytnax Notation One (ASN.1) and is usually serialized according to Distinguished Encoding Rule (DER).
+DER is a binary format and not human-readable.
+We chose to further encode the DER output into PEM, which is a human-readable format that exclusively uses ASCII characters.
+Although the PEM-format requires a larger size to store the same certificate/private key because it is a Base64 encoding of the DER data enclosed in header and footer, it is also much easier to work with, as we could trivially load a PEM-formatted certificate into the embedded client's firmware using C macros (Listing \ref{lst:load-cert-as-macro}).
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htbp,
+    label={lst:load-cert-as-macro}, 
+    caption={
+        PEM-formatted certificate can be loaded without a file system
+    }
+]
+#define CA_CERT                    \
+    "-----BEGIN CERTIFICATE-----"  \
+    "..."                          \
+    "-----END CERTIFICATE-----"
+/* ... setting up WolfSSL ... */
+uint8_t ca_certs[] = CA_CERT;
+size_t ca_certs_size = sizeof(ca_certs);
+wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
+ssl_err = wolfSSL_CTX_load_verify_buffer(ctx, ca_certs, ca_certs_size,
+                                         SSL_FILETYPE_PEM);
+if (ssl_err != SSL_SUCCESS) {
+    /* fail */
+}
+\end{lstlisting}
+
+WolfSSL includes an ASN.1 module that can generate, sign, encode, and parse public-key certificates and private keys (Listing \ref{lst:wolfssl-asn1-example}).
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htbp,
+    label={lst:wolfssl-asn1-example}, 
+    caption={
+        Generate, sign, then PEM-encode certificate with WolfSSL
+    }
+]
+int ret;
+WC_RNG rng;
+MlDsaKey key;
+Cert cert;
+uint8_t der[BUF_SIZE], pem[BUF_SIZE];
+int derSz, pemSz;
+/* ... initialize signature keypairs and RNG
+wc_InitCert(&cert);
+cert.sigType = CTC_ML_DSA_LEVEL1;
+/* ... fill in subject, issuer, valid dates ... */
+derSz = wc_MakeCert_ex(&cert, der, sizeof(der), ML_DSA_LEVEL2_TYPE, 
+                       &key, &rng);
+derSz = wc_SignCert_ex(cert.bodySz, cert.sigType, der, sizeof(der), 
+                       ML_DSA_LEVEL2_TYPE, &key, &rng);
+pemSz = wc_DerToPem(der, derSz, pem, sizeof(pem), CERT_TYPE);
+\end{lstlisting}
+
+Thanks to existing scaffolding for supporting ML-DSA, expanding WolfSSL's ASN.1 engine to support generating certificates containing ML-KEM/HQC/Falcon/SPHINCS+ public key, and to support signing certificate body with Falcon/SPHINCS+ private keys is straightforward.
+We particularly appreciate the clever abstraction with which WolfSSL's \texttt{MakeCert} and \texttt{SignCert} API can support more than a dozen signature scheme/variants while maintaining a compact function signature (Listing \ref{lst:enum-as-type-hint}).
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htbp,
+    label={lst:enum-as-type-hint}, 
+    caption={
+        Using enum as hint to cast void pointers to the correct type allows \texttt{MakeCert}/\texttt{SignCert} to have
+        compact signature despite lack of generics in C
+    }
+]
+int wc_MakeCert_ex(Cert* cert, byte* derBuffer, word32 derSz, 
+                   int keyType, void* key, WC_RNG* rng) {
+    /* ... other key types ...*/
+    falcon_key*        falconKey = NULL;
+    dilithium_key*     dilithiumKey = NULL;
+    sphincs_key*       sphincsKey = NULL;
+    if (keyType == FALCON_LEVEL1_TYPE)
+        falconKey = (falcon_key*)key;
+    else if (keyType == FALCON_LEVEL5_TYPE)
+        falconKey = (falcon_key*)key;
+    else if (keyType == ML_DSA_LEVEL2_TYPE)
+        dilithiumKey = (dilithium_key*)key;
+    else if (keyType == ML_DSA_LEVEL3_TYPE)
+        dilithiumKey = (dilithium_key*)key;
+    else if (keyType == ML_DSA_LEVEL5_TYPE)
+        dilithiumKey = (dilithium_key*)key;
+    else if (keyType == SPHINCS_FAST_LEVEL1_TYPE)
+        sphincsKey = (sphincs_key*)key;
+    else if (keyType == SPHINCS_FAST_LEVEL3_TYPE)
+        sphincsKey = (sphincs_key*)key;
+    else if (keyType == SPHINCS_FAST_LEVEL5_TYPE)
+        sphincsKey = (sphincs_key*)key;
+    else if (keyType == SPHINCS_SMALL_LEVEL1_TYPE)
+        sphincsKey = (sphincs_key*)key;
+    else if (keyType == SPHINCS_SMALL_LEVEL3_TYPE)
+        sphincsKey = (sphincs_key*)key;
+    else if (keyType == SPHINCS_SMALL_LEVEL5_TYPE)
+        sphincsKey = (sphincs_key*)key;
+    /* ... build cert with key and encode DER to derBuffer ... */
+}
+\end{lstlisting}
+
+Last but not least, an Object Identifier (OID) is needed to identify the public key and the signature on a public-key certificate (as well as the type of key in a private key file).
+The OIDs for ML-KEM, ML-DSA, and SPHINCS+ (SLH-DSA) were standardized by NIST \footnote{\scriptsize\url{https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration}}, so we extended them for HQC and Falcon.
 
 \subsection{Implementing KEMTLS}\label{sec:implementing-kemtls}
-\subsubsection{Generating certificate chain and private keys}
-WolfCrypt's \texttt{asn.h} API provides a nearly complete collection of tools needed to generate certificate chains, encode certificates and private keys according to DER, then further encode them to PEM format. At the time of writing this thesis, WolfCrypt does not support signing a certificate signing request (CSR), but for benchmarking purposes I control the entire chain, and WolfCrypt does support directly signing the body of a certificate.
-
-Modifying WolfCrypt's \texttt{asn.h} module to support KEM public key in a certificate is relatively straightforward. The only non-trivial obstacle comes from how WolfSSL handles OIDs. Object Identifier (OID) is a variable-length sequence of integers used to identify individual cryptographic primitives. For example, the OID for ML-KEM-512 is \texttt{2.16.840.1.101.3.4.4.1}. OID is included in an certificate to identify the public key and the signature; it is also included in the DER encoding of private keys. Having variable length makes OID tedious to work with when programming in C: unlike \texttt{NamedGroup}, which has fixed length that can be captured in a 16-bit integer, OID cannot be easily abstracted using a fixed-sized enum type. WolfSSL works around this limitation by using an ``OID sum'' algorithm, which computes an ``hash'' of an OID that fit into a 32-bit integer. Compressing variable-length integer sequence into a 32-bit integer carries with it the risk of collision, and in fact the first version of the OID summing algorithm indeed ran into a collision between SPHINCS-192-fast and SPHINCS-128-fast. A newer OID summing algortihm provided stronger collision resistance and resolved this issue. All OID sums are stored in a header file \texttt{oid\_sum.h}, which is generated by a Perl script.
-
+{\color{red} Re-write!}
 \subsubsection{Implementing unilaterally authenticated KEMTLS handshake}
 KEMTLS handshake workflow is identical to TLS 1.3's handshake flow from the beginning until client starts processing server's \texttt{Certificate} message.
 Even after KEMTLS and TLS 1.3's handshake flow diverges, they still share the format of the \texttt{Finished} message (which contains exactly one HMAC tag).
@@ -1510,48 +1748,62 @@ We appreciate the many thoughtful design choices made in both WolfSSL and WolfCr
 
 Another difficulty with WolfSSL comes from the need for manual memory management. This is especially the case when building for the Pico, which has only 512kB SRAM and can be easily overwhelmed by memory leaks since post-quantum keys, ciphertexts, and signatures all consume 1-10 kilobytes of memories each. Fortunately, there are only a handful of places where WolfSSL requires dynamic memory allocations, and they are either freed within the function scope or freed at the end of the handshake as part of \texttt{wolfSSL\_shutdown} or \texttt{wolfSSL\_free}. Other instances of dynamic memory allocation were flawlessly managed in WolfSSL's existing source code, allowing the Pico to continuously perform thousands of handshakes without exhausting its SRAM or needing assistance from an RTOS.
 
-\section{Hardware setup}
-We chose to test TLS 1.3 and KEMTLS performance on a Raspberry Pi Pico 2 W and a Linux desktop. 
-The Raspberry Pi Pico 2 W is a microcontroller developed by the Raspberry Pi Foundation and released in late 2024. 
-At the heart of the Pico 2 W is the RP2350 chip, which contains two ARM Cortex-M33 cores and two Hazard3 RISC-V cores, though only one architecture can be enabled at boot time.
+\chapter{Performance of post-quantum TLS 1.3 and KEMTLS}
+This section will present and analyze performance benchmarking data. 
+Section \ref{sec:experiment-setup} describes the hardware setup and the software toolchain. 
+Section \ref{sec:communication-costs} analyzes the communication costs, including the sizes of the various certificate chains. 
+Section \ref{sec:crypto-primitive-performance} summarizes the performance of relevant cryptographic primitives on the test hardware. 
+Finally Section \ref{sec:handshake-performance} details the performance of post-quantum TLS 1.3 and KEMTLS.
+
+\section{Experiment setup}\label{sec:experiment-setup}
+
+\subsection{Client}\label{sec:experiment-client}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.45\linewidth]{benchmarks/imgs/pico-2-w.jpg}\hfill
+    \includegraphics[width=0.45\linewidth]{benchmarks/imgs/pico-w-network.png}
+    \caption{Client hardware: Pi Pico 2 W connected via 2.4GHz WiFi}
+    \label{fig:pi-pico-2-w}
+\end{figure}
+\paragraph{Hardware} The Raspberry Pi Pico 2 W (Figure \ref{fig:pi-pico-2-w}) is a microcontroller developed by the Raspberry Pi Foundation and was released in late 2024.
+At the heart of the Pico 2 W is the RP2350 chip, which contains two ARM Cortex-M33 cores and two Hazard3 RISC-V cores, although only one architecture can be enabled at a time.
 The chip is clocked at 150MHz.
 The Pico 2 W also has 520KB of SRAM and 4MB of flash storage.
 For connectivity, the Pico 2 W has a CYW43439 module that supports 2.4 GHz Wifi and Bluetooth 5.4.
 
-For developing on the Pico 2 W, we used the GNU ARM toolchain (\texttt{arm-none-eabi-gcc} version 8.5.0) and the Pico-SDK, which comes with a standard library as well as integration with third-party open source projects, most notably \texttt{lwip} (lightweight IP).
+\paragraph{Software Toolchain} For developing on the Pico 2 W, we used the GNU ARM toolchain (\texttt{arm-none-eabi-gcc} version 8.5.0) and the Pico-SDK, which comes with a standard library as well as integration with third-party open source projects, most notably \texttt{lwip} (lightweight IP).
 \texttt{lwip} is a TCP/IP library designed for embedded system, and the Pico-SDK provided tight integration between \texttt{lwip} and the \texttt{cyw43} driver, which allowed us to implement a simple TCP stream on top of the raw TCP API.
 We also used \texttt{lwip} to implement DNS and time synchronization over NTP, the latter being necessary for WolfSSL to validate the expiration dates of peer's certificates.
-
 Because of the lack of a file system, certificates must be baked into the firmware at compilation. 
 While it is possible to define certificates as raw bytes in C preprocessing macro, we found it much easier to encode the certificates in PEM format, which consists entirely of ASCII characters.
-On the other hand, while private keys can also be encoded in DER or PEM format and included into the firmware at compilation, without further protection they can be easily extracted from the devices via a firmware dump.
-The Pico 2 W features a one-time programmable (OTP) ROM that, once enabled and written to, will permanently be protected by secure boot.
-In December 2024, Raspberry Pi Ltd. launched a hacking challenge\footnote{https://github.com/raspberrypi/rp2350\_hacking\_challenge} in which the participants try to extract a secret from a secure-boot-enaled Pico 2 W.
-While some participants have successfully extracted the secret, all publicly known winners used intrusive methods that required extensive physical access and non-trivial external hardware.
-Another issue with using the OTP for private key is size, since on RP2350 the OTP has a limited capacity of 8KB, although it is possible to store a seed that can then be expanded into the private key at bootup.
-Embedded devices that need to store private keys should consider using a peripheral device, such as a trusted platform module (TPM) or secure hardware module (HSM).
 
-The Linux desktop has an 8-core AMD Ryzen 7 1700X with 12GB of RAM, running Ubuntu 24.04 LTS, and compiling with \texttt{GCC 13.3.0}.
+\subsection{Server and network}\label{sec:experiment-server-and-network}
+\paragraph{Server} The TLS server runs on a desktop computer with an 8-core AMD Ryzen 7 1700X clocked at 3.4GHz and 12GB of DDR4 RAM.
+The desktop runs Ubuntu 24.04 LTS.
+The server binary is compiled using \texttt{GCC 13.3.0} and \texttt{CMAKE\_BUILD\_TYPE=RelWithDebInfo}.
+Turbo boosting was disabled from the BIOS.
 
-Our network setup takes advantage of Pico 2 W's wireless capabilities. 
-We used a netowrk router that is connected to University of Waterloo's internal network via Ethernet, then connect the Pico 2 W to the router via Wifi.
-The Linux desktop was connected to the internal network via Ethernet as well.
-\textbf{\color{red} I need more metrics on the network :(}
+\paragraph{Network} Our network setup takes advantage of Pico 2W's wireless capabilities.
+The Pico 2W is connected to a TP-LINK wireless access point via 2.4GHz WiFi (Figure \ref{fig:pi-pico-2-w}).
+The access point is then connected via Ethernet to the internal network of University of Waterloo.
+The server is directly connected to the same internal network via Ethernet, as well.
+According to \texttt{traceroute}, there is one more hop (an internal nameserver) between the access point and the server.
+The average network latency is less than 10 milliseconds.
+We choose to connect to an internal network with Internet access instead of a direct connection because we want to simulate a realistic peer verification policy that checks the expiration dates of peer's certificates.
+To achieve this, we adapted the example Network Time Protocol (NTP) client from Pico-SDK's repository \footnote{\url{https://github.com/raspberrypi/pico-examples/blob/master/pico_w/wifi/ntp_client}} and synchronized time with \texttt{pool.ntp.org}.
+We also used \texttt{lwip}'s DNS API to resolve the server IP address from its hostname.
+Time synchronization and DNS lookup are both performed once at Pico 2 W's boot time and do not count toward TLS handshake measurements.
 
-\chapter{Performance of post-quantum TLS 1.3 and KEMTLS}
-In this section we will compare the performance of post-quantum TLS 1.3, KEMTLS, and classical TLS 1.3.
-
-\section{Communication cost}
+\section{Communication cost}\label{sec:communication-costs}
 TLS 1.3 recommended ephemeral elliptic curve Diffie-Hellman key agreement (ECDHE) to be the default scheme for key exchange in \texttt{ClientHello} and \texttt{ServerHello}.
 Using ECDHE, the client and the server each sends the other an element from the agreed group of points on an elliptic curve, so round-trip communication cost is the sum of two group points.
 When using a post-quantum KEM, the client sends to the server an encapsulation key, and the server sends back a ciphertext obtained under said encapsulation key.
 The round-trip communication cost of a KEM key agreemnt is thus the sum of a public key and a ciphertext.
-Table \ref{tab:kex-traffic-sizes} lists the costs of each key agreement scheme.
+Table \ref{tab:kex-traffic-sizes} compares the communication costs between ECDHE and various post-quantum KEMs. Note that NIST curves (P-256, P-384, P-521) can be represented using compressed or uncompressed forms, but per RFC 8446 \cite{DBLP:journals/rfc/rfc8446}, ECDHE in TLS 1.3 always uses the uncompressed form, hence only uncompressed forms are listed.
 
 \begin{table}[htbp]
 \centering
-\caption{Key agreement communication costs (bytes).}
-\vspace{1em}
+\caption{Key exchange communication costs (bytes)}
 \label{tab:kex-traffic-sizes}
 \footnotesize\begin{tabular}{llrrr}
 \toprule
@@ -1559,12 +1811,12 @@ Table \ref{tab:kex-traffic-sizes} lists the costs of each key agreement scheme.
     & \textbf{Scheme} 
     & \textbf{Public key} 
     & \textbf{Ciphertext}
-    & \textbf{Total} \\
+    & \textbf{Round trip} \\
 \midrule
 \textbf{ECDHE}
-& SECP256R1                 & 33/65    &        & 66/130  \\
-& SECP384R1                 & 49/97    &        & 98/194  \\
-& SECP521R1                 & 67/133   &        & 134/266 \\
+& P-256                 & 65    &        & 130  \\
+& P-384                 & 97    &        & 194  \\
+& P-521                 & 133   &        & 266 \\
 & X25519                    & 32    &        & 64  \\
 & X448                      & 56    &        & 112 \\
 \midrule
@@ -1579,13 +1831,13 @@ Table \ref{tab:kex-traffic-sizes} lists the costs of each key agreement scheme.
 \end{tabular}
 \end{table}
 
-Post-quantum digital signature schemes also have larger sizes than elliptic-curve signatures and RSA-signatures. 
-Table \ref{tab:sig-sizes} compares the sizes of public key and signature across the chosen set of signature schemes.
+Post-quantum digital signature schemes also have larger sizes than elliptic-curve signatures and RSA-signatures.
+The round trip cost of digital signature is the sum of public key size and signature size.
+Table \ref{tab:sig-sizes} compares the sizes of public key and signature across RSA, elliptic-curve, and a selection of post-quantum signature schemes.
 
 \begin{table}[htbp]
 \centering
 \caption{Digital signatures communication costs (bytes)}
-\vspace{1em}
 \label{tab:sig-sizes}
 \footnotesize\begin{tabular}{llrrr}
 \toprule
@@ -1598,9 +1850,9 @@ Table \ref{tab:sig-sizes} compares the sizes of public key and signature across 
 \textbf{Classical}
 % TODO: need to verify these numbers!
 & RSA-2048 (PKCS\#1 v1.5)  & 256   & 256   & 512   \\
-& ECDSA SECP256R1          & 64    & 64    & 128   \\
-& ECDSA SECP384R1          & 96    & 96    & 192   \\
-& ECDSA SECP521R1          & 132   & 132   & 264   \\
+& ECDSA P-256          & 64    & 64    & 128   \\
+& ECDSA P-384          & 96    & 96    & 192   \\
+& ECDSA P-521          & 132   & 132   & 264   \\
 & Ed25519                  & 32    & 64    & 96    \\
 & Ed448                    & 57    & 114   & 171   \\
 \midrule
@@ -1623,82 +1875,72 @@ Table \ref{tab:sig-sizes} compares the sizes of public key and signature across 
 \end{tabular}
 \end{table}
 
-In our handshake setup, server's public key sits at the top of a chain of three certificates (root, intermediate, and leaf).
-However, the root certificate is compiled into the client's firmware, so it is not transmitted in the handshake.
-Table \ref{tab:cert-chain-sizes} compares the sizes of certificate chain.
-
-\begin{table}[p]
-\centering
-\caption{
-    Server certificate chain size (bytes).
-    % TODO: PEM format sizes are not exactly right; Certificate message contains certificates encoded in DER,
-    %       while PEM is the base64 encoding of DER plus header and footer
-    Each certificate is encoded in PEM format.
-    For rows with one name, there are still three certificates, but they use the same scheme for all three keys.
-}
-\vspace{1em}
-\label{tab:cert-chain-sizes}
-\footnotesize\begin{tabular}{llllr}
-\toprule
-    \textbf{Category} 
-    & \textbf{Root} 
-    & \textbf{Intermediate} 
-    & \textbf{Leaf} 
-    & \textbf{Size} 
-    \\
-\midrule
-% TODO: include more realistic chain, such as mldsa65-mldsa65-mldsa44
-\textbf{Classical}
-    & RSA2048           &&                 & 2506 \\
-    & ECDSA SECP256R1   &&         & 1429 \\
-    & ECDSA SECP384R1   &&         & 1429 \\
-    & ECDSA SECP521R1   &&         & 1429 \\
-    & Ed25519           &&                 & 1893 \\
-    & Ed448             &&                 & 1893 \\
-\midrule
-\textbf{PQ-TLS}
-    & ML-DSA-44 &&               & 16763 \\
-    & ML-DSA-65 &&               & ??? \\
-    & ML-DSA-87 &&               & ??? \\
-    & SPHINCS-128f  & ML-DSA-44 & ML-DSA-44 & 54734 \\
-    & SPHINCS-128s  & ML-DSA-44 & ML-DSA-44 & ?? \\
-    & Falcon-512  & ML-DSA-44 & ML-DSA-44 & ?? \\
-    & SPHINCS-192f  & ML-DSA-65 & ML-DSA-65 & ?? \\
-    & SPHINCS-192s  & ML-DSA-65 & ML-DSA-65 & ?? \\
-    & SPHINCS-256f  & ML-DSA-87 & ML-DSA-87 & ?? \\
-    & SPHINCS-256s  & ML-DSA-87 & ML-DSA-87 & ?? \\
-    & Falcon-1024  & ML-DSA-87 & ML-DSA-87 & ?? \\
-\midrule
-\textbf{PQ-KEMTLS}
-    & ML-DSA-44 & ML-DSA-44 & ML-KEM-512 & ??? \\
-    & ML-DSA-65 & ML-DSA-65 & ML-KEM-768 & ??? \\
-    & ML-DSA-87 & ML-DSA-87 & ML-KEM-1024 & ??? \\
-    & ML-DSA-44 & ML-DSA-44 & HQC-128 & ??? \\
-    & ML-DSA-65 & ML-DSA-65 & HQC-192 & ??? \\
-    & ML-DSA-87 & ML-DSA-87 & HQC-256 & ??? \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{Cryptographic operations performance}
-We benchmarked the speed of relevant cryptographic operations on the Pico 2 W.
-Table \ref{tab:kex-performance-rp2350} and \ref{tab:digital-signature-performance-rp2350} summarizes the results.
+In practice, the \texttt{Certificate} message often contains a certificate chain.
+In our experiment setup, we generate a server certificate chain with three certificates: a leaf certificate for which the server holds the private key, an intermediate certificate authority who signs server's publickey, and a root certificate authority who signs the intermediate certificate authority's public key.
+However, root CA's certificate is directly compiled into the client firmware. so server's \texttt{Certificate} only contains the leaf certificate and the intermediate CA certificate.
+Table \ref{tab:cert-chain-sizes} compares the size of root CA and server's certificate chain size across a variety of configurations.
+Note that these sizes are measured with PEM encoding, whereas the \texttt{Certificate} message contains certificates encoded using DER.
+Since PEM is the base-64 encoding of the raw bytes of DER plus a human-readable header and footer, the sizes presented in Table \ref{tab:cert-chain-sizes} are proportionally larger than what is actually transmitted in a handshake.
 
 \begin{table}[htbp]
 \centering
 \caption{
-    Key exchange performance on RP2350
+    Server certificate chain size (bytes).
 }
-\vspace{1em}
-\label{tab:kex-performance-rp2350}
-
-\footnotesize\begin{tabular}{lrrrrrr}
+\label{tab:cert-chain-sizes}
+\footnotesize\begin{tabular}{lrllr}
 \toprule
-
+    \textbf{Root} 
+    & \textbf{Root cert size} 
+    & \textbf{Intermediate} 
+    & \textbf{Leaf} 
+    & \textbf{Server chain size} 
+    \\
+\midrule
+\multicolumn{5}{c}{Classical} \\
+\midrule
+    RSA-2048 & 1265 & RSA-2048 & RSA-2408 & 2506 \\
+    ECDSA P-256 & ??? & ECDSA P-256 & ECDSA P-256 & ??? \\
+    Ed25519 & ??? & Ed25519 & Ed25519 & ??? \\
+    ECDSA P-384 & ??? & ECDSA P-384 & ECDSA P-384 & ??? \\
+    Ed448 & ??? & Ed448 & Ed448 & ??? \\
+    ECDSA P-521 & ??? & ECDSA P-521 & ECDSA P-521 & ??? \\
+\midrule
+\multicolumn{5}{c}{PQ-TLS} \\
+\midrule
+    ML-DSA-44 & ??? & ML-DSA-44 & ML-DSA-44 & ??? \\
+    ML-DSA-65 & ??? & ML-DSA-65 & ML-DSA-65 & ??? \\
+    ML-DSA-87 & ??? & ML-DSA-87 & ML-DSA-87 & ??? \\
+    Falcon-512 & ??? & Falcon-512 & Falcon-512 & ??? \\
+    Falcon-1024 & ??? & Falcon-1024 & Falcon-1024 & ??? \\
+    SPHINCS-128f & ??? & SPHINCS-128f & SPHINCS-128f & ??? \\
+    SPHINCS-192f & ??? & SPHINCS-192f & SPHINCS-192f & ??? \\
+    SPHINCS-256f & ??? & SPHINCS-256f & SPHINCS-256f & ??? \\
+    SPHINCS128s  & ??? & SPHINCS128s  & SPHINCS128s  & ??? \\
+    SPHINCS192s   & ??? & SPHINCS192s   & SPHINCS192s   & ??? \\
+    SPHINCS256s   & ??? & SPHINCS256s   & SPHINCS256s   & ??? \\
+    Falcon-512 & ??? & Falcon-512 & ML-DSA-44 & ??? \\
+    Falcon-1024 & ??? & Falcon-1024 & ML-DSA-65 & ??? \\
+    SPHINCS128s  & ??? & SPHINCS128s  & ML-DSA-44 & ??? \\
+\midrule
+\multicolumn{5}{c}{KEMTLS} \\
+\midrule
+    ML-DSA-44 & ??? & ML-DSA-44 & ML-KEM-512 & ??? \\
+    Falcon-512 & ??? & Falcon-512 & ML-KEM-512 & ??? \\
+    SPHINCS128s  & ??? & SPHINCS128s  & HQC-128 & ??? \\
 \bottomrule
-\end{tabular}\vspace{1em}
+\end{tabular}
+\end{table}
 
-\begin{tabular}{lrrrrrrrrr}
+\section{Cryptographic operations performance}\label{sec:crypto-primitive-performance}
+We benchmarked the speed of relevant cryptographic operations on the Pico 2 W.
+We measure performance of cryptographic routines with the number of CPU cycles, which is read from the \texttt{CYCCNT} register, located at \texttt{PPB\_BASE + M33\_DWT\_CYCCNT\_OFFSET} according to Pico 2 W's data sheet.
+Table \ref{tab:kex-performance-rp2350} and \ref{tab:digital-signature-performance-rp2350} summarizes the results.
+
+\begin{table}[H]
+\centering
+\caption{Key exchange performance on RP2350 (cycles/tick)}\label{tab:kex-performance-rp2350}
+\footnotesize\begin{tabular}{lrrrrrrrrr}
 \toprule
 \multicolumn{10}{c}{\textbf{ECDHE}} \\
 \midrule
@@ -1709,9 +1951,9 @@ Table \ref{tab:kex-performance-rp2350} and \ref{tab:digital-signature-performanc
 \midrule
 X25519 \\
 X448 \\
-SECP256R1 \\
-SECP384R1 \\
-SECP521R1 \\
+P-256 \\
+P-384 \\
+P-521 \\
 \midrule
 \multicolumn{10}{c}{\textbf{Post-quantum KEM}} \\
 \midrule
@@ -1738,20 +1980,21 @@ HQC-256 \\
 \end{tabular}
 \end{table}
 
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
-    \caption{Digital signature performance on RP2350}\vspace{1em}
+    \caption{Digital signature performance on RP2350 (cycles/tick)}\vspace{1em}
     \label{tab:digital-signature-performance-rp2350}
-    \footnotesize\begin{tabular}{lrrrrrr}
+    \footnotesize\begin{tabular}{lrrrrrrrrr}
         \toprule
-        \multicolumn{7}{c}{\textbf{Digital signature}} \\
-        \midrule
-        & \multicolumn{3}{c}{\texttt{Sign}} & \multicolumn{3}{c}{\texttt{Verify}} \\
+        & \multicolumn{3}{c}{\texttt{KeyGen}} 
+        & \multicolumn{3}{c}{\texttt{Sign}}
+        & \multicolumn{3}{c}{\texttt{Verify}} \\
         \cmidrule(lr){2-4}
         \cmidrule(lr){5-7}
-        & Medium & P90 & P99 & Medium & P90 & P99 \\
+        \cmidrule(lr){8-10}
+        & Medium & P90 & P99 & Medium & P90 & P99 & Medium & P90 & P99\\
         \midrule
-        \multicolumn{7}{c}{Classical signatures} \\
+        \multicolumn{10}{c}{\bf Classical} \\
         \midrule
         RSA-2048 \\
         Ed25519 \\
@@ -1759,7 +2002,7 @@ HQC-256 \\
         ECDSA (P-384) \\
         ECDSA (P-521) \\
         \midrule
-        \multicolumn{7}{c}{Post-quantum signatures} \\
+        \multicolumn{10}{c}{\bf Post-quantum} \\
         \midrule
         ML-DSA-44 \\
         ML-DSA-65 \\
@@ -1776,153 +2019,517 @@ HQC-256 \\
     \end{tabular}
 \end{table}
 
-\section{Handshake latency}
-TLS 1.3 and KEMLS handshake can be divided into two distinct phases.
-The first phase is key agreement, which starts at the beginning at the handshake and ends when client finishes processing \texttt{ServerHello}.
-The second phase is authentication, which starts at the end of the key agreement phase and ends when the handshake is completed.
-We collected the timestamps at key moments from the client side: \begin{enumerate}
-    \item \texttt{ch\_start}: when the handshake starts
-    \item \texttt{ch\_sent}: when \texttt{ClientHello} is sent
-    \item \texttt{sh\_start}: when \texttt{ServerHello} is received
-    \item \texttt{sh\_done}: when \texttt{ServerHello} is processed
-    \item \texttt{auth\_start}: when \texttt{Certificate} is received
-    \item \texttt{auth\_done}: when the handshake finishes
-\end{enumerate}
+\section{Handshake latency}\label{sec:handshake-performance}
+To analyze and compare handshake latency data, we modified the WolfSSL library to collect timestamps at important steps of the handshake on the client side.
+The timestamps are collected using the CPU clock, which is not a real-time clock but can precisely measure time interval (within 1-2 microseconds per 150,000 microseconds).
+The timestamps include: \begin{itemize}
+    \item \texttt{ch\_start}: the beginning of the handshake
+    \item \texttt{keygen\_start}: when client starts generating the ephemeral keypair
+    \item \texttt{keygen\_done}: when client finishes generating the ephemeral keypair
+    \item \texttt{ch\_sent}: when client finishes sending \texttt{ClientHello}
+    \item \texttt{sh\_start}: when client start processing \texttt{ServerHello}
+    \item \texttt{decap\_start}: when client start processing server's key share in \texttt{ServerHello}. With ECDHE, this means running the \texttt{agree} sub-routine; with KEMs, this means running the \texttt{decaosulation} sub-routine
+    \item \texttt{decap\_done}: when client finishes processing server's key share, but before updating key schedule
+    \item \texttt{sh\_done}: when client finishes processing \texttt{ServerHello}, which includes updating key schedule and deriving handshake secret
+    \item \texttt{cert\_start}: when client starts processing \texttt{Certificate}
+    \item \texttt{auth\_start}: when client starts the asymmetric cryptographic operation for server authentication. In signature-based workflow, this is right before client starts verifying the signature in \texttt{CertificateVerify}. In KEM-based workflow, this is right before client starts encapsulating using server's public key.
+    \item \texttt{auth\_done}: when client finishes the asymmetric cryptographic operation for server authentication
+    \item \texttt{hs\_done}: when client finishes processing server's \texttt{Finished}. Note that in signature-based workflow, this is the earliest moment when client can start sending application data, but in KEM-based workflow, client can start at an earlier moment in the handshake. Due to time constraint we did not get to implement this ``early application data'', but we speculate that the performance impact will be minimal.
+\end{itemize}
 
-Using these timestamps we can clearly define the boundaries of the two phases from the client's perspective: key agreement duration is time delta between \texttt{sh\_done} and \texttt{ch\_start}, while authentication duration is the interval from \texttt{auth\_start} to \texttt{auth\_done}.
-These detailed timestamps also allow us to observe the impact of communication cost on handshake.
-For example, the interval from \texttt{sh\_done} to \texttt{auth\_start} reflects the time it takes for server to transmit the certificate chain.
+Although communication cost contrinutes significantly to the latency of a handshake in both the key exchange phase and the authentication phase, measuring standalone ``certificate transmission time'' is not straightforward as it requires high precision time synchronization between the client and the server. Unfortunately, the NTP client can have up to hundreds of milliseconds of bias and is thus rather not helpful.
+It is also questionable whether standalone transmission time is all that meaningful, because data transmission often happens concurrently with data processing. 
+For example, server transmitting \texttt{Certificate} can happen concurrently with client processing \texttt{ServerHello}.
+Therefore, longer transmission time by itself does not necessarily translate to longer handshake latency.
+Instead, we will only measure the combined duration of data processing and data transmission.
+Finally, each configuration is repeated for at least 1,000 times.
 
 % TODO: analyze data, present graph and analysis in the main body, present table in appendix.
-\paragraph{Key agreement.}
-We define the total key agreement time to be the length of interval from the start of the handshake to the end of processing \texttt{ServerHello}. 
-In addition, we also track the length of time for which the Pico is doing active work: the time spent constructing \texttt{ClientHello} plus the time spent processing \texttt{ServerHello}.
-Table \ref{tab:ka-performance-comparison} compares the performance of various key exchange scheme using these two metrics. 
-Figure \ref{fig:ka-performance-comparison} illustrates the distribution of data points.
+\paragraph{Key exchange metrics}
+Within the key exchange phase we mainly care about three metrics: \begin{itemize}
+    \item \emph{Total time}: the duration of the entire key exchange from the client's perspective, which is the interval from \texttt{ch\_start} to \texttt{sh\_done}.
+    \item \emph{CPU time}: the time spent constructing \texttt{ClientHello} and processing \texttt{ServerHello}, equivalently the time during which client's CPU is doing active work. It is computed as \texttt{ch\_sent - ch\_start + sh\_done - sh\_start}.
+    \item \emph{Crypto time}: the time spent on generating client's key share and processing server's key share. With ECDHE, this means running \texttt{keygen} and \texttt{agree} each once; with KEM, this means running \texttt{keygen} and \texttt{decap} each once. Crypto time should be a subset of CPU time, since the client needs to process other components of the two messages and update the key schedule to derive handshake secret. It is computed as \texttt{keygen\_done - keygen\_start + decap\_done - decap\_start}
+\end{itemize}
 
-\begin{table}[htbp]
+% Table \ref{tab:ka-performance-comparison} compares various key exchange schemes according these metrics. 
+
+\begin{table}[H]
 \footnotesize
 \centering
-\begin{tabular}{llrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-    \textbf{Category}
-    & \textbf{Key agreement}
-    & \multicolumn{2}{c}{\textbf{Total time}}
-    & \multicolumn{2}{c}{\textbf{CPU time}} \\
-    \cmidrule(lr){3-4}
-    \cmidrule(lr){5-6}
-    & & Median & Std & Median & Std \\
-\midrule
-    \textbf{Classical} 
-    & ECDHE (P-256) & 445096.0 & 195745.12 & 438639.0 & 182.35 \\
-    & X25519 & 36322.5 & 713456.00 & 28813.0 & 31.68 \\
-    & ECDHE (P-384) \\
-    & ECDHE (P-521) \\
-    & X448 \\
-\midrule
-    \textbf{PQC}
-    & ML-KEM-512 & 27254.0 & 284903.41 & 19443.0 & 85.32\\
-    & ML-KEM-768 \\
-    & ML-KEM-1024 \\
-    & OT-ML-KEM-512 & 16938.0 & 5573.21 & 14025.0 & 41.26 \\
-    & OT-ML-KEM-768 \\
-    & OT-ML-KEM-1024 \\
-    & HQC-128 & 1341054.5 & 303532.68 & 1321492.0 & 80.01 \\
-    & HQC-192 \\
-    & HQC-256 \\
+    \textbf{Key exchange}
+    & \multicolumn{2}{c}{\textbf{Crypto time}}
+    & \multicolumn{2}{c}{\textbf{CPU time}}
+    & \multicolumn{2}{c}{\textbf{Total time}} \\
+    \cmidrule(lr){2-3}
+    \cmidrule(lr){4-5}
+    \cmidrule(lr){6-7}
+    & Median & Std & Median & Std & Median & Std \\
+    \midrule
+    \multicolumn{7}{c}{\bf ECDHE} \\
+    \midrule
+    P-256                   & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    X25519                  & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf PQ KEM} \\
+    \midrule
+    ML-KEM-512              & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    OT-ML-KEM-512           & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    HQC-128                 & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf ECC+KEM hybrid} \\
+    \midrule
+    P-256 + ML-KEM-512      & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    P-256 + ML-KEM-768      & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    X25519 + ML-KEM-512     & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    X25519 + ML-KEM-768     & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
 \bottomrule
 \end{tabular}
-\caption{Comparing key agreement performance (microseconds).}
-\label{tab:ka-performance-comparison}
+\caption{Key exchange phase duration ($\us$) with NIST level 1 security}
+\label{tab:kex-level1-perf}
 \end{table}
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\linewidth]{benchmarks/imgs/ka_tot_dur.png}
-    \includegraphics[width=\linewidth]{benchmarks/imgs/ka_cpu_dur.png}
-    \caption{Key agreement performance (microseconds).}
-    \label{fig:ka-performance-comparison}
-\end{figure}
-
-\paragraph{Authentication.}
-We define the \textit{certificate transmission time} to be the length of interval from the end of key agreement to the start of processing server's certificates,
-\textit{authentication time} to be from start of processing certificates to the end of the handshake.
-Table \ref{tab:auth-performance-comparison} summarizes these metrics. Figure \ref{fig:auth-performance-comparison} illustrates the distribution of data points.
-
-Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-performance} summarize the performance of the handshake as a whole.
-
-\begin{table}[htbp]
+\begin{table}[H]
 \footnotesize
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+    \textbf{Key exchange}
+    & \multicolumn{2}{c}{\textbf{Crypto time}}
+    & \multicolumn{2}{c}{\textbf{CPU time}}
+    & \multicolumn{2}{c}{\textbf{Total time}} \\
+    \cmidrule(lr){2-3}
+    \cmidrule(lr){4-5}
+    \cmidrule(lr){6-7}
+    & Median & Std & Median & Std & Median & Std \\
+    \midrule
+    \multicolumn{7}{c}{\bf ECDHE} \\
+    \midrule
+    P-384                   & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    X448                    & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf PQ KEM} \\
+    \midrule
+    ML-KEM-768              & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    OT-ML-KEM-768           & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    HQC-192                 & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf ECC+KEM hybrid} \\
+    \midrule
+    P-384 + ML-KEM-768      & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    P-384 + ML-KEM-1024     & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    X448 + ML-KEM-768       & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+\bottomrule
+\end{tabular}
+\caption{Key exchange phase duration ($\us$) with NIST level 3 security}
+\label{tab:kex-level3-perf}
+\end{table}
+
+\begin{table}[H]
+\footnotesize
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+    \textbf{Key exchange}
+    & \multicolumn{2}{c}{\textbf{Crypto time}}
+    & \multicolumn{2}{c}{\textbf{CPU time}}
+    & \multicolumn{2}{c}{\textbf{Total time}} \\
+    \cmidrule(lr){2-3}
+    \cmidrule(lr){4-5}
+    \cmidrule(lr){6-7}
+    & Median & Std & Median & Std & Median & Std \\
+    \midrule
+    \multicolumn{7}{c}{\bf ECDHE} \\
+    \midrule
+    P-521                   & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf PQ KEM} \\
+    \midrule
+    ML-KEM-1024             & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    OT-ML-KEM-1024          & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    HQC-256                 & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf ECC+KEM hybrid} \\
+    \midrule
+    P-521 + ML-KEM-1024     & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+\bottomrule
+\end{tabular}
+\caption{Key exchange phase duration ($\us$) with NIST level 5 security}
+\label{tab:kex-level5-perf}
+\end{table}
+
+\paragraph{Authentication metrics}
+For the authentication phase we mainly care about two metrics: \begin{itemize}
+    \item \emph{Crypto time}: the time spent on asymmetric cryptographic operations during the authentication phase. For signature-based authentication, this includes verifying the signature in \texttt{Certificate} verify. For KEM-based authentication, this includes encapsulating the authentication secret. Note that in our KEMTLS implementation, the authentication secret is encapsulated eagerly while processing server's \texttt{Certificate}, and constructing \texttt{KemCiphertext} only involves copying the ciphertext from the internal state to the output buffer, so authentication's crypto time does not involve \texttt{KemCiphertext}.
+    \item \emph{Total time}: the duration of the entire authentication phase, which counts from \texttt{cert\_start} to \texttt{hs\_done}.
+\end{itemize}
+
+\begin{table}[H]
+\footnotesize
+\centering
+\begin{tabular}{lllrrrr}
+\toprule
+    \multicolumn{3}{c}{\bf Certificate chain}
+    & \multicolumn{2}{c}{\bf Crypto time}
+    & \multicolumn{2}{c}{\bf Total time} \\
+    \cmidrule(lr){1-3}
+    \cmidrule(lr){4-5}
+    \cmidrule(lr){6-7}
+    Root & Int & Leaf & Median & Std & Median & Std \\
+    \midrule
+    \multicolumn{7}{c}{\bf Classical} \\
+    \midrule
+    RSA-2048    & RSA-2048      & RSA-2048      & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    ECDSA P-256 & ECDSA P-256   & ECDSA P-256   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Ed25519     & Ed25519       & Ed25519       & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf PQ-TLS} \\
+    \midrule
+    ML-DSA-44   & ML-DSA-44     & ML-DSA-44     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    ML-DSA-65   & ML-DSA-65     & ML-DSA-44     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-512  & Falcon-512    & Falcon-512    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-512  & Falcon-512    & ML-DSA-44     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS128s & SPHINCS128s   & SPHINCS128s   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS128s & SPHINCS128s   & ML-DSA-44     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS128s & SPHINCS128s   & Falcon-512    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf KEMTLS} \\
+    \midrule
+    ML-DSA-44   & ML-DSA-44     & ML-KEM-512    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    ML-DSA-65   & ML-DSA-65     & ML-KEM-512    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-512  & Falcon-512    & ML-KEM-512    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS128s & SPHINCS128s   & ML-KEM-512    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS128s & SPHINCS128s   & HQC-128       & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \bottomrule
+\end{tabular}
+\caption{Authentication durations ($\us$) with NIST level 1 security}
+\label{tab:auth-level-1-perf}
+\end{table}
+
+\begin{table}[H]
+\footnotesize
+\centering
+\begin{tabular}{lllrrrr}
+\toprule
+    \multicolumn{3}{c}{\bf Certificate chain}
+    & \multicolumn{2}{c}{\bf Crypto time}
+    & \multicolumn{2}{c}{\bf Total time} \\
+    \cmidrule(lr){1-3}
+    \cmidrule(lr){4-5}
+    \cmidrule(lr){6-7}
+    Root & Int & Leaf & Median & Std & Median & Std \\
+    \midrule
+    \multicolumn{7}{c}{\bf Classical} \\
+    \midrule
+    ECDSA P-384 & ECDSA P-384   & ECDSA P-384   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Ed448       & Ed448         & Ed448         & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf PQ-TLS} \\
+    \midrule
+    ML-DSA-65   & ML-DSA-65     & ML-DSA-65     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    ML-DSA-87   & ML-DSA-87     & ML-DSA-65     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-1024 & Falcon-1024   & ML-DSA-65     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS192s & SPHINCS192s   & ML-DSA-65     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf KEMTLS} \\
+    \midrule
+    ML-DSA-65   & ML-DSA-65     & ML-KEM-768    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    ML-DSA-87   & ML-DSA-87     & ML-KEM-768    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-1024 & Falcon-1024   & ML-KEM-768    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS192s & SPHINCS192s   & ML-KEM-768    & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS192s & SPHINCS192s   & HQC-192       & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \bottomrule
+\end{tabular}
+\caption{Authentication durations ($\us$) with NIST level 3 security}
+\label{tab:auth-level-3-perf}
+\end{table}
+
+\begin{table}[H]
+\footnotesize
+\centering
+\begin{tabular}{lllrrrr}
+\toprule
+    \multicolumn{3}{c}{\bf Certificate chain}
+    & \multicolumn{2}{c}{\bf Crypto time}
+    & \multicolumn{2}{c}{\bf Total time} \\
+    \cmidrule(lr){1-3}
+    \cmidrule(lr){4-5}
+    \cmidrule(lr){6-7}
+    Root & Int & Leaf & Median & Std & Median & Std \\
+    \midrule
+    \multicolumn{7}{c}{\bf Classical} \\
+    \midrule
+    ECDSA P-521 & ECDSA P-521   & ECDSA P-521   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf PQ-TLS} \\
+    \midrule
+    ML-DSA-87   & ML-DSA-87     & ML-DSA-87     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-1024 & Falcon-1024   & Falcon-1024   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-1024 & Falcon-1024   & ML-DSA-87     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS256s & SPHINCS256s   & ML-DSA-87     & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS256s & SPHINCS256s   & Falcon-1024   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \midrule
+    \multicolumn{7}{c}{\bf KEMTLS} \\
+    \midrule
+    ML-DSA-87   & ML-DSA-87     & ML-KEM-1024   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    Falcon-1024 & Falcon-1024   & ML-KEM-1024   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS256s & SPHINCS256s   & ML-KEM-1024   & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    SPHINCS256s & SPHINCS256s   & HQC-256       & xxxxxx & xxxxxx & xxxxxx & xxxxxx \\
+    \bottomrule
+\end{tabular}
+\caption{Authentication durations ($\us$) with NIST level 5 security}
+\label{tab:auth-level-5-perf}
+\end{table}
+
+% \begin{table}[H]
+% \scriptsize
+% \centering
+% \begin{tabular}{llllrr}
+% \toprule
+%     \textbf{KEX}
+%     & \multicolumn{3}{c}{\bf Auth}
+%     & \multicolumn{2}{c}{\bf Latency} \\
+% % \midrule
+%     \cmidrule(lr){2-4}\cmidrule(lr){5-6}
+%     & Root & Int & Leaf & Median & Std \\
+% \midrule
+%     \multicolumn{6}{c}{\bf Classical} \\
+% \midrule
+%     P-256               & RSA-2048      & RSA-2048      & RSA-2048      & 486970.0      & 103761.19 \\
+%     P-256               & ECDSA P-256   & ECDSA P-256   & ECDSA P-256   & 810259.5      &  21448.88 \\
+%     X25519              & Ed25519       & Ed25519       & Ed25519       & xxxxxx        & xxxxxx \\
+    
+%     P-384               & ECDSA P-384   & ECDSA P-384   & ECDSA P-384   & xxxxxx        & xxxxxx \\
+%     X448                & Ed448         & Ed448         & Ed448         & xxxxxx        & xxxxxx \\
+    
+%     P-521               & ECDSA P-521   & ECDSA P-521   & ECDSA P-521   & xxxxxx        & xxxxxx \\
+% \midrule
+%     \multicolumn{6}{c}{\bf PQ-TLS} \\
+% \midrule
+%     ML-KEM-512          & ML-DSA-44     & ML-DSA-44     & ML-DSA-44     & 164019.5      & 7742.55 \\
+%     ML-KEM-512          & Falcon-512    & Falcon-512    & ML-DSA-44     & xxxxxx        & xxxxxx \\
+%     ML-KEM-512          & Falcon-512    & Falcon-512    & Falcon-512    & xxxxxx        & xxxxxx \\
+%     ML-KEM-512          & SPHINCS128s   & SPHINCS128s   & ML-DSA-44     & xxxxxx        & xxxxxx \\
+%     ML-KEM-512          & SPHINCS128s   & SPHINCS128s   & Falcon-512    & xxxxxx        & xxxxxx \\
+%     OT-ML-KEM-512       & ML-DSA-44     & ML-DSA-44     & ML-DSA-44     & xxxxxx        & xxxxxx \\
+%     P-256 + ML-KEM-512  & ML-DSA-44     & ML-DSA-44     & ML-DSA-44     & xxxxxx        & xxxxxx \\
+%     X25519 + ML-KEM-512 & ML-DSA-44     & ML-DSA-44     & ML-DSA-44     & xxxxxx        & xxxxxx \\
+%     P-256 + ML-KEM-768  & ML-DSA-65     & ML-DSA-65     & ML-DSA-44     & xxxxxx        & xxxxxx \\
+%     X25519 + ML-KEM-768 & ML-DSA-65     & ML-DSA-65     & ML-DSA-44     & xxxxxx        & xxxxxx \\
+%     HQC-128             & SPHINCS128s   & SPHINCS128s   & SPHINCS128s   & 2540080.0     & 128924.41 \\
+    
+%     ML-KEM-768          & ML-DSA-65     & ML-DSA-65     & ML-DSA-65     & xxxxxx        & xxxxxx \\
+%     ML-KEM-768          & Falcon-1024   & Falcon-1024   & ML-DSA-65     & xxxxxx        & xxxxxx \\
+%     ML-KEM-768          & SPHINCS192s   & SPHINCS192s   & ML-DSA-65     & xxxxxx        & xxxxxx \\
+%     OT-ML-KEM-768       & ML-DSA-65     & ML-DSA-65     & ML-DSA-65     & xxxxxx        & xxxxxx \\
+%     P-384 + ML-KEM-768  & ML-DSA-65     & ML-DSA-65     & ML-DSA-65     & xxxxxx        & xxxxxx \\
+%     X448  + ML-KEM-768  & ML-DSA-65     & ML-DSA-65     & ML-DSA-65     & xxxxxx        & xxxxxx \\
+%     P-384 + ML-KEM-1024 & ML-DSA-87     & ML-DSA-87     & ML-DSA-65     & xxxxxx        & xxxxxx \\
+%     HQC-192             & SPHINCS192s   & SPHINCS192s   & ML-DSA-65     & xxxxxx        & xxxxxx \\
+
+%     ML-KEM-1024         & ML-DSA-87     & ML-DSA-87     & ML-DSA-87     & xxxxxx        & xxxxxx \\
+%     ML-KEM-1024         & Falcon-1024   & Falcon-1024   & Falcon-1024   & xxxxxx        & xxxxxx \\
+%     ML-KEM-1024         & Falcon-1024   & Falcon-1024   & ML-DSA-87     & xxxxxx        & xxxxxx \\
+%     ML-KEM-1024         & SPHINCS256s   & SPHINCS256s   & ML-DSA-87     & xxxxxx        & xxxxxx \\
+%     ML-KEM-1024         & SPHINCS256s   & SPHINCS256s   & Falcon-1024   & xxxxxx        & xxxxxx \\
+%     OT-ML-KEM-1024      & ML-DSA-87     & ML-DSA-87     & ML-DSA-87     & xxxxxx        & xxxxxx \\
+%     P-521 + ML-KEM-1024 & ML-DSA-87     & ML-DSA-87     & ML-DSA-87     & xxxxxx        & xxxxxx \\
+%     HQC-256             & SPHINCS256s   & SPHINCS256s   & ML-DSA-87     & xxxxxx        & xxxxxx \\
+% \midrule
+%     \multicolumn{6}{c}{\bf KEMTLS} \\
+% \midrule
+%     ML-KEM-512          & ML-DSA-44     & ML-DSA-44     & ML-KEM-512    &  189151.5     & 20774.16 \\
+%     ML-KEM-512          & ML-DSA-65     & ML-DSA-65     & ML-KEM-512    & xxxxxx        & xxxxxx \\
+%     ML-KEM-512          & Falcon-512    & Falcon-512    & ML-KEM-512    & xxxxxx        & xxxxxx \\
+%     ML-KEM-512          & SPHINCS128s   & SPHINCS128s   & ML-KEM-512    & xxxxxx        & xxxxxx \\
+%     HQC-128             & SPHINCS128s   & SPHINCS128s   & HQC-128       &  2918399.0    & 223598.25 \\
+
+%     ML-KEM-768          & ML-DSA-65     & ML-DSA-65     & ML-KEM-768    & xxxxxx        & xxxxxx \\
+%     ML-KEM-768          & ML-DSA-87     & ML-DSA-87     & ML-KEM-768    & xxxxxx        & xxxxxx \\
+%     ML-KEM-768          & Falcon-1024   & Falcon-1024   & ML-KEM-768    & xxxxxx        & xxxxxx \\
+%     ML-KEM-768          & SPHINCS192s   & SPHINCS192s   & ML-KEM-768    & xxxxxx        & xxxxxx \\
+%     HQC-192             & SPHINCS192s   & SPHINCS192s   & HQC-192       &  7304369.0    & 243299.18 \\
+
+%     ML-KEM-1024         & ML-DSA-87     & ML-DSA-87     & ML-KEM-1024   & xxxxxx        & xxxxxx \\
+%     ML-KEM-1024         & Falcon-1024   & Falcon-1024   & ML-KEM-1024   &   210244.5    &  30846.48 \\
+%     ML-KEM-1024         & SPHINCS256s   & SPHINCS256s   & ML-KEM-1024   &  1899104.0    & 226068.66 \\
+%     HQC-256             & SPHINCS256s   & SPHINCS256s   & HQC-256       & 12987320.5    & 445509.98 \\
+% \bottomrule
+% \end{tabular}
+% \caption{Handshake latency ($\us$)}
+% \label{tab:handshake-performance}
+% \end{table}
+\begin{table}[H]
+\scriptsize
 \centering
 \begin{tabular}{llllrr}
 \toprule
-    \textbf{Category}
-    & \multicolumn{3}{c}{\textbf{Certificate chain}}
-    & \textbf{Cert TX time}
-    & \textbf{Auth time} \\
-    \cmidrule(lr){2-4}
-    & Root & Int & Leaf \\
+\textbf{KEX}
+& \multicolumn{3}{c}{\bf Auth}
+& \multicolumn{2}{c}{\bf Latency} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}
+& Root            & Int             & Leaf            & Median           & Std \\
 \midrule
-    \textbf{Classical} 
-    & RSA-2048 \\
-    & ECDSA (P-256) \\
-    & Ed25519 \\
+\multicolumn{6}{c}{\bf Classical} \\
 \midrule
-    \textbf{PQC}
-    & ML-DSA-44 \\
-    & SPHINCS+ 128f & ML-DSA-44 & ML-DSA-44 \\
-    & ML-DSA-44 & ML-DSA-44 & ML-KEM-512 \\
+P-256               & RSA-2048       & RSA-2048        & RSA-2048         & \texttt{486970.0}     & \texttt{103761.19} \\
+P-256               & ECDSA P-256    & ECDSA P-256     & ECDSA P-256      & \texttt{810259.5}     & \texttt{21448.88}  \\
+X25519              & Ed25519        & Ed25519         & Ed25519          & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+P-384               & ECDSA P-384    & ECDSA P-384     & ECDSA P-384      & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+X448                & Ed448          & Ed448           & Ed448            & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+P-521               & ECDSA P-521    & ECDSA P-521     & ECDSA P-521      & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+\midrule
+\multicolumn{6}{c}{\bf PQ-TLS} \\
+\midrule
+ML-KEM-512          & ML-DSA-44      & ML-DSA-44       & ML-DSA-44        & \texttt{164019.5}     & \texttt{7742.55}   \\
+ML-KEM-512          & Falcon-512     & Falcon-512      & ML-DSA-44        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-512          & Falcon-512     & Falcon-512      & Falcon-512       & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-512          & SPHINCS128s    & SPHINCS128s     & ML-DSA-44        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-512          & SPHINCS128s    & SPHINCS128s     & Falcon-512       & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+OT-ML-KEM-512       & ML-DSA-44      & ML-DSA-44       & ML-DSA-44        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+P-256 + ML-KEM-512  & ML-DSA-44      & ML-DSA-44       & ML-DSA-44        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+X25519 + ML-KEM-512 & ML-DSA-44      & ML-DSA-44       & ML-DSA-44        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+P-256 + ML-KEM-768  & ML-DSA-65      & ML-DSA-65       & ML-DSA-44        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+X25519 + ML-KEM-768 & ML-DSA-65      & ML-DSA-65       & ML-DSA-44        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+HQC-128             & SPHINCS128s    & SPHINCS128s     & SPHINCS128s      & \texttt{2540080.0}    & \texttt{128924.41} \\
+ML-KEM-768          & ML-DSA-65      & ML-DSA-65       & ML-DSA-65        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-768          & Falcon-1024    & Falcon-1024     & ML-DSA-65        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-768          & SPHINCS192s    & SPHINCS192s     & ML-DSA-65        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+OT-ML-KEM-768       & ML-DSA-65      & ML-DSA-65       & ML-DSA-65        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+P-384 + ML-KEM-768  & ML-DSA-65      & ML-DSA-65       & ML-DSA-65        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+X448 + ML-KEM-768   & ML-DSA-65      & ML-DSA-65       & ML-DSA-65        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+P-384 + ML-KEM-1024 & ML-DSA-87      & ML-DSA-87       & ML-DSA-65        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+HQC-192             & SPHINCS192s    & SPHINCS192s     & ML-DSA-65        & \texttt{5299501.0}    & \texttt{304464.20} \\
+ML-KEM-1024         & ML-DSA-87      & ML-DSA-87       & ML-DSA-87        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-1024         & Falcon-1024    & Falcon-1024     & Falcon-1024      & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-1024         & Falcon-1024    & Falcon-1024     & ML-DSA-87        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-1024         & SPHINCS256s    & SPHINCS256s     & ML-DSA-87        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-1024         & SPHINCS256s    & SPHINCS256s     & Falcon-1024      & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+OT-ML-KEM-1024      & ML-DSA-87      & ML-DSA-87       & ML-DSA-87        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+P-521 + ML-KEM-1024 & ML-DSA-87      & ML-DSA-87       & ML-DSA-87        & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+HQC-256             & SPHINCS256s    & SPHINCS256s     & ML-DSA-87        & \texttt{9243921.0}    & \texttt{40152.74}  \\
+\midrule
+\multicolumn{6}{c}{\bf KEMTLS} \\
+\midrule
+ML-KEM-512          & ML-DSA-44      & ML-DSA-44       & ML-KEM-512       & \texttt{189151.5}     & \texttt{20774.16}  \\
+ML-KEM-512          & ML-DSA-65      & ML-DSA-65       & ML-KEM-512       & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-512          & Falcon-512     & Falcon-512      & ML-KEM-512       & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-512          & SPHINCS128s    & SPHINCS128s     & ML-KEM-512       & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+HQC-128             & SPHINCS128s    & SPHINCS128s     & HQC-128          & \texttt{2918399.0}    & \texttt{223598.25} \\
+ML-KEM-768          & ML-DSA-65      & ML-DSA-65       & ML-KEM-768       & \texttt{xxxxxx}       & \texttt{xxxxxx}    \\
+ML-KEM-768          & ML-DSA-87      & ML-DSA-87       & ML-KEM-768       & \texttt{326002.0}     & \texttt{35235.57}  \\
+ML-KEM-768          & Falcon-1024    & Falcon-1024     & ML-KEM-768       & \texttt{183946.5}     & \texttt{16618.27}  \\
+ML-KEM-768          & SPHINCS192s    & SPHINCS192s     & ML-KEM-768       & \texttt{1277371.5}    & \texttt{51458.02}  \\
+HQC-192             & SPHINCS192s    & SPHINCS192s     & HQC-192          & \texttt{7304369.0}    & \texttt{243299.18} \\
+ML-KEM-1024         & ML-DSA-87      & ML-DSA-87       & ML-KEM-1024      & \texttt{354981.0}     & \texttt{35428.57}  \\
+ML-KEM-1024         & Falcon-1024    & Falcon-1024     & ML-KEM-1024      & \texttt{210244.5}     & \texttt{30846.48}  \\
+ML-KEM-1024         & SPHINCS256s    & SPHINCS256s     & ML-KEM-1024      & \texttt{1899104.0}    & \texttt{226068.66} \\
+HQC-256             & SPHINCS256s    & SPHINCS256s     & HQC-256          & \texttt{12987320.5}   & \texttt{445509.98} \\
 \bottomrule
 \end{tabular}
-\caption{Medium authentication durations (microseconds).}
-\label{tab:auth-performance-comparison}
-\end{table}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\linewidth]{benchmarks/imgs/cert_tx_time.png}
-    \includegraphics[width=\linewidth]{benchmarks/imgs/auth_time.png}
-    \caption{Authentication durations (microseconds).}
-    \label{fig:auth-performance-comparison}
-\end{figure}
-
-\begin{table}[htbp]
-\footnotesize
-\centering
-\begin{tabular}{lllllr}
-\toprule
-    \textbf{Category}
-    & \textbf{KA}
-    & \multicolumn{3}{c}{\textbf{Auth}}
-    & \multicolumn{1}{c}{\textbf{Handshake time}} \\
-    \cmidrule{3-5}
-    & & Root & Int & Leaf \\
-\midrule
-    \textbf{Classical}
-    & ECDHE (P-256) & RSA-2048 & & & \\
-    & ECDHE (P-256) & ECDSA (P-256) & & & \\
-    & X25519 & Ed25519 & & & \\
-\midrule
-    \textbf{PQC}
-    & ML-KEM-512 & ML-DSA-44 & & & \\
-    & ML-KEM-512 & SPHINCS+ 128f & ML-DSA-44 & ML-DSA-44 & \\
-    & ML-KEM-512 & ML-DSA-44 & ML-DSA-44 & ML-KEM-512 & \\
-\bottomrule
-\end{tabular}
-\caption{Medium handshake durations (microseconds).}
+\caption{Handshake latency ($\us$)}
 \label{tab:handshake-performance}
 \end{table}
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\linewidth]{benchmarks/imgs/handshake_time.png}
-    \caption{Handshake durations (microseconds).}
-    \label{fig:handshake-performance}
-\end{figure}
 
 \subsection{Discussion}
+\paragraph{IND-1CCA KEM} We expected meaningful performance improvements from removing \textit{re-encryption} from an FO-protected IND-CCA secure KEM.
+Prior implementations on SIKE/Kyber/Lightsaber \cite{DBLP:conf/eurocrypt/Huguenin-Dumittan22} and ML-KEM \cite{DBLP:conf/esorics/ZhengZDSZYZ24} reported decapsulation speedup ranging from 2x to 6x.
+However, the performance gains in TLS 1.3 were minimal in environments where server and clients both had desktop CPUs.
+On the other hand, with a constrained TLS client, client-side cryptographic operations pose a more severe bottleneck, so the speed improvements are more pronounced.
+Another consideration unique to an embedded client is energy consumption: as reported in \cite{DBLP:conf/cf/TasopoulosDFZSS23,DBLP:conf/iotdi/SchoffelLRW21}, the choice of cryptographic primitives can greatly affect energy consumption, and thus the lifetime of a battery-operated embedded device.
+
+Figure \ref{fig:comparing-cca-and-1cca-kems} compares the distribution of key exchange latency and the handshake latecy between ML-KEM (IND-CCA secure) and one-time ML-KEM (IND-1CCA secure).
+
+\begin{figure}[H]
+    \centering
+    % TODO: make ML-KEM vs OT-ML-KEM graph
+    \caption{Comparing IND-CCA and IND-1CCA KEMs}
+    \label{fig:comparing-cca-and-1cca-kems}
+\end{figure}
+
+\paragraph{ML-DSA vs. Falcon} ML-DSA and Falcon are both lattice-based digital signature schemes selected by NIST for standardization (ML-DSA was standardized in August 2024; Falcon was selected but still in the process of being standardized).
+However, there are notable differences between their designs and performance characteristics that make one suitable than the other in certain scenarios.
+Falcon has smaller signature size (752 vs 2420 bytes at NIST level 1, 1462 vs 4627 at level 5) and smaller public key size (897 vs 1312 at level 1, 1793 vs 2592 at level 5).
+According to eBACS \cite{eBACS2025}, on a Cortex-A72 (Raspberry Pi 4B)\footnote{\url{https://bench.cr.yp.to/results-sign/aarch64-pi4b.html}}, Falcon has significantly faster signing and verification than ML-DSA. {\color{red}\bf Does my data support this?}.
+Because ML-DSA signs using the ``Fiat-Shamir with abort'' \cite{DBLP:conf/asiacrypt/Lyubashevsky09} strategy, signing time can have large variances depending on the input randomness, while Falcon's signing routine does not have this issue.
+On the other hand, Falcon's signing routine uses a discrete Gaussian sampler, which requires constant-time floating point arithmetics with at least 53-bits of precision.
+The float-point arithmetics requirement is not only difficult to fulfill, such as on legacy CPUs and/or embedded devices, but also difficult to implement without risk of introducing side-channel vulnerabilities \cite{}.
+
+While each signature scheme can make a valid certificate chain, given the performance and security characteristics mentioned above, we recommend using Falcon only for offline signatures (signatures are produced ahead of the handshake) while using ML-DSA for online signature (signatures are produced during handshake).
+For example, root and intermediate CAs can issue certificates using the Falcon, and server signs \texttt{CertificateVerify} with ML-DSA.
+Figure \ref{fig:comparing-mldsa-falcon-cert-chains} compares the performance across various Falcon/ML-DSA certificate chain configurations.
+
+\begin{figure}[H]
+    \centering
+    % TODO: graph ML-DSA/Falcon chains
+    \caption{Comparing ML-DSA/Falcon mixture chains}
+    \label{fig:comparing-mldsa-falcon-cert-chains}
+\end{figure}
+
+\paragraph{Using SPHINCS+} Among all post-quantum signature schemes, SPHINCS+ represent the most conservative security consideration.
+However, the conservative security approach comes at the cost of immense performance penalty: across all variants SPHINCS+'s signature size and signing speed are one or more magnitudes worse than its competitors.
+This makes SPHINCS+ unsuitable as an online signature for TLS 1.3 handshake: the conservative security margins are not useful due to the relatively short lifespan (usually no more than a year) of leaf certificates, while the slow signing and large signature size will incur unacceptable CPU and bandwidth costs on the server side.
+In fact, amongst all SPHINCS+ variants, only SPHINCS-128s's signature can fit into a single TLS 1.3 record-layer fragment\footnote{TLS 1.3 record fragment size cannot exceed $2^{14} - 1$ bytes}; all other variant's signatures will need to be fragmented across two or more records.
+
+We may still consider SPHINCS+ for offline signatures.
+In these use cases, the ``small'' variants offer both smaller signatures and faster verification than the ``fast'' variants.
+Figure \ref{fig:comparing-sphincs-cert-chains} compares the performance of various configurations using SPHINCS+ in the certificate chain.
+
+\begin{figure}[H]
+    \centering
+    % TODO: graph SPHINCS+ chains
+    \caption{Comparing SPHINCS+ chains}
+    \label{fig:comparing-sphincs-cert-chains}
+\end{figure}
+
+\paragraph{PQ-TLS vs KEMTLS}
+In our setup, KEMTLS and PQ-TLS showed comparable performance with respect to handshake latency.
+As shown in Figure \ref{fig:comparing-kemtls-and-pqtls}, encapsulating an authentication secret is not any faster than verifying the signature in \texttt{CertificateVerify}.
+The communication cost advantage of KEMTLS is also partially mitigated by the fact that in a multi-core processor such as the RP2350 in our client device, receiving \texttt{Certificate} can happen concurrently with processing \texttt{ServerHello}.
+We speculate that our client can receive \texttt{Certificate} much faster than it can decapsulate the ciphertext in \texttt{ServerHello}, hence a shorter certificate chain ended up offering no meaningful performance advantage.
+Other implementations \cite{DBLP:conf/latincrypt/CeliFSTVWWW21,DBLP:conf/space/GonzalezW22} simulated congested or narrow-band networks, which demonstrated more sizeable performance advantage to KEMTLS.
+
+\begin{figure}[H]
+    \centering
+    % TODO: graph KEMTLS
+    \caption{Comparing KEMTLS with PQ-TLS}
+    \label{fig:comparing-kemtls-and-pqtls}
+\end{figure}
 
 \chapter{Conclusion and future works}
+This chapter summarizes previous chapters and list some future directions to be considered.
+
+\section{Summary of thesis}
+In this thesis, we implemented post-quantum TLS and KEMTLS, then evaluated their performance characteristics on a constrained client.
+Chapter \ref{} reviewed the TLS 1.3 protocol, its security properties, and its transition to post-quantum cryptography.
+Chapter \ref{} introduced two optimizations for post-quatnum TLS 1.3: using IND-1CCA KEM for ephemeral key exchange and using KEM for server authentication.
+In Chapter \ref{} and \ref{}, we described in details how we incorporated post-quantum primitive into TLS 1.3 for an embedded client, then discussed the performance characteristics of various configurations.
+
+Our main contribuion {\color{red}\bf is what}.
+
+\emph{Limitations} No optimized impls, missing SPHINCs-128f due to no fragmented \texttt{CertificateVerify}, no client authentication, missing server-side metrics.
+
+\section{Future works}
+\paragraph{Broaden PQC primitive support}
+At the time of this writing, NIST's PQC standardization project is calling for a second batch of digital signature schemes that may be of interest for evaluation. We may also wish to incorporate KEMs that are not selected for NIST standardization, such as NTRU and FrodoKEM.
+
+\paragraph{Explore other protocol and/or variations} This work primarily focused on post-quantum TLS 1.3 and KEMTLS with unilateral authentication, but they are not the only protocols suitable for embedded systems.
+Future works may explore further variations on these protocols or other protocols, including but not limited to \begin{itemize}
+    \item \emph{Datagram TLS}: DTLS is a variation on TLS that assumes the network to be lossy (i.e. using UDP instead of TCP), for which the increased communication cost of post-quantum primitives may affect performance.
+    \item \emph{TLS with cached-certificates}: RFC 7924 proposed an extension to \texttt{ClientHello} called \texttt{cached\_info}, through which a client can declare posession of server's certificate, thus saving the need to transmit the certificate chain; this can favor signature schemes with large public key but small signature. The equivalent KEMTLS-PDK \cite{DBLP:conf/esorics/SchwabeSW21} may also favor KEM with large public key but small ciphertext, such as Classic McEliece.
+    \item \emph{QUIC} is an alternative to TLS/DTLS that offered a more modern design and superior performnace. We wish to explore how incorporating post-quantum primitives might affect the behavior of QUIC on embedded devices.
+\end{itemize}
+
+\paragraph{Extended performance profiling}
+So far this thesis primarily focused on handshake latency as the sole performance metric.
+Future works may include a more comprehensive collection of metrics, especially on the embedded client, such as code size, memory usage, and energy consumption.
+
+\paragraph{IoT security and robustness}
+IoT devices operating in hostile environments may need to adopt defense against physical attacks, such as power analysis and fault injections.
+In this work, we only incorporated reference implementations with certain performance optimization, and future works we may wish to evaluate hardened/masked implementations.
 
 %----------------------------------------------------------------------
 % END MATERIAL
@@ -1933,7 +2540,8 @@ Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-per
 
 % The following statement selects the style to use for references.  
 % It controls the sort order of the entries in the bibliography and also the formatting for the in-text labels.
-\bibliographystyle{plain}
+\bibliographystyle{alpha}
+% \bibliographystyle{plain}
 % This specifies the location of the file containing the bibliographic information.  
 % It assumes you're using BibTeX to manage your references (if not, why not?).
 \cleardoublepage % This is needed if the "book" document class is used, to place the anchor in the correct page, because the bibliography will start on its own page.
@@ -1961,6 +2569,160 @@ Finally, Table \ref{tab:handshake-performance} and Figure \ref{fig:handshake-per
 % Add an un-numbered title page before the appendices and a line in the Table of Contents
 \chapter*{APPENDICES}
 \addcontentsline{toc}{chapter}{APPENDICES}
+
+\chapter{Cryptography definitions}\label{sec:cryptography-definitions}
+\section{Public-key encryption scheme}
+\paragraph{Syntax} A public-key encryption scheme (PKE) is a collection of three routines $(\keygen, \encrypt, \decrypt)$ defined over some plaintext space $\mathcal{M}$ and some ciphertext space $\mathcal{C}$. Key generation $(\pk, \sk) \leftsample \keygen(1^\lambda)$ is a randomized routine that returns a keypair consisting of a public encryption key and a secret decryption key. The encryption routine $\encrypt: (\pk, m) \mapsto c$ encrypts the input plaintext $m$ under the input public key $\pk$ and produces a ciphertext $c$. The decryption routine $\decrypt: (\sk, c) \mapsto m$ decrypts the input ciphertext $c$ under the input secret key and produces the corresponding plaintext. Where the encryption routine is randomized, we denote the randomness by a coin $r \in \mathcal{R}$ where $\mathcal{R}$ is called the coin space. Decryption routines are assumed to always be deterministic.
+
+\paragraph{Correctness} A PKE is $\delta$-correct if
+
+\begin{equation*}
+    E\left[\max_{m\in\mathcal{M}}
+        P\left[ \decrypt(\sk, c) \neq m \mid c \leftsample \encrypt(\pk, m)\right]
+    \right] \leq \delta
+\end{equation*}
+
+Where the expectation is taken with respect to the probability distribution of all possible keypairs. For many lattice-based cryptosystems, decryption failures could leak information about the secret key, although the probability of a decryption failure is low enough that classical adversaries cannot exploit decryption failure more than they can defeat the underlying lattice problems.
+
+\paragraph{Security} The security of PKE's is conventionally discussed using adversarial games played between a challenger and an adversary \cite{DBLP:conf/stoc/GoldwasserM82}. In the OW-ATK game (Figure \ref{fig:pke-ow-atk-game}), the challenger samples a random keypair and a random encryption. The adversary is given the public key, the random encryption (also called the challenge ciphertext), and access to ATK, then asked to decrypt the challenge ciphertext.
+
+\begin{figure}[h]
+    \centering
+    \begin{minipage}[t]{0.45\textwidth}
+    \begin{algorithm}[H]
+        \caption*{OW-ATK game}
+        \begin{algorithmic}[1]
+            \State $(\pk, \sk) \leftsample \keygen(1^\lambda)$
+            \State $m^\ast \leftsample \mathcal{M}$
+            \State $c^\ast \leftsample \encrypt(\pk, m)$
+            \State $\hat{m} \leftsample A^\text{ATK}(1^\lambda, \pk, c^\ast)$
+            \State \Return $\llbrack \hat{m} = m^\ast \rrbrack$
+        \end{algorithmic}
+    \end{algorithm}
+    \end{minipage}
+    \caption{The one-wayness game: challenger samples a random keypair and a random encryption, and the adversary wins if it correctly produces the decryption}\label{fig:pke-ow-atk-game}
+\end{figure}
+
+The advantage of an adversary is its probability of producing the correct decryption: $\text{Adv}^\text{OW-ATK}_\pke(A) = P[\hat{m} = m^\ast]$. A PKE is said to be OW-ATK secure if no efficient adversary can win the OW-ATK game with non-negligible probability.
+
+\begin{figure}[h]
+    \centering
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{algorithm}[H]
+            \caption*{IND-ATK game}
+            \begin{algorithmic}[1]
+                \State $(\pk, \sk) \leftsample \keygen(1^\lambda)$
+                \State $(m_0, m_1) \leftsample A^\text{ATK}(1^\lambda, \pk)$
+                \State $b \leftsample \{0,1\}$
+                \State $c^\ast \leftsample \encrypt(\pk, m_b)$
+                \State $\hat{b} \leftsample A^\text{ATK}(1^\lambda, \pk, c^\ast)$
+                \State \Return $\llbrack \hat{b} = b \rrbrack$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+    \caption{IND-ATK game: adversary is asked to distinguish the encryption of one message from another}\label{fig:pke-ind-atk-game}
+\end{figure}
+
+In the IND-ATK game (Figure \ref{fig:pke-ind-atk-game}), the adversary chooses two distinct messages and receives the encryption of one of them, randomly selected by the challenger. The advantage of an adversary is its probability of correctly distinguishing the ciphertext of one message from the other beyond blind guess: $\text{Adv}^\text{IND-ATK}_\pke(A) = \vert P[\hat{b} = b] - \frac{1}{2}\vert$. A PKE is said to be IND-ATK secure if no efficient adversary can win the IND-ATK game with non-negligible advantage.
+
+\begin{figure}[h]
+    \centering
+    \begin{minipage}[t]{0.4\textwidth}
+        \begin{algorithm}[H]
+            \caption*{$\mathcal{O}^\decrypt(c)$}
+            \begin{algorithmic}[1]
+                \State \Return $\decrypt(\sk, c)$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.4\textwidth}
+        \begin{algorithm}[H]
+            \caption*{$\mathcal{O}^\pco(m, c)$}
+            \begin{algorithmic}[1]
+                \State \Return $\llbrack \decrypt(\sk, c) = m \rrbrack$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+    \caption{Decryption oracle $\mathcal{O}^\decrypt$ (left) answers decryption queries by returning the decryption of the queried ciphertext. Plaintext-checking oracle $\mathcal{O}^\pco$ (right) answers whether the queried plaintext is the decryption of the queried ciphertext.}\label{fig:pke-oracles}
+\end{figure}
+
+In public-key cryptography, all adversaries are assumed to have access to the public key ($\text{ATK} = \text{CPA}$). If the adversary has access to a decryption oracle, it is said to mount chosen-ciphertext attack (ATK = CCA). If the adversary has access to a plaintext-checking oracle (PCO) , then it is said to mount plaintext-checking attack (ATK = PCA). See Figure \ref{fig:pke-oracles} for algorithmic description of the oracles.
+
+\begin{equation*}
+    \text{ATK} = \begin{cases}
+        \text{CPA} & \mathcal{O}^\text{ATK} = \cdot \\
+        \text{PCA} & \mathcal{O}^\text{ATK} = \mathcal{O}^\pco \\
+        \text{CCA} & \mathcal{O}^\text{ATK} = \mathcal{O}^\decrypt \\
+    \end{cases}
+\end{equation*}
+
+\section{Key encapsulation mechanism (KEM)}\label{sec:key-encapsulation-mechanism}
+\paragraph{Syntax} A key encapsulation mechanism (KEM) is a collection of three routines \\$(\keygen, \encap, \decap)$ defined over some ciphertext space $\mathcal{C}$ and some key space $\mathcal{K}$. Key generation $\keygen: 1^\lambda \mapsto (\pk, \sk)$ is a randomized routine that returns a keypair. Encapsulation $\encap: \pk \mapsto (c, K)$ is a randomized routine that takes a public encapsulation key and returns a pair of ciphertext $c$ and shared secret $K$ (also commonly referred to as session key). Decapsulation $\decap: (\sk, c) \mapsto K$ is a deterministic routine that uses the secret key $\sk$ to recover the shared secret $K$ from the input ciphertext $c$. Where the KEM chooses to reject invalid ciphertext explicitly, the decapsulation routine can also output the rejection symbol $\bot$. We assume a KEM to be perfectly correct:
+
+$$
+P\left[
+    \decap(\sk, c) = K \mid (\pk, \sk) \leftsample \keygen(1^\lambda); (c, K) \leftsample \encap(\pk)
+\right] = 1
+$$
+
+\paragraph{Security} Similar to PKE security, the security of KEM is discussed using adversarial games. In the IND-ATK game (Figure \ref{fig:kem-ind-atk-game}), the challenger generates a random keypair and encapsulates a random secret; the adversary is given the public key and the ciphertext, then asked to distinguish the shared secret from a random bit string.
+
+\begin{figure}[h]
+    \centering
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{algorithm}[H]
+            \caption*{KEM IND-ATK Game}
+            \begin{algorithmic}[1]
+                \State $(\pk, \sk) \leftsample \keygen((1^\lambda))$
+                \State $(c^\ast, K_0) \leftsample \encap(\pk)$
+                \State $K_1 \leftsample \mathcal{K}$
+                \State $b \leftsample \{0,1\}$
+                \State $\hat{b} \leftsample A^\texttt{ATK}(1^\lambda, \pk, c^\ast, K_b)$
+                \State \Return $\llbrack \hat{b} = b \rrbrack$
+            \end{algorithmic}
+        \end{algorithm}
+    \end{minipage}
+    \caption{The IND-ATK game for KEM}\label{fig:kem-ind-atk-game}
+\end{figure}
+
+The advantage of an adversary is its probability of winning beyong blind guess. A KEM is said to be IND-ATK secure if no efficient adversary can win the IND-ATK game with non-negligible advantage.
+
+$$
+\texttt{Adv}^\texttt{IND-ATK}(A) = \left\vert P\left[
+    A^\texttt{ATK}(1^\lambda, c^\ast, K_b) = b
+    \mid \begin{aligned}
+    &(\pk, \sk) \leftsample \keygen(1^\lambda); \\
+    &(c^\ast, K_0) \leftsample \encap(\pk); \\
+    &K_1 \leftsample \mathcal{K}; b \leftsample \{0,1\}
+    \end{aligned}
+\right] - \frac{1}{2}
+\right\vert
+$$
+
+By default, all adversaries are assumed to have the public key, with which they can mount chosen plaintext attacks (ATK = CPA). If the adversary as access to a decapsulation oracle $\mathcal{O}^\decap: c \mapsto \decap(\sk, c)$, it is said to mount a chosen-ciphertext attack (ATK = CCA).
+
+\section{Message authentication code (MAC)}\label{sec:message-authentication-code}
+\paragraph{Syntax} A message authentication code (MAC) is a collection of two routines $\sign$ and $\verify$ defined over some key space $\mathcal{K}$, some message space $\mathcal{M}$, and some tag space $\mathcal{T}$. The signing routine $\sign: (k, m) \mapsto t$ authenticates the message $m$ under the symmetric key $k$ by producing a tag $t$. The verification routine $\verify(k,m,t)$ outputs $1$ if the message-tag pair $(m, t)$ is authentic under the symmetric key $k$ and $0$ otherwise. Many MAC constructions are deterministic: for these constructions it is simpler to denote the signing routine by $t \leftarrow \mac(k, m)$, and verification done using a simple comparison. Some MAC constructions require a distinct or randomized nonce $r \leftsample \mathcal{R}$, and the signing routine will take this additional argument $t \leftarrow \mac(k, m; r)$.
+
+\paragraph{Security} The standard security notion for a MAC is \textit{existential unforgeability under chosen message attack (EUF-CMA)}. We define it using an adversarial game in which an adversary has access to a signing oracle $\mathcal{O}^\sign: m \mapsto \sign(k, m)$ and tries to produce a valid message-tag pair that has not been queried from the signing oracle (Figure \ref{fig:euf-cma-game}).
+
+\begin{figure}[h]
+    \centering
+    \begin{minipage}[t]{0.6\textwidth}
+    \begin{algorithm}[H]
+        \caption*{MAC EUF-CMA game}
+        \begin{algorithmic}[1]
+            \State $k^\ast \leftsample \mathcal{K}$
+            \State $(\hat{m}, \hat{t}) \leftsample A^\texttt{CMA}()$
+            \State \Return $\llbrack \verify(k^\ast, \hat{m}, \hat{t}) \land (\hat{m}, \hat{t}) \not\in \mathcal{O}^\sign \rrbrack$
+        \end{algorithmic}
+    \end{algorithm}
+    \end{minipage}
+    \caption{The signing oracle signs the queried message with the secret key. The adversary must produce a message-tag pair that has never been queried before}\label{fig:euf-cma-game}
+\end{figure}
+
+The advantage of the adversary is the probability that it successfully produces a valid message-tag pair. A MAC is said to be EUF-CMA secure if no efficient adversary has non-negligible advantage. Some MACs are \textit{one-time existentially unforgeable} (we call them one-time MAC), meaning that each secret key can be used to authenticate exactly one message. The corresponding security game is identical to the EUF-CMA game except for that the signing oracle will only answer up to one query.
+
 % Appendices are just more chapters, with different labeling (letters instead of numbers).
 % \chapter[PDF Plots From Matlab]{Matlab Code for Making a PDF Plot}
 % \label{AppendixA}
