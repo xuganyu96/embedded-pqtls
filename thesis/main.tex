@@ -131,31 +131,31 @@
 \usepackage{algpseudocode}
 \usepackage{caption}
 \usepackage{amsmath,amsfonts,amssymb,amsthm}
-\usepackage{listings,listing-rust}
+\usepackage{listings}
 \usepackage{xcolor}
 
-% \definecolor{gh-gray}{gray}{0.95}
-% \definecolor{gh-blue}{rgb}{0.0,0.0,0.6}
-% \definecolor{gh-green}{rgb}{0.0,0.5,0.0}
-% \definecolor{gh-orange}{rgb}{0.6,0.3,0.0}
-% \definecolor{gh-comment}{rgb}{0.5,0.5,0.5}
-% \definecolor{gh-string}{rgb}{0.8,0.1,0.1}
-% \lstdefinestyle{boxed}{
-%   language=C,
-%   basicstyle=\ttfamily\footnotesize,
-%   backgroundcolor=\color{gh-gray},
-%   keywordstyle=\color{gh-blue}\bfseries,
-%   commentstyle=\color{gh-comment}\itshape,
-%   stringstyle=\color{gh-string},
-%   numberstyle=\tiny\color{gray},
-%   numbers=left,
-%   numbersep=6pt,
-%   frame=single,
-%   breaklines=true,
-%   tabsize=2,
-%   showstringspaces=false,
-%   captionpos=b
-% }
+\definecolor{gh-gray}{gray}{0.95}
+\definecolor{gh-blue}{rgb}{0.0,0.0,0.6}
+\definecolor{gh-green}{rgb}{0.0,0.5,0.0}
+\definecolor{gh-orange}{rgb}{0.6,0.3,0.0}
+\definecolor{gh-comment}{rgb}{0.5,0.5,0.5}
+\definecolor{gh-string}{rgb}{0.8,0.1,0.1}
+\lstdefinestyle{boxed}{
+  language=C,
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{gh-gray},
+  keywordstyle=\color{gh-blue}\bfseries,
+  commentstyle=\color{gh-comment}\itshape,
+  stringstyle=\color{gh-string},
+  numberstyle=\tiny\color{gray},
+  numbers=left,
+  numbersep=6pt,
+  frame=single,
+  breaklines=true,
+  tabsize=2,
+  showstringspaces=false,
+  captionpos=b
+}
 
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{corollary}{Corollary}[theorem]
@@ -792,7 +792,7 @@ A second strategy for accelerating post-quantum cryptography is to target the mo
 Besides hardware accelerations dedicated to specific PQC scheme \cite{DBLP:journals/tches/HoweOKG18,DBLP:journals/tc/KozielAK18,DBLP:journals/tches/AmietCZ18}, there are also active efforts at re-purposing RSA/ECC hardware accelerators \cite{DBLP:journals/tches/AlbrechtHHPVW19}.
 Banerjee et al. \cite{DBLP:conf/iscas/BanerjeeDC20} combined hardware acceleration for both symmetric primitives and modular arithmetics and achieved order-of-magnitude speed and energy efficiency improvements over software-only implementations.
 
-\subsection{Authenticating the embedded device}
+\subsection{Authenticating the embedded device}\label{sec:authenticating-the-embedded-device}
 Prior works \cite{cryptoeprint:2021/1553,DBLP:conf/ccs/Burstinghaus-Steinbach20,DBLP:conf/space/GonzalezW22} evaluating post-quantum TLS on embedded systems primarily focused on configurations in which the constrained device is an anonymous TLS client who does not need to authenticate itself to the server. 
 While the TLS 1.3 (and KEMTLS) supports mutual authentication, implementing it on an embedded device posts unique challenges. 
 The same set of challenges also apply to using embedded device as TLS server.
@@ -1518,12 +1518,13 @@ We especially appreciate this flat abstraction when using a visual debugger such
 
 \begin{lstlisting}[
     frame=single, 
-    style=boxed, 
+    style=boxed,
     float=!htb,
-    language=Rust,
-    label={lst:rustls-cryptoprovider-struct}, caption={
-    User can provide custom cryptographic backend to \texttt{rustls} through the \texttt{CryptoProvider} struct
-}]
+    label={lst:rustls-cryptoprovider-struct}, 
+    caption={
+        User can provide custom cryptographic backend to \texttt{rustls} through the \texttt{CryptoProvider} struct
+    }
+]
 pub struct CryptoProvider {
     pub cipher_suites: Vec<SupportedCipherSuite>,
     pub kx_groups: Vec<&'static dyn SupportedKxGroup>,
@@ -1590,7 +1591,7 @@ We were unaware of this feature and had spent a lot of effort trying to find out
 Last but not least, WolfSSL included ECC+KEM hybrids for key exchange, but the integration with WolfCrypt's ML-KEM is too complex for us to modify in time.
 We included benchmark results from these hybrid key exchange groups in Section \ref{sec:handshake-performance} but they are not directly comparable with other ML-KEM-only key exchange.
 
-\subsection{Generating certificate chain and private keys}\label{sec:generate-certificates}
+\subsection{Authenticate with post-quantum signatures}\label{sec:authenticate-with-pq-sig}
 Because we need to distribute related components of a public-key certificate chain to the server and the client separately, we need to generate the certificate and the private key files.
 X.509 is the standard format for encoding a public-key certificate.
 It is based on the Abstract Sytnax Notation One (ASN.1) and is usually serialized according to Distinguished Encoding Rule (DER).
@@ -1665,88 +1666,154 @@ We particularly appreciate the clever abstraction with which WolfSSL's \texttt{M
 ]
 int wc_MakeCert_ex(Cert* cert, byte* derBuffer, word32 derSz, 
                    int keyType, void* key, WC_RNG* rng) {
-    /* ... other key types ...*/
     falcon_key*        falconKey = NULL;
     dilithium_key*     dilithiumKey = NULL;
-    sphincs_key*       sphincsKey = NULL;
-    if (keyType == FALCON_LEVEL1_TYPE)
-        falconKey = (falcon_key*)key;
-    else if (keyType == FALCON_LEVEL5_TYPE)
-        falconKey = (falcon_key*)key;
-    else if (keyType == ML_DSA_LEVEL2_TYPE)
-        dilithiumKey = (dilithium_key*)key;
-    else if (keyType == ML_DSA_LEVEL3_TYPE)
-        dilithiumKey = (dilithium_key*)key;
-    else if (keyType == ML_DSA_LEVEL5_TYPE)
-        dilithiumKey = (dilithium_key*)key;
-    else if (keyType == SPHINCS_FAST_LEVEL1_TYPE)
-        sphincsKey = (sphincs_key*)key;
-    else if (keyType == SPHINCS_FAST_LEVEL3_TYPE)
-        sphincsKey = (sphincs_key*)key;
-    else if (keyType == SPHINCS_FAST_LEVEL5_TYPE)
-        sphincsKey = (sphincs_key*)key;
-    else if (keyType == SPHINCS_SMALL_LEVEL1_TYPE)
-        sphincsKey = (sphincs_key*)key;
-    else if (keyType == SPHINCS_SMALL_LEVEL3_TYPE)
-        sphincsKey = (sphincs_key*)key;
-    else if (keyType == SPHINCS_SMALL_LEVEL5_TYPE)
-        sphincsKey = (sphincs_key*)key;
+    /* ... other key types ...*/
+    switch (keyType) {
+        case FALCON_LEVEL1_TYPE:
+        case FALCON_LEVEL5_TYPE:
+            falconKey = (falcon_key *)key;
+            break;
+        case ML_DSA_LEVEL2_TYPE:
+        case ML_DSA_LEVEL3_TYPE:
+        case ML_DSA_LEVEL5_TYPE:
+            dilithiumKey = (dilithium_key *)key;
+            break;
+        /* ... */
+    }
     /* ... build cert with key and encode DER to derBuffer ... */
 }
 \end{lstlisting}
 
-Last but not least, an Object Identifier (OID) is needed to identify the public key and the signature on a public-key certificate (as well as the type of key in a private key file).
-The OIDs for ML-KEM, ML-DSA, and SPHINCS+ (SLH-DSA) were standardized by NIST \footnote{\scriptsize\url{https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration}}, so we extended them for HQC and Falcon.
+Expanding WolfSSL's implementation to parse Falcon/SPHINCS+ public key from certificate and produce/verify Falcon/SPHINCS+ signature in \texttt{CertificateVerify} follows similar procedures, so we omit the implementation details.
+The one exception is the 16383-byte fragment size limit of TLS 1.3's record layer.
+This prevents all SPHINCS+ signatures (except for the ``small'' variant at NIST level 1) from being sent in a single record.
+While RFC 8446 allows \texttt{CertificateVerify} with signature size up to 65535 bytes to be fragmented across multiple records, unfortunately WolfSSL did not support fragmenting this message.
+Consequently, we were unable to test server authentication with any of SPHINCS+ fast variants nor any of the small variants at NIST level 3 or above.
 
-\subsection{Implementing KEMTLS}\label{sec:implementing-kemtls}
-{\color{red} Re-write!}
-\subsubsection{Implementing unilaterally authenticated KEMTLS handshake}
-KEMTLS handshake workflow is identical to TLS 1.3's handshake flow from the beginning until client starts processing server's \texttt{Certificate} message.
-Even after KEMTLS and TLS 1.3's handshake flow diverges, they still share the format of the \texttt{Finished} message (which contains exactly one HMAC tag).
-Finally, once the handshake is complete, TLS 1.3 and KEMTLS exchange application data in identical fashion.
-The similarity between TLS 1.3 and KEMTLS handshake workflow allows us to reuse a significant part of WolfSSL's TLS 1.3 implementation, diverging at only a handful of places that are easy to reason about.
-While working with a TLS library written in C is intimidating at first, this implementation strategy proved successful, and I was able to finish implementing KEMTLS in less than a month using only around 4600 lines of code change.
+\subsection{Implementing unilaterally authenticated KEMTLS}\label{sec:implementing-kemtls}
+{\color{red} \begin{itemize}
+    \item Key schedule, Finished, App data, message order checks
+\end{itemize}}
+As illustrated in Figure \ref{fig:tls13-handshake} and \ref{fig:kemtls-handshake}, KEMTLS and TLS 1.3 share half of the handshake workflow, and they handle exchanging application data identically.
+Their similarities allowed us to reuse much of WolfSSL's existing TLS 1.3 state machine, making modifications only where the handshake workflows diverge. This section describe in details these modifications.
 
-The \texttt{WOLFSSL} struct is used on both client-side and server-side and encodes the pair of client and server state as a global TLS state.
-We begin modifying the TLS state machine by adding two flags \texttt{haveMlKemAuth} and \texttt{haveHqcAuth} to the main \texttt{WOLFSSL} struct.
-In a unilaterally authenticated KEMTLS handshake, the two flags are set on the server side when the server loads a KEM private key.
-Detecting a KEM private key is cleanly accomplished because at certificate generation, private keys are encoded according to DER, and the OID of the KEM scheme is included.
-If the OID belongs to one of ML-KEM's variants, then \texttt{haveMlKemAuth} is set, and if the OID belongs to one of HQC's variants, then \texttt{haveHqcAuth} is set.
-On the client side, these two flags are set when the client finds a ML-KEM or HQC public key in the certificate chain sent by the server.
-The combination of these two flags is sufficient for deciding when the two peers are performing a KEMTLS or TLS 1.3 handshake, and all divergence between KEMTLS and TLS 1.3 handshake flow will be controlled by these two flags.
+\subsubsection{Handling KEM certificates}
+We begin by adding two flags \texttt{haveMlKemAuth} and \texttt{haveHqcAuth} to the \texttt{WOLFSSL} struct, which represents the TLS 1.3 state machine and used for both client and server.
+These flags indicate whether server authentication will go through KEMTLS' workflow and with which scheme.
+As discussed in Section \ref{sec:authenticating-the-embedded-device}, we did not implement client authentication in KEMTLS, so we reused the same set of flags on the client side to indicate whether peer is to be authenticated with KEMTLS.
+If client authentication is to be implemented in future works, then we need to account for the possibility that server may wish to be authenticated with KEM while client is authenticated with signatures, hence two sets of flags are needed.
 
-On the client side, KEMTLS and TLS 1.3 handshake flows first diverge after the client finishes processing server's \texttt{Certificate} message. 
-In signature-based TLS 1.3, client's immediate next step is to receive and process server's \texttt{CertificateVerify} containing a signature over the handshake transcript.
-In KEMTLS, client will not receive additional message. Instead, it uses the KEM public key to encapsulate the \textbf{authentication secret}, then sends the ciphertext to the server in a \texttt{KemCiphertext} message.
-We followed the original KEMTLS implementation's \texttt{KemCiphertext} format as a handshake message whose payload contains the raw ciphertext and no additional metadata.
-Within the context of this project, each server instance will only load one private key, so \texttt{KemCiphertext} not carrying metadata on the ciphertext will not cause confusion.
-However, WolfSSL supports loading multiple private keys for authentication, in which case it might be necessary for \texttt{KemCiphertext} to carry metadata such as an OID.
+On the server side, if the leaf public key from the loaded certificate chain is a ML-KEM/HQC key, as identified by the OID, then the appropriate flag is set.
+After server finishes sending \texttt{Certificate}, the KEM-auth flags will decide whether the state machine will proceed to send \texttt{CertificateVerify} as in signature-based authentication, or to process \texttt{KemCiphertext} as in KEM-authentication (Listing \ref{lst:accept-KEMTLS}).
 
-Client's \texttt{KemCiphertext} is encrypted under handshake traffic keys derived from the unauthenticated handshake secret (HS).
-After sending \texttt{KemCiphertext}, client must update the key schedule by mixing in the authentication secret and deriving the authenticated handshake secret (AHS).
-From AHS, the client will derive new handshake traffic key for encrypting additional handshake messages, as well as application traffic key.
-This key schedule update is necessary for subsequent messages to provide implicit authentication: no adversary, even if it compromises the handshake secret, can decrypt subsequent handshake message or application data without the long-term secret key.
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htbp,
+    label={lst:accept-KEMTLS}, 
+    caption={
+        \texttt{accept\_KEMTLS} will take over the handshake workflow after sending \texttt{Certificate} if either of \texttt{haveMlKemAuth} or \texttt{haveHqcAuth} is set
+    }
+]
+int wolfSSL_accept_TLSv13(WOLFSSL *ssl) {
+    /*  ... earlier states ... */
+    if (!ssl->options.resuming && ssl->options.sendVerify) {
+        if ((ssl->error = SendTls13Certificate(ssl)) != 0) {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        }
+    }
+    if (ssl->options.haveMlKemAuth || ssl->options.haveHqcAuth) {
+        ssl->options.acceptState = KEMTLS_ACCEPT_CERT_SENT;
+        ssl->error = accept_KEMTLS(ssl);
+        if (ssl->error == 0) {
+            return WOLFSSL_SUCCESS;
+        } else {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        }
+    } else {
+        ssl->options.acceptState = TLS13_CERT_SENT;
+    }
+    if (!ssl->options.resuming && ssl->options.sendVerify) {
+        if ((ssl->error = SendTls13CertificateVerify(ssl)) != 0) {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        }
+    }
+    /* ... later states ...*/
+}
+\end{lstlisting}
 
-Client's \texttt{Finished} follows the same format as TLS 1.3's \texttt{Finished}: a handshake message whose payload contains a raw HMAC tag computed under the \texttt{finished\_key} against the handshake transcript. 
-The MAC key is derived from the \texttt{MasterSecret}, which is itself derived from AHS. 
-After sending \texttt{Finished}, the client can start sending application data without receiving server's \texttt{Finished} first.
-Because application data will be encrypted under application traffic key derived from authenticated handshake secret, any server successfully decrypting them is implicitly authenticated.
-Finally, client explicitly authenticates the server after receiving server's \texttt{Finished}.
+On the client side, the KEM-auth flags are set during \texttt{Certificate} processing, and they decide whether the client state machine proceeds to process \texttt{CertificateVerify} or to send \texttt{KemCiphertext} (Listing \ref{lst:connect-KEMTLS}).
 
-On the server side, KEMTLS and TLS 1.3 handshake flow first diverges after server finishes sending its \texttt{Certificate}. 
-If either of \texttt{haveMlKemAuth} and \texttt{haveHqcAuth} flag is set, then after exiting \texttt{SendTls13Certificate}, instead of constructing and sending \texttt{CertificateVerify}, server will receive and process \texttt{KemCiphertext}.
-After decapsulating client's \texttt{KemCiphertext}, server similarly needs to update the key schedule: first derive the authenticated handshake secret using the authentication secret, then derive new handshake traffic keys, HMAC keys for processing client's \texttt{Finished} and constructing server's \texttt{Finished}, and finally the application traffic keys.
-Last but not least, server needs to construct and send its \texttt{Finished} before it can start sending application data.
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htbp,
+    label={lst:connect-KEMTLS}, 
+    caption={
+        Advance client's state machine until after \texttt{Certificate} is processed, then \texttt{connect\_KEMTLS} will take over the handshake if either of \texttt{haveMlKemUath} or \texttt{haveHqcAuth} is set while processing \texttt{Certificiate}
+    }
+]
+int wolfSSL_connect_TLSv13(WOLFSSL *ssl) {
+    /* ... setup, send ClientHello, process ServerHello, etc. ... */
+    while (ssl->options.serverState < SERVER_CERT_COMPLETE) {
+        if ((ssl->error = ProcessReply(ssl)) < 0) {
+                WOLFSSL_ERROR(ssl->error);
+                return WOLFSSL_FATAL_ERROR;
+        }
+    }
+    if (ssl->options.haveMlKemAuth || ssl->options.haveHqcAuth) {
+        ssl->error = connect_KEMTLS(ssl);
+        if (ssl->error != 0) {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        } else {
+            return WOLFSSL_SUCCESS;
+        }
+    }
 
-In our implementation, we used the handshake message type for \texttt{client\_key\_exchange} when constructing \texttt{KemCiphertext}. \texttt{client\_key\_exchange} is a handshake message type that exists only in TLS 1.2 or prior but not in TLS 1.3. 
-This upsets some sanity checks in WolfSSL's TLS 1.3 state machine. Similarly, the different order of messages, particularly the order of \texttt{Finished}, can also cause the same set of sanity checks to fail. 
-For the purpose of benchmarking performance only, we modified the these sanity checks to ignore message orders when \texttt{haveMlKemAuth} or \texttt{haveHqcAuth} is set.
-However, in production use, KEMTLS will definitely require a distinct set of checks to ensure the integrity of the handshake state machine.
+    while (ssl->options.serverState < SERVER_FINISHED_COMPLETE) {
+        if ((ssl->error = ProcessReply(ssl)) < 0) {
+            WOLFSSL_ERROR(ssl->error);
+            return WOLFSSL_FATAL_ERROR;
+        }
+    }
+    /* ... cleanup ... */
+}
+\end{lstlisting}
 
-\subsection{Miscellaneous comments}
-We appreciate the many thoughtful design choices made in both WolfSSL and WolfCrypt. Using C preprocessing macros defined in a easily manageable \texttt{user\_settings.h} file allowed us to build for three different platforms (Apple Silicon on the author's laptop running MacOS, \texttt{x86\_64} on the test server running Linux, and 32-bit ARM on baremetal) using a single codebase. The modular I/O callback API made it possible to run WolfSSL on the Pi Pico without any RTOS. WolfSSL's repository even provided ready-made integration with the \texttt{Pico-SDK} so that using Pico's hardware RNG with WolfCrypt's \texttt{WC\_RNG} struct requires no additional effort from the authors.
+\subsubsection{Constructing and handling \texttt{KemCiphertext}}\label{sec:handling-kemciphertext}
+We follow prior implementation \cite{DBLP:conf/latincrypt/CeliFSTVWWW21,DBLP:conf/space/GonzalezW22} for the structure of this message: \texttt{KemCiphertext} is a handshake message (borrowing the message type \texttt{client\_key\_exchange} from TLS 1.2) whose body contains the raw ciphertext bytes (Listing \ref{lst:send-kemciphertext}).
+In our implementation, each server will load at most one private key, so the content of \texttt{KemCiphertext} will be decapsulated or rejected according to that one key.
+We leave for future works to design a richer structure that annotates the message with some identifier (perhaps an OID) so it can be correctly decapsulated by server loaded with multiple private keys.
 
-Another difficulty with WolfSSL comes from the need for manual memory management. This is especially the case when building for the Pico, which has only 512kB SRAM and can be easily overwhelmed by memory leaks since post-quantum keys, ciphertexts, and signatures all consume 1-10 kilobytes of memories each. Fortunately, there are only a handful of places where WolfSSL requires dynamic memory allocations, and they are either freed within the function scope or freed at the end of the handshake as part of \texttt{wolfSSL\_shutdown} or \texttt{wolfSSL\_free}. Other instances of dynamic memory allocation were flawlessly managed in WolfSSL's existing source code, allowing the Pico to continuously perform thousands of handshakes without exhausting its SRAM or needing assistance from an RTOS.
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htbp,
+    label={lst:send-kemciphertext}, 
+    caption={
+        Client constructing \texttt{KemCiphertext}
+    }
+]
+static int SendKemTlsClientKemCiphertext(WOLFSSL *ssl) {
+    /* add both record and handshake headers */
+    AddTls13Headers(output, ssl->kemCiphertextSz, client_key_exchange, ssl);
+    XMEMCPY(input + HANDSHAKE_HEADER_SZ, ssl->kemCiphertext,
+            ssl->kemCiphertextSz);
+    inputSz = ssl->kemCiphertextSz + HANDSHAKE_HEADER_SZ;
+    sendSz = BuildTls13Message(ssl, output, outputSz, input, inputSz, handshake,
+                               hashOutput, 0, 0);
+    if (sendSz < 0)
+        return BUILD_MSG_ERROR;
+    ssl->buffers.outputBuffer.length += sendSz;
+    ret = SendBuffered(ssl);
+    return ret;
+}
+\end{lstlisting}
 
 \chapter{Performance of post-quantum TLS 1.3 and KEMTLS}
 This section will present and analyze performance benchmarking data. 
@@ -2453,7 +2520,7 @@ Figure \ref{fig:comparing-cca-and-1cca-kems} compares the distribution of key ex
 \paragraph{ML-DSA vs. Falcon} ML-DSA and Falcon are both lattice-based digital signature schemes selected by NIST for standardization (ML-DSA was standardized in August 2024; Falcon was selected but still in the process of being standardized).
 However, there are notable differences between their designs and performance characteristics that make one suitable than the other in certain scenarios.
 Falcon has smaller signature size (752 vs 2420 bytes at NIST level 1, 1462 vs 4627 at level 5) and smaller public key size (897 vs 1312 at level 1, 1793 vs 2592 at level 5).
-According to eBACS \cite{eBACS2025}, on a Cortex-A72 (Raspberry Pi 4B)\footnote{\url{https://bench.cr.yp.to/results-sign/aarch64-pi4b.html}}, Falcon has significantly faster signing and verification than ML-DSA. {\color{red}\bf Does my data support this?}.
+According to eBACS \cite{eBACS2025}, on a Cortex-A72 (Raspberry Pi 4B)\footnote{\url{https://bench.cr.yp.to/results-sign/aarch64-pi4b.html}}, Falcon has significantly faster signing and verification than ML-DSA.
 Because ML-DSA signs using the ``Fiat-Shamir with abort'' \cite{DBLP:conf/asiacrypt/Lyubashevsky09} strategy, signing time can have large variances depending on the input randomness, while Falcon's signing routine does not have this issue.
 On the other hand, Falcon's signing routine uses a discrete Gaussian sampler, which requires constant-time floating point arithmetics with at least 53-bits of precision.
 The float-point arithmetics requirement is not only difficult to fulfill, such as on legacy CPUs and/or embedded devices, but also difficult to implement without risk of introducing side-channel vulnerabilities \cite{}.
@@ -2508,9 +2575,6 @@ Chapter \ref{} reviewed the TLS 1.3 protocol, its security properties, and its t
 Chapter \ref{} introduced two optimizations for post-quatnum TLS 1.3: using IND-1CCA KEM for ephemeral key exchange and using KEM for server authentication.
 In Chapter \ref{} and \ref{}, we described in details how we incorporated post-quantum primitive into TLS 1.3 for an embedded client, then discussed the performance characteristics of various configurations.
 
-Our main contribuion {\color{red}\bf is what}.
-
-\emph{Limitations} No optimized impls, missing SPHINCs-128f due to no fragmented \texttt{CertificateVerify}, no client authentication, missing server-side metrics.
 
 \section{Future works}
 \paragraph{Broaden PQC primitive support}
