@@ -459,7 +459,12 @@ This is dedicated to the one I love.
 % Change page numbering back to Arabic numerals
 \pagenumbering{arabic}
 
-\chapter{Introduction}
+\chapter{Introduction}\label{sec:introduction}
+\emph{Transport Layer Security} (TLS) is the most widely used cryptographic protocol on the Internet.
+It allows two parties two establish a secure communication channel that achieves confidentiality, integrity, and authenticity over an insecure or even malicious network.
+Although TLS (and its predecessor SSL) was originally designed for web browsing, through more than thirty years of iterations, it has become the default choice for many secure applications, including email (via SMTP, IMAPS, and POP3S), remote desktop (RDP), 
+
+\chapter{Post-quantum TLS 1.3}
 \section{An overview of TLS 1.3}
 Transport Layer Security (TLS) is a communication protocol with which two parties can exchange data in the presence of passive or active adversaries while preserving \textbf{confidentiality, integrity, and authenticity}.
 It was first developed at Netscape in 1994 and went through many iterations.
@@ -817,7 +822,7 @@ KEMTLS is motivatd by the observation that post-quantum signature candidates gen
 
 Section \ref{sec:kemtls-handshake} will introduce the KEMTLS handshake workflow. Section \ref{sec:kemtls-security} will review the security properties of KEMTLS and compare them with TLS 1.3.
 
-\subsection{KEMTLS Handshake}\label{sec:kemtls-handshake}
+\subsection{KEMTLS handshake}\label{sec:kemtls-handshake}
 Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral authentication. Like TLS 1.3's handshake (Figure \ref{fig:tls13-handshake}), KEMTLS handshake can be cleanly divided into a key exchange phases where the two parties establish an ephemeral shared secret, and an authentication phase where the server proves its identity to the client. However, KEMTLS' authentication flow diverges significantly from TLS 1.3's authentication flow, and there are subtle downstream differences. We will discuss them in detail in this section.
 
 \begin{figure}[htbp]
@@ -1355,8 +1360,9 @@ A OW-PCA adversary can then simulate the modified IND-CCA game for the KEM adver
 \end{proof}
 
 \subsection{Related works}\label{sec:ind-1cca-discussion}
-To our knowledge, the concept of IND-qCCA security is first published by Cramer et al.\cite{DBLP:conf/asiacrypt/CramerHHIKPSV07}, whose proposed a generic black-box IND-qCCA PKE construction whose security reduces to the IND-CPA security of the underlying PKE and the existential unforgeability of the underlying one-time signature \cite{lamport1979constructing}.
-It is particularly remarkable how this reduction is proved in the standard model instead of the random oracle model, although this came at the cost of computational efficiency.
+Bounded CCA security is first proposed by Cramer et al.\cite{DBLP:conf/asiacrypt/CramerHHIKPSV07}, who proposed a generic black-box IND-qCCA PKE construction whose security reduces to the IND-CPA security of the underlying PKE and the existential unforgeability of the underlying one-time signature \cite{lamport1979constructing}.
+Besides being the first of its kind, Cramer's IND-qCCA transformation is also remarkable because the security reduction is proved under the standard model insteasd of the ROM.
+Unfortunately, this transformation is also computationally ineffiency and thus impractical.
 
 \begin{figure}[htbp]
     \centering
@@ -1396,7 +1402,7 @@ It is particularly remarkable how this reduction is proved in the standard model
 \end{figure}
 
 Huguenin-Dumittan and Vaudenay \cite{DBLP:conf/eurocrypt/Huguenin-Dumittan22} extended this line of work to the post-quantum setting by proposing two IND-qCCA KEM constructions (respectively denoted by $T_\text{CH}$ and $T_H$) from CPA-secure PKEs. 
-$T_\text{CH}$ achieves qCCA security using a ``confirmation hash'': the KEM ciphertext includes the PKE ciphertext and a hash of the PKE plaintext, and the KEM shared secret is derived from hashing the PKE plaintext ({\color{red} the encrypt-then-MAC transformatino can be seen as a special case of the $T_\text{CH}$ transformation \bf{not sure if we should mention this similarity}}).
+$T_\text{CH}$ achieves qCCA security using a ``confirmation hash'': the KEM ciphertext includes the PKE ciphertext and a hash of the PKE plaintext, and the KEM shared secret is derived from hashing the PKE plaintext.
 The security reduction is loose by a factor of $2^q$ where $q$ is the number of decapsulation queries.
 $T_H$ achieves qCCA security by deriving the shared secret from hashing both the PKE plaintext and ciphertext (Figure \ref{fig:dumittan-th-transform}), so decapsulation queries with modified ciphertext will be answered with independent random values under the rancom oracle model.
 $T_H$'s construction is simpler than $T_\text{CH}$ and retains the original ciphertext length, but on the other hand, the security reduction is looser, with a factor of $q_H^{2q}$, where $q_H$ is the number of hash oracle queries, and $q$ is the number of decapsulation queries.
@@ -1468,7 +1474,7 @@ We considered using \texttt{liboqs}, but found the lack of documentation on bare
 PQClean's simple structure allowed us to easily use a single codebase and build for both server (\texttt{x86\_64} on Linux) and embedded client with no RTOS.
 
 \subsection{Implementing post-quantum key exchange}\label{sec:implementing-pq-kex}
-\paragraph{Adding new KEM} Incorporating post-quantum KEMs into the key exchange flow of TLS 1.3 is relatively straightforward despite the API difference between a KEM and a Diffie-Hellman key exchange.
+\subsubsection{Adding new KEM} Incorporating post-quantum KEMs into the key exchange flow of TLS 1.3 is relatively straightforward despite the API difference between a KEM and a Diffie-Hellman key exchange.
 In fact, WolfSSL already supports ML-KEM for the key exchange phase, which provides a template with which we can integrate HQC and IND-1CCA ML-KEM.
 RFC 8446 specified that each key exchange group (called \texttt{NamedGroup}) is identified with a 16-bit value, which is captured in an enum type \texttt{NamedGroup} in WolfSSL.
 The variants of this enum type are assigned their group point to be directly used in constructing the \texttt{key\_share} extension the hello messages.
@@ -1534,7 +1540,7 @@ pub struct CryptoProvider {
 }
 \end{lstlisting}
 
-\paragraph{Memory management} Programming in C brings substantial challenge in memory management, especially on the embedded client, where memory leaks can quickly exhaust the meager amount of available RAM.
+\subsubsection{Memory management} Programming in C brings substantial challenge in memory management, especially on the embedded client, where memory leaks can quickly exhaust the meager amount of available RAM.
 Following best practices, we allocate memory for cryptographic operations on the stack wherever possible, and on the heap only when necessary, such as when data need to persist across multiple TLS messages.
 With the ephemeral key exchange, KEM public key and private key must be dynamically allocated because they need to live after the local frame exits.
 On the other hand, ciphertexts and shared secrets are short-lived and are thus allocated on the stack.
@@ -1583,7 +1589,7 @@ static int TLSX_KeyShare_GenPQCleanMlKemKeyClient(WOLFSSL *ssl,
 }
 \end{lstlisting}
 
-\paragraph{Miscellaneous} One interesting design is a \texttt{static const word16 preferredGroup[]}.
+\subsubsection{Miscellaneous} One interesting design is a \texttt{static const word16 preferredGroup[]}.
 User can specify the key exchange groups using the \texttt{wolfSSL\_CTX\_set\_groups} API, but this user-specified list of groups is copmared with the internal static \texttt{preferredGroups} when constructing \texttt{ClientHello}.
 If the two lists do not match, then WolfSSL will send a \texttt{ClientHello} with an empty \texttt{key\_share} extension; per RFC 8446, this indicates that client is requesting group selection from the server, and will increase handshake latency by one round trip.
 We were unaware of this feature and had spent a lot of effort trying to find out why the client is sending \texttt{ClientHello} twice even though client and server both support the newly added KEM.
@@ -1640,7 +1646,7 @@ MlDsaKey key;
 Cert cert;
 uint8_t der[BUF_SIZE], pem[BUF_SIZE];
 int derSz, pemSz;
-/* ... initialize signature keypairs and RNG
+/* ... initialize signature keypairs and RNG ... */
 wc_InitCert(&cert);
 cert.sigType = CTC_ML_DSA_LEVEL1;
 /* ... fill in subject, issuer, valid dates ... */
@@ -1692,25 +1698,23 @@ While RFC 8446 allows \texttt{CertificateVerify} with signature size up to 65535
 Consequently, we were unable to test server authentication with any of SPHINCS+ fast variants nor any of the small variants at NIST level 3 or above.
 
 \subsection{Implementing unilaterally authenticated KEMTLS}\label{sec:implementing-kemtls}
-{\color{red} \begin{itemize}
-    \item Key schedule, Finished, App data, message order checks
-\end{itemize}}
 As illustrated in Figure \ref{fig:tls13-handshake} and \ref{fig:kemtls-handshake}, KEMTLS and TLS 1.3 share half of the handshake workflow, and they handle exchanging application data identically.
 Their similarities allowed us to reuse much of WolfSSL's existing TLS 1.3 state machine, making modifications only where the handshake workflows diverge. This section describe in details these modifications.
 
 \subsubsection{Handling KEM certificates}
-We begin by adding two flags \texttt{haveMlKemAuth} and \texttt{haveHqcAuth} to the \texttt{WOLFSSL} struct, which represents the TLS 1.3 state machine and used for both client and server.
-These flags indicate whether server authentication will go through KEMTLS' workflow and with which scheme.
+We begin by adding two flags \texttt{haveMlKemAuth} and \texttt{haveHqcAuth} to the \texttt{WOLFSSL} struct.
+These flags indicate whether server authentication will go through KEMTLS workflow and with which scheme.
 As discussed in Section \ref{sec:authenticating-the-embedded-device}, we did not implement client authentication in KEMTLS, so we reused the same set of flags on the client side to indicate whether peer is to be authenticated with KEMTLS.
 If client authentication is to be implemented in future works, then we need to account for the possibility that server may wish to be authenticated with KEM while client is authenticated with signatures, hence two sets of flags are needed.
 
 On the server side, if the leaf public key from the loaded certificate chain is a ML-KEM/HQC key, as identified by the OID, then the appropriate flag is set.
 After server finishes sending \texttt{Certificate}, the KEM-auth flags will decide whether the state machine will proceed to send \texttt{CertificateVerify} as in signature-based authentication, or to process \texttt{KemCiphertext} as in KEM-authentication (Listing \ref{lst:accept-KEMTLS}).
+On the client side, the KEM-auth flags are set during \texttt{Certificate} processing, and they decide whether the client state machine proceeds to process \texttt{CertificateVerify} or to send \texttt{KemCiphertext} (Listing \ref{lst:connect-KEMTLS}).
 
 \begin{lstlisting}[
     frame=single, 
     style=boxed, 
-    float=htbp,
+    float=htb,
     label={lst:accept-KEMTLS}, 
     caption={
         \texttt{accept\_KEMTLS} will take over the handshake workflow after sending \texttt{Certificate} if either of \texttt{haveMlKemAuth} or \texttt{haveHqcAuth} is set
@@ -1745,8 +1749,6 @@ int wolfSSL_accept_TLSv13(WOLFSSL *ssl) {
     /* ... later states ...*/
 }
 \end{lstlisting}
-
-On the client side, the KEM-auth flags are set during \texttt{Certificate} processing, and they decide whether the client state machine proceeds to process \texttt{CertificateVerify} or to send \texttt{KemCiphertext} (Listing \ref{lst:connect-KEMTLS}).
 
 \begin{lstlisting}[
     frame=single, 
@@ -1793,7 +1795,7 @@ We leave for future works to design a richer structure that annotates the messag
 \begin{lstlisting}[
     frame=single, 
     style=boxed, 
-    float=htbp,
+    float=htb,
     label={lst:send-kemciphertext}, 
     caption={
         Client constructing \texttt{KemCiphertext}
@@ -1801,17 +1803,159 @@ We leave for future works to design a richer structure that annotates the messag
 ]
 static int SendKemTlsClientKemCiphertext(WOLFSSL *ssl) {
     /* add both record and handshake headers */
-    AddTls13Headers(output, ssl->kemCiphertextSz, client_key_exchange, ssl);
+    AddTls13Headers(output, ssl->kemCiphertextSz, client_key_exchange, 
+                    ssl);
     XMEMCPY(input + HANDSHAKE_HEADER_SZ, ssl->kemCiphertext,
             ssl->kemCiphertextSz);
     inputSz = ssl->kemCiphertextSz + HANDSHAKE_HEADER_SZ;
-    sendSz = BuildTls13Message(ssl, output, outputSz, input, inputSz, handshake,
-                               hashOutput, 0, 0);
+    sendSz = BuildTls13Message(ssl, output, outputSz, input, inputSz,
+                               handshake, hashOutput, 0, 0);
     if (sendSz < 0)
         return BUILD_MSG_ERROR;
     ssl->buffers.outputBuffer.length += sendSz;
     ret = SendBuffered(ssl);
     return ret;
+}
+\end{lstlisting}
+
+\subsubsection{\texttt{Finished} and application data}
+\texttt{Finished} is the last handshake message in both KEMTLS and TLS 1.3.
+Syntactically, KEMTLS \texttt{Finished} is identical to TLS 1.3 \texttt{Finished}: an HMAC tag under the sender's \texttt{finished\_key} against the running hash of the handshake transcript.
+Therefore we made no change to the construction or processing of this message.
+On the other hand, there are several semantic differences that require modification for KEMTLS.
+First, the pair of \texttt{finished\_key} is derived with input from both the handshake secret and the authentication secret (Listing \ref{lst:derive-kemtls-finished-secrets}). Second, the order in which client and server's \texttt{Finished} is sent is flipped, which requires modifying the corresponding ``message order sanity checks'' in WolfSSL.
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htb,
+    label={lst:derive-kemtls-finished-secrets}, 
+    caption={
+        Deriving \texttt{HS, dHS, AHS, dAHS, MS, finished keys}
+    }
+]
+static int deriveKemTlsFinishedSecrets(WOLFSSL *ssl, 
+                                       byte *kemSharedSecret,
+                                       word32 kemShareddSecretSz) {
+    /* ... after sending Finished, derive HS, dHS, AHS, dAHS, and MS ... */
+    /* client_finished_key <- HKDF_expand(MS, "c finished", NULL) */
+    DeriveKeyMsg(ssl, ssl->keys.client_write_MAC_secret, -1,
+                 ssl->arrays->masterSecret, clientFinishedKeyLabel,
+                 clientFinishedKeyLabelLen, NULL, 0,
+                 ssl->specs.mac_algorithm);
+    /* server_finished_key <- HKDF_expand(MS, "s finished", NULL) */
+    DeriveKeyMsg(ssl, ssl->keys.server_write_MAC_secret, -1,
+                 ssl->arrays->masterSecret, serverFinishedKeyLabel,
+                 serverFinishedKeyLabelLen, NULL, 0,
+                 ssl->specs.mac_algorithm);
+    return 0;
+}
+\end{lstlisting}
+
+KEMTLS's application data layer is identical to its TLS 1.3 counterpart and requires no changes, but before KEMTLS transitions to exchanging application data, we need to derive the application traffic keys and configure the handshake state machine to indicate a successful handshake.
+KEMTLS and TLS 1.3 both derive application traffic keys from the Master Secret (MS), so we can reuse WolfSSL's \texttt{DeriveTls13Keys} after \texttt{deriveKemTlsFinishedSecrets} derives MS from HS and $\texttt{ss}_s$.
+As for configuring the handshake state machine, we observe that WolfSSL keeps track of the state of a handshake using an increasing sequence of integers (Listing \ref{lst:wolfssl-ssl-in-handshake}).
+We added handshake states unique to KEMTLS while making sure that the value of individual states is consistent with the order in which a KEMTLS handshake goes through these states.
+To ensure that the KEMTLS handshake correctly produced a consistent pair of application traffic keys, we implemented the client to send a few random bytes after the handshake finishes, and the server to echo back client's application data.
+The application data do not count toward handshake performance in Section \ref{sec:handshake-performance}.
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htb,
+    label={lst:wolfssl-ssl-in-handshake}, 
+    caption={
+        WolfSSL checks the state of using the enum \texttt{handShakeState} and 
+        \texttt{connectState}/\texttt{acceptState}. Smaller value in this enum indicates earlier
+        state in the handshake.
+    }
+]
+static int ssl_in_handshake(WOLFSSL *ssl, int sending_data) {
+    if (ssl->options.handShakeState != HANDSHAKE_DONE)
+        return 1;
+    if (ssl->options.side == WOLFSSL_SERVER_END) {
+        if (IsAtLeastTLSv1_3(ssl->version))
+            return ssl->options.acceptState < TLS13_TICKET_SENT;
+        return 0;
+    }
+    if (ssl->options.side == WOLFSSL_CLIENT_END) {
+        if (IsAtLeastTLSv1_3(ssl->version))
+            return ssl->options.connectState < FINISHED_DONE;
+        return 0;
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\section{Embedded client networking}\label{sec:embedded-client-networking}
+TLS requires a reliable transport layer such as TCP/IP.
+In our implementation, server-side networking is trivially handled by the Linux operating system: we only need to call \texttt{wolfSSL\_set\_fd} to connect the TLS state machine to the TCP stream.
+Client-side networking is non-trivial due to the lack of an operating system.
+Instead we had to use WolfSSL's I/O callback API and manually connect the transport layer to the TLS state machine.
+In this section we briefly describe how we approached implementing the transport layer on the embedded client.
+
+We programmed our embedded client (see Section \ref{sec:experiment-setup}) using the Pico-SDK, which includes the \texttt{cyw43} driver for wireless connectivity and the \texttt{lwip} library for low-level protocol control.
+\texttt{lwip} (Lightweight IP) is an open-source TCP/IP stack developed by Adam Dunkels \cite{lwip-dunkels-adam}. It is designed for minimal code size and memory usage, making it particularly well-suited for resource-constrained environments.
+
+Unlike prior work evaluating PQ-TLS/KEMTLS \cite{DBLP:conf/space/GonzalezW22}, we chose not to use a real-time operating system (RTOS). This decision helped us avoid the added complexity of asynchronous network programming typically required with an RTOS. However, it also meant we could not use \texttt{lwip}’s higher-level socket API, which depends on RTOS features such as threading and synchronization. Instead, we used \texttt{lwip}’s raw API, which offers fine-grained control over TCP but only in an event-driven, callback-based form. Since WolfSSL’s I/O callback interface is designed to work with stream-oriented transports, we needed to build a stream-like abstraction on top of \texttt{lwip}’s raw API.
+
+\texttt{lwip}'s raw API handles data at packet level.
+When the network interface receives an IP packet, a handler is called to process the packet based on higher level need.
+To get a stream-like behavior, we implemented a buffered read: when a packet is received, the handler will append the incoming packet onto an internal buffer, then later when the application reads from the stream, a pointer keeps track of the amount of data consumed from the internal buffer.
+The read buffer is freed when all data have been consumed by the application to prevent memory leak.
+WolfSSL already buffers its write operations, so we did not implement buffered write at the stream level.
+Listing \ref{lst:pico-tcp-stack} shows how the buffered read is implemented.
+
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed, 
+    float=htb,
+    label={lst:pico-tcp-stack}, 
+    caption={
+        Buffered read using \texttt{lwip}'s raw API
+    }
+]
+/* handle incoming packet */
+static err_t tcp_recv_handler(void *arg, struct tcp_pcb *tpcb, 
+                              struct pbuf *p, err_t err) {
+    tcp_stream_t *stream = (tcp_stream_t *)arg;
+    err_t lwip_err = ERR_OK;
+    if (stream == NULL) {
+        /*... fail ...*/
+    } else if (!p) {
+        stream->terminated = true; /* peer terminated connection */
+    } else if (p) {
+        if (stream->rx_pbuf) {
+            uint32_t remaining_cap = 0xFFFF - stream->rx_pbuf->tot_len;
+            if (remaining_cap < p->tot_len) {
+                lwip_err = ERR_WOULDBLOCK;
+            } else {
+                pbuf_cat(stream->rx_pbuf, p);
+            }
+        } else {
+            stream->rx_pbuf = p;
+        }
+    }
+    return lwip_err;
+}
+
+err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
+                      size_t *outlen) {
+    /* ... */
+    if (stream->rx_pbuf != NULL) {
+        uint16_t remlen = stream->rx_pbuf->tot_len - stream->rx_offset;
+        size_t copylen = MIN(remlen, bufcap);
+        *outlen = pbuf_copy_partial(stream->rx_pbuf, buf, copylen, 
+                                    stream->rx_offset);
+        tcp_recved(stream->pcb, *outlen);
+        if (stream->rx_pbuf->tot_len == *outlen + stream->rx_offset) {
+            pbuf_free(stream->rx_pbuf);
+            stream->rx_pbuf = NULL;
+            stream->rx_offset = 0;
+        } else {
+            stream->rx_offset += *outlen;
+        }
+    } /* ... */
 }
 \end{lstlisting}
 
@@ -1824,7 +1968,6 @@ Finally Section \ref{sec:handshake-performance} details the performance of post-
 
 \section{Experiment setup}\label{sec:experiment-setup}
 
-\subsection{Client}\label{sec:experiment-client}
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.45\linewidth]{benchmarks/imgs/pico-2-w.jpg}\hfill
@@ -1832,19 +1975,14 @@ Finally Section \ref{sec:handshake-performance} details the performance of post-
     \caption{Client hardware: Pi Pico 2 W connected via 2.4GHz WiFi}
     \label{fig:pi-pico-2-w}
 \end{figure}
-\paragraph{Hardware} The Raspberry Pi Pico 2 W (Figure \ref{fig:pi-pico-2-w}) is a microcontroller developed by the Raspberry Pi Foundation and was released in late 2024.
+\paragraph{Client} The Raspberry Pi Pico 2 W (Figure \ref{fig:pi-pico-2-w}) is a microcontroller developed by the Raspberry Pi Foundation and was released in late 2024.
 At the heart of the Pico 2 W is the RP2350 chip, which contains two ARM Cortex-M33 cores and two Hazard3 RISC-V cores, although only one architecture can be enabled at a time.
 The chip is clocked at 150MHz.
 The Pico 2 W also has 520KB of SRAM and 4MB of flash storage.
 For connectivity, the Pico 2 W has a CYW43439 module that supports 2.4 GHz Wifi and Bluetooth 5.4.
 
-\paragraph{Software Toolchain} For developing on the Pico 2 W, we used the GNU ARM toolchain (\texttt{arm-none-eabi-gcc} version 8.5.0) and the Pico-SDK, which comes with a standard library as well as integration with third-party open source projects, most notably \texttt{lwip} (lightweight IP).
-\texttt{lwip} is a TCP/IP library designed for embedded system, and the Pico-SDK provided tight integration between \texttt{lwip} and the \texttt{cyw43} driver, which allowed us to implement a simple TCP stream on top of the raw TCP API.
-We also used \texttt{lwip} to implement DNS and time synchronization over NTP, the latter being necessary for WolfSSL to validate the expiration dates of peer's certificates.
-Because of the lack of a file system, certificates must be baked into the firmware at compilation. 
-While it is possible to define certificates as raw bytes in C preprocessing macro, we found it much easier to encode the certificates in PEM format, which consists entirely of ASCII characters.
+Firmware is compiled using the GNU ARM toolchain (\texttt{arm-none-eabi-gcc} version 8.5.0) and \texttt{CMakeBuildType=RelWithDebInfo}.
 
-\subsection{Server and network}\label{sec:experiment-server-and-network}
 \paragraph{Server} The TLS server runs on a desktop computer with an 8-core AMD Ryzen 7 1700X clocked at 3.4GHz and 12GB of DDR4 RAM.
 The desktop runs Ubuntu 24.04 LTS.
 The server binary is compiled using \texttt{GCC 13.3.0} and \texttt{CMAKE\_BUILD\_TYPE=RelWithDebInfo}.
@@ -2604,8 +2742,8 @@ In this work, we only incorporated reference implementations with certain perfor
 
 % The following statement selects the style to use for references.  
 % It controls the sort order of the entries in the bibliography and also the formatting for the in-text labels.
-\bibliographystyle{alpha}
-% \bibliographystyle{plain}
+% \bibliographystyle{alpha}
+\bibliographystyle{plain}
 % This specifies the location of the file containing the bibliographic information.  
 % It assumes you're using BibTeX to manage your references (if not, why not?).
 \cleardoublepage % This is needed if the "book" document class is used, to place the anchor in the correct page, because the bibliography will start on its own page.
