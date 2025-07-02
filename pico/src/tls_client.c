@@ -11,46 +11,21 @@
 
 #define SLEEP_MS (100)
 
-// #include "pico-pqtls/cafiles/rsa2048-rsa2048-rsa2048.h"
-// #include "pico-pqtls/cafiles/sha256ecdsa.h"
-// #include "pico-pqtls/cafiles/ed25519.h"
-// #include "pico-pqtls/cafiles/mldsa44.h"
-// #include "pico-pqtls/cafiles/falcon512.h"
-// #include "pico-pqtls/cafiles/sphincs128s.h"
-// #include "pico-pqtls/cafiles/sphincs128s-sphincs128s-hqc128.h"
-// #include "pico-pqtls/cafiles/sphincs256s-sphincs256s-hqc256.h"
-// #include "pico-pqtls/cafiles/sphincs128f-mldsa44-mldsa44-mldsa44.h"
-// #include "pico-pqtls/cafiles/falcon512-mldsa44-mldsa44-mldsa44.h"
-// #include "pico-pqtls/cafiles/sphincs128s-mldsa44-mldsa44.h"
-// #include "pico-pqtls/cafiles/mldsa44-mldsa44-mlkem512-mldsa44.h"
-// #include "pico-pqtls/cafiles/mldsa44-mldsa44-hqc128-mldsa44.h"
-// #include "pico-pqtls/cafiles/falcon1024-falcon1024-mlkem1024.h"
-// #include "pico-pqtls/cafiles/sphincs192s-sphincs192s-hqc192.h"
-// #include "pico-pqtls/cafiles/sphincs256s-sphincs256s-mlkem1024.h"
-// #include "pico-pqtls/cafiles/mldsa87-mldsa87-mlkem1024.h"
-// #include "pico-pqtls/cafiles/sphincs192s-sphincs192s-mlkem768.h"
-// #include "pico-pqtls/cafiles/falcon1024-falcon1024-mlkem768.h"
-// #include "pico-pqtls/cafiles/mldsa87-mldsa87-mlkem768.h"
-// #include "pico-pqtls/cafiles/sphincs256s-sphincs256s-mldsa87.h"
-// #include "pico-pqtls/cafiles/sphincs192s-sphincs192s-mldsa65.h"
-// #include "pico-pqtls/cafiles/mldsa65-mldsa65-mlkem768.h"
-// #include "pico-pqtls/cafiles/sphincs128s-sphincs128s-mlkem512.h"
-// #include "pico-pqtls/cafiles/falcon512-falcon512-mlkem512.h"
-#include "pico-pqtls/cafiles/mldsa65-mldsa65-mlkem512.h"
+#include "pico-pqtls/cafiles/mldsa87.h"
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
 #endif
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "mlkem512"
+#define KEX_NAME "p521mlkem1024"
 static int kex_groups[] = {
     // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
     // WOLFSSL_ECC_SECP521R1,
     // WOLFSSL_ECC_X25519,
     // WOLFSSL_ECC_X448,
-    WOLFSSL_ML_KEM_512,
+    // WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
     // WOLFSSL_ML_KEM_1024,
     // HQC_128,
@@ -66,7 +41,7 @@ static int kex_groups[] = {
     // WOLFSSL_P384_ML_KEM_768,
     // WOLFSSL_X448_ML_KEM_768,
     // WOLFSSL_P384_ML_KEM_1024,
-    // WOLFSSL_P521_ML_KEM_1024,
+    WOLFSSL_P521_ML_KEM_1024,
 };
 static int kex_groups_nelems = sizeof(kex_groups) / sizeof(int);
 
