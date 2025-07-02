@@ -1,15 +1,25 @@
 # Thesis write-up
 A peer's Master's thesis has 50 pages of main content. For a first draft I want to have at least 60 pages of stuff, then trim down as needed.
 
-- Post-quntum TLS in embedded systems
-    - What is TLS, main features, overview of the handshake protocols
-    - TLS in embedded/constrained systems
-    - (post-quantum) cryptography in embedded systems
-- Improvement: use IND-1CCA KEM for ephemeral key exchange
-- Improvement: use KEMTLS
-- Improvement: embed trusted public key (i.e. `cache_info`)
-- Implementation and results
-- Conclusion and future works
+**Proposed structure of paper**"
+- Introduction  
+TLS is important, transition to PQC, public experiment, need to focus on IoT
+    - Contributions: proposed optimization, implementation, evaluation, summarize improvements with table or graph
+    - Related works: other works evaluating PQ-TLS on embedded systems, other works optimizing PQC/PQ-TLS on embedded systems
+- Post-quantum TLS handshake
+    - TLS 1.3 handshake  
+    describe, graph, mutual auth in appendix
+        - certificate chain and PKI
+        - key schedule, HKDF
+        - security: at high level confidentiality-integrity-authenticity, formally discuss Dowling papers, Multi-stage security, state the **Theorem**
+    - KEMTLS  
+    describe, graph, mutual auth in appendix
+        - compare to TLS 1.3: key schedule, implicit auth
+        - security: state the **Theorem**
+- IND-1CCA KEM
+- Implementing PQTLS/KEMTLS
+- Performance on embedded client
+- Conclusions and future works
 
 ## Implementation
 In Thom Wiggers' thesis, *"Implementing and measuring post-quantum TLS in Rust"* is a section that spans 15 pages! I should document my implementation, as well.

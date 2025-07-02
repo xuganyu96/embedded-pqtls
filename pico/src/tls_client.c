@@ -34,7 +34,8 @@
 // #include "pico-pqtls/cafiles/sphincs256s-sphincs256s-mldsa87.h"
 // #include "pico-pqtls/cafiles/sphincs192s-sphincs192s-mldsa65.h"
 // #include "pico-pqtls/cafiles/mldsa65-mldsa65-mlkem768.h"
-#include "pico-pqtls/cafiles/sphincs128s-sphincs128s-mlkem512.h"
+// #include "pico-pqtls/cafiles/sphincs128s-sphincs128s-mlkem512.h"
+#include "pico-pqtls/cafiles/falcon512-falcon512-mlkem512.h"
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
 #endif
