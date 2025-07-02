@@ -11,7 +11,7 @@
 
 #define SLEEP_MS (100)
 
-#include "pico-pqtls/cafiles/sphincs256s-sphincs256s-mldsa87.h"
+#include "pico-pqtls/cafiles/falcon1024-falcon1024-mldsa87.h"
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
 #endif
