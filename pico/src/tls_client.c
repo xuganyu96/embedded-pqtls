@@ -18,7 +18,7 @@
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "p521mlkem1024"
+#define KEX_NAME "mlkem1024"
 static int kex_groups[] = {
     // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
@@ -27,7 +27,7 @@ static int kex_groups[] = {
     // WOLFSSL_ECC_X448,
     // WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
-    // WOLFSSL_ML_KEM_1024,
+    WOLFSSL_ML_KEM_1024,
     // HQC_128,
     // HQC_192,
     // HQC_256,
@@ -41,7 +41,7 @@ static int kex_groups[] = {
     // WOLFSSL_P384_ML_KEM_768,
     // WOLFSSL_X448_ML_KEM_768,
     // WOLFSSL_P384_ML_KEM_1024,
-    WOLFSSL_P521_ML_KEM_1024,
+    // WOLFSSL_P521_ML_KEM_1024,
 };
 static int kex_groups_nelems = sizeof(kex_groups) / sizeof(int);
 
