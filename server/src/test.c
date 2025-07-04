@@ -13,8 +13,6 @@
 #include <wolfssl/wolfcrypt/rsa.h>
 #include <wolfssl/wolfcrypt/sphincs.h>
 
-#include "wolfssl/wolfcrypt/hash.h"
-
 #define SIG_MSG_SIZE 48
 #define WARMUP_ROUNDS 1
 #define BENCH_ROUNDS 5
@@ -1347,7 +1345,7 @@ static void sphincs_verify(void *_args) {
 
 int main(void) {
     wolfSSL_Init();
-    wolfSSL_Debugging_ON();
+    // wolfSSL_Debugging_ON();
     WC_RNG rng;
     wc_InitRng(&rng);
     printf("Initialized RNG\n");
