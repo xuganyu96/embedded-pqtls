@@ -9,6 +9,7 @@
 #include <wolfssl/wolfcrypt/ed25519.h>
 #include <wolfssl/wolfcrypt/ed448.h>
 #include <wolfssl/wolfcrypt/falcon.h>
+#include <wolfssl/wolfcrypt/hash.h>
 #include <wolfssl/wolfcrypt/hqc.h>
 #include <wolfssl/wolfcrypt/otmlkem.h>
 #include <wolfssl/wolfcrypt/pqclean_mlkem.h>
@@ -17,21 +18,68 @@
 #include <wolfssl/wolfcrypt/sphincs.h>
 
 #include "pico-pqtls/utils.h"
-#include "wolfssl/wolfcrypt/hash.h"
 
 #define SIG_MSG_SIZE 48
 #define WARMUP_ROUNDS 10
-#define BENCH_ROUNDS 100
+#define BENCH_ROUNDS 200
 
-#define BENCH_RSA2048 1
-#define NO_BENCH_RSA2048_KEYGEN 1
-#define BENCH_ECDSA 1
-#define BENCH_HQC 1
-#define BENCH_ED25519 1
-#define BENCH_ED448 1
-#define BENCH_DILITHIUM 1
-#define BENCH_FALCON 1
-#define BENCH_SPHINCS 1
+#define BENCH_X25519
+#define BENCH_X25519_KEYGEN
+#define BENCH_X25519_AGREE
+
+#define BENCH_X448
+#define BENCH_X448_KEYGEN
+#define BENCH_X448_AGREE
+
+#define BENCH_ECDHE
+#define BENCH_ECDHE_KEYGEN
+#define BENCH_ECDHE_AGREE
+
+/* I am lazy, so ML-KEM will bench iff OT-ML-KEM bench */
+#define BENCH_MLKEM
+#define BENCH_MLKEM_KEYGEN
+#define BENCH_MLKEM_ENCAP
+#define BENCH_MLKEM_DECAP
+
+#define BENCH_HQC
+#define BENCH_HQC_KEYGEN
+#define BENCH_HQC_ENCAP
+#define BENCH_HQC_DECAP
+
+#define BENCH_RSA2048
+#undef BENCH_RSA2048_KEYGEN
+#undef BENCH_RSA2048_SIGN
+#define BENCH_RSA2048_VERIFY
+
+#define BENCH_ECDSA
+#undef BENCH_ECDSA_KEYGEN
+#undef BENCH_ECDSA_SIGN
+#define BENCH_ECDSA_VERIFY
+
+#define BENCH_ED25519
+#undef BENCH_ED25519_KEYGEN
+#undef BENCH_ED25519_SIGN
+#define BENCH_ED25519_VERIFY
+
+#define BENCH_ED448
+#undef BENCH_ED448_KEYGEN
+#undef BENCH_ED448_SIGN
+#define BENCH_ED448_VERIFY
+
+#define BENCH_DILITHIUM
+#undef BENCH_DILITHIUM_KEYGEN
+#undef BENCH_DILITHIUM_SIGN
+#define BENCH_DILITHIUM_VERIFY
+
+#define BENCH_FALCON
+#undef BENCH_FALCON_KEYGEN
+#undef BENCH_FALCON_SIGN
+#define BENCH_FALCON_VERIFY
+
+#define BENCH_SPHINCS
+#undef BENCH_SPHINCS_KEYGEN
+#undef BENCH_SPHINCS_SIGN
+#define BENCH_SPHINCS_VERIFY
 
 /* Benchmark a black box by running it many times. The CPU cycles counts are
  * written to the input timestamp arrays.
@@ -105,24 +153,11 @@ static void bench_sleep(void *args) {
     sleep_ms(1);
 }
 
+#ifdef BENCH_X25519
 struct x25519_args {
     curve25519_key alice;
     curve25519_key bob;
 };
-
-/* args must be a pointer to WC_RNG
- */
-static void x25519_keygen(void *args) {
-    curve25519_key key;
-    WC_RNG *rng = (WC_RNG *)args;
-    int ret;
-    wc_curve25519_init(&key);
-    ret = wc_curve25519_make_key(rng, 32, &key);
-    if (ret < 0) {
-        printf("wc_curve25519_make_key returned %d\n", ret);
-        exit(-1);
-    }
-}
 
 static void x25519_setup(struct x25519_args *args, WC_RNG *rng) {
     int ret;
@@ -141,6 +176,21 @@ static void x25519_setup(struct x25519_args *args, WC_RNG *rng) {
     printf("x25519 setup complete\n");
 }
 
+#ifdef BENCH_X25519_KEYGEN
+static void x25519_keygen(void *args) {
+    curve25519_key key;
+    WC_RNG *rng = (WC_RNG *)args;
+    int ret;
+    wc_curve25519_init(&key);
+    ret = wc_curve25519_make_key(rng, 32, &key);
+    if (ret < 0) {
+        printf("wc_curve25519_make_key returned %d\n", ret);
+        exit(-1);
+    }
+}
+#endif /* BENCH_X25519_KEYGEN */
+
+#ifdef BENCH_X25519_AGREE
 static void x25519_agree(void *args) {
     byte out[32];
     word32 outlen = 32;
@@ -152,18 +202,23 @@ static void x25519_agree(void *args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_X25519 */
 
+#ifdef BENCH_X448
 struct x448_args {
     curve448_key alice;
     curve448_key bob;
 };
 
+#ifdef BENCH_X448_KEYGEN
 static void x448_keygen(void *args) {
     WC_RNG *rng = (WC_RNG *)args;
     curve448_key key;
     wc_curve448_init(&key);
     wc_curve448_make_key(rng, 56, &key);
 }
+#endif
 
 static void x448_setup(struct x448_args *args, WC_RNG *rng) {
     int ret;
@@ -182,6 +237,7 @@ static void x448_setup(struct x448_args *args, WC_RNG *rng) {
     printf("x448 setup complete\n");
 }
 
+#ifdef BENCH_X448_AGREE
 static void x448_agree(void *args) {
     byte out[56];
     word32 outlen = 56;
@@ -193,12 +249,16 @@ static void x448_agree(void *args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_X448 */
 
+#ifdef BENCH_ECDHE
 struct ecdhe_args {
     ecc_key alice;
     ecc_key bob;
 };
 
+#ifdef BENCH_ECDHE_KEYGEN
 static void ecdhe256_keygen(void *args) {
     WC_RNG *rng = (WC_RNG *)args;
     ecc_key key;
@@ -234,6 +294,7 @@ static void ecdhe521_keygen(void *args) {
         exit(-1);
     }
 }
+#endif /* BENCH_ECDHE_KEYGEN */
 
 static void ecdhe_setup(struct ecdhe_args *args, WC_RNG *rng, int curve_id) {
     int ret;
@@ -256,6 +317,7 @@ static void ecdhe_setup(struct ecdhe_args *args, WC_RNG *rng, int curve_id) {
     printf("ecdhe (%s) setup complete\n", wc_ecc_get_name(curve_id));
 }
 
+#ifdef BENCH_ECDHE_AGREE
 static void ecdhe_agree(void *args) {
     struct ecdhe_args *keypair = (struct ecdhe_args *)args;
     byte out[80];
@@ -267,7 +329,10 @@ static void ecdhe_agree(void *args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_ECDHE */
 
+#ifdef BENCH_MLKEM
 struct mlkem_args {
     WC_RNG *rng;
     PQCleanMlKemKey key;
@@ -275,6 +340,7 @@ struct mlkem_args {
     byte ss[PQCLEAN_MLKEM_SS_SIZE];
 };
 
+#ifdef BENCH_MLKEM_KEYGEN
 static void mlkem512_keygen(void *args) {
     WC_RNG *rng = (WC_RNG *)args;
     PQCleanMlKemKey key;
@@ -310,6 +376,7 @@ static void mlkem1024_keygen(void *args) {
         exit(-1);
     }
 }
+#endif /* BENCH_MLKEM_KEYGEN */
 
 static void mlkem_setup(struct mlkem_args *args, int level, WC_RNG *rng) {
     int ret;
@@ -337,6 +404,7 @@ static void mlkem_setup(struct mlkem_args *args, int level, WC_RNG *rng) {
     printf("mlkem (level=%d) setup complete\n", level);
 }
 
+#ifdef BENCH_MLKEM_ENCAP
 static void mlkem_encap(void *_args) {
     struct mlkem_args *args = (struct mlkem_args *)_args;
     int ret;
@@ -348,7 +416,9 @@ static void mlkem_encap(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_MLKEM_DECAP
 static void mlkem_decap(void *_args) {
     struct mlkem_args *args = (struct mlkem_args *)_args;
     int ret;
@@ -369,7 +439,10 @@ static void mlkem_decap(void *_args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_MLKEM */
 
+#ifdef BENCH_HQC
 struct hqc_args {
     WC_RNG *rng;
     HqcKey key;
@@ -377,6 +450,7 @@ struct hqc_args {
     byte ss[PQCLEAN_HQC_MAX_SHAREDSECRET_SIZE];
 };
 
+#ifdef BENCH_HQC_KEYGEN
 static void hqc128_keygen(void *args) {
     WC_RNG *rng = (WC_RNG *)args;
     HqcKey key;
@@ -412,6 +486,7 @@ static void hqc256_keygen(void *args) {
         exit(-1);
     }
 }
+#endif /* BENCH_HQC_KEYGEN */
 
 static void hqc_setup(struct hqc_args *args, int level, WC_RNG *rng) {
     int ret;
@@ -439,6 +514,7 @@ static void hqc_setup(struct hqc_args *args, int level, WC_RNG *rng) {
     printf("hqc (level=%d) setup complete\n", level);
 }
 
+#ifdef BENCH_HQC_ENCAP
 static void hqc_encap(void *_args) {
     struct hqc_args *args = (struct hqc_args *)_args;
     int ret;
@@ -450,7 +526,9 @@ static void hqc_encap(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_HQC_DECAP
 static void hqc_decap(void *_args) {
     struct hqc_args *args = (struct hqc_args *)_args;
     int ret;
@@ -471,7 +549,10 @@ static void hqc_decap(void *_args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_HQC */
 
+#ifdef BENCH_MLKEM
 struct otmlkem_args {
     WC_RNG *rng;
     OtMlKemKey key;
@@ -479,6 +560,7 @@ struct otmlkem_args {
     byte ss[PQCLEAN_OTMLKEM_MAX_SHAREDSECRET_SIZE];
 };
 
+#ifdef BENCH_MLKEM_KEYGEN
 static void otmlkem512_keygen(void *args) {
     WC_RNG *rng = (WC_RNG *)args;
     OtMlKemKey key;
@@ -514,6 +596,7 @@ static void otmlkem1024_keygen(void *args) {
         exit(-1);
     }
 }
+#endif /* BENCH_MLKEM_KEYGEN */
 
 static void otmlkem_setup(struct otmlkem_args *args, int level, WC_RNG *rng) {
     int ret;
@@ -541,6 +624,7 @@ static void otmlkem_setup(struct otmlkem_args *args, int level, WC_RNG *rng) {
     printf("otmlkem (level=%d) setup complete\n", level);
 }
 
+#ifdef BENCH_MLKEM_ENCAP
 static void otmlkem_encap(void *_args) {
     struct otmlkem_args *args = (struct otmlkem_args *)_args;
     int ret;
@@ -552,7 +636,9 @@ static void otmlkem_encap(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_MLKEM_DECAP
 static void otmlkem_decap(void *_args) {
     struct otmlkem_args *args = (struct otmlkem_args *)_args;
     int ret;
@@ -573,6 +659,8 @@ static void otmlkem_decap(void *_args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_MLKEM */
 
 /* Benchmarking digital signatures
  *
@@ -586,6 +674,8 @@ static void otmlkem_decap(void *_args) {
  */
 #define MSG_SIZE 48
 
+#ifdef BENCH_RSA2048
+#ifdef BENCH_RSA2048_KEYGEN
 static void rsa2048_keygen(void *args) {
     WC_RNG *rng = (WC_RNG *)args;
     RsaKey key;
@@ -601,6 +691,7 @@ static void rsa2048_keygen(void *args) {
         printf("wc_MakeRsaKey returned %d\n", ret);
     }
 }
+#endif
 
 struct rsa_args {
     WC_RNG *rng;
@@ -654,6 +745,7 @@ static void rsa2048_setup(struct rsa_args *args, WC_RNG *rng) {
     printf("RSA2048 setup complete\n");
 }
 
+#ifdef BENCH_RSA2048_SIGN
 static void rsa2048_sign(void *_args) {
     struct rsa_args *args = (struct rsa_args *)_args;
     int ret;
@@ -669,7 +761,9 @@ static void rsa2048_sign(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_RSA2048_VERIFY
 static void rsa2048_verify(void *_args) {
     struct rsa_args *args = (struct rsa_args *)_args;
     int ret;
@@ -686,7 +780,10 @@ static void rsa2048_verify(void *_args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_RSA2048 */
 
+#ifdef BENCH_ECDSA
 /* ECDSA benchmarks */
 struct ecdsa_args {
     ecc_key key;
@@ -752,6 +849,7 @@ static void ecdsa_setup(struct ecdsa_args *args, WC_RNG *rng, int curve_id) {
     printf("ECDSA (%s) setup complete\n", wc_ecc_get_name(curve_id));
 }
 
+#ifdef BENCH_ECDSA_KEYGEN
 /* does not mutate the args, only read the curve_id and use the RNG */
 static void ecdsa_keygen(void *_args) {
     struct ecdsa_args *args = (struct ecdsa_args *)_args;
@@ -769,7 +867,9 @@ static void ecdsa_keygen(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_ECDSA_SIGN
 static void ecdsa_sign(void *_args) {
     struct ecdsa_args *args = (struct ecdsa_args *)_args;
     int ret;
@@ -801,7 +901,9 @@ static void ecdsa_sign(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_ECDSA_VERIFY
 static void ecdsa_verify(void *_args) {
     struct ecdsa_args *args = (struct ecdsa_args *)_args;
     int ret, verified;
@@ -832,8 +934,10 @@ static void ecdsa_verify(void *_args) {
         exit(-1);
     }
 }
+#endif
+#endif /* BENCH_ECDSA */
 
-#if BENCH_ED25519
+#ifdef BENCH_ED25519
 /* benchmarking Ed25519 */
 typedef struct ed25519_args {
     ed25519_key key;
@@ -881,6 +985,7 @@ static void ed25519_setup(struct ed25519_args *args, WC_RNG *rng) {
     printf("ed25519 setup complete\n");
 }
 
+#ifdef BENCH_ED25519_KEYGEN
 static void ed25519_keygen(void *_args) {
     struct ed25519_args *args = (struct ed25519_args *)_args;
     int ret;
@@ -895,7 +1000,9 @@ static void ed25519_keygen(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_ED25519_SIGN
 static void ed25519_sign(void *_args) {
     struct ed25519_args *args = (struct ed25519_args *)_args;
     int ret;
@@ -908,7 +1015,9 @@ static void ed25519_sign(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_ED25519_VERIFY
 static void ed25519_verify(void *_args) {
     struct ed25519_args *args = (struct ed25519_args *)_args;
     int ret, verified;
@@ -924,9 +1033,10 @@ static void ed25519_verify(void *_args) {
         exit(-1);
     }
 }
+#endif
 #endif /* BENCH_ED25519 */
 
-#if BENCH_ED448
+#ifdef BENCH_ED448
 /* benchmarking Ed448 */
 typedef struct ed448_args {
     ed448_key key;
@@ -974,6 +1084,7 @@ static void ed448_setup(struct ed448_args *args, WC_RNG *rng) {
     printf("ed448 setup complete\n");
 }
 
+#ifdef BENCH_ED448_KEYGEN
 static void ed448_keygen(void *_args) {
     struct ed448_args *args = (struct ed448_args *)_args;
     int ret;
@@ -988,7 +1099,9 @@ static void ed448_keygen(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_ED448_SIGN
 static void ed448_sign(void *_args) {
     struct ed448_args *args = (struct ed448_args *)_args;
     int ret;
@@ -1001,7 +1114,9 @@ static void ed448_sign(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_ED448_VERIFY
 static void ed448_verify(void *_args) {
     struct ed448_args *args = (struct ed448_args *)_args;
     int ret, verified;
@@ -1017,15 +1132,16 @@ static void ed448_verify(void *_args) {
         exit(-1);
     }
 }
+#endif
 #endif /* BENCH_ED448 */
 
-#if BENCH_DILITHIUM
+#ifdef BENCH_DILITHIUM
 /* benchmarking dilithium */
 typedef struct dilithium_args {
     dilithium_key key;
     WC_RNG *rng;
     byte msg[MSG_SIZE];
-    byte sig[DILITHIUM_LEVEL5_SIG_SIZE];
+    byte sig[DILITHIUM_MAX_SIG_SIZE];
     word32 siglen;
 } dilithium_args_t;
 
@@ -1072,6 +1188,7 @@ static void dilithium_setup(struct dilithium_args *args, WC_RNG *rng,
     printf("dilithium setup complete\n");
 }
 
+#ifdef BENCH_DILITHIUM_KEYGEN
 static void dilithium_keygen(void *_args) {
     struct dilithium_args *args = (struct dilithium_args *)_args;
     int ret;
@@ -1090,11 +1207,13 @@ static void dilithium_keygen(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_DILITHIUM_SIGN
 static void dilithium_sign(void *_args) {
     struct dilithium_args *args = (struct dilithium_args *)_args;
     int ret;
-    byte sig[DILITHIUM_LEVEL5_SIG_SIZE];
+    byte sig[DILITHIUM_MAX_SIG_SIZE];
     word32 siglen = sizeof(sig);
 
     if ((ret = wc_dilithium_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
@@ -1103,7 +1222,9 @@ static void dilithium_sign(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_DILITHIUM_VERIFY
 static void dilithium_verify(void *_args) {
     struct dilithium_args *args = (struct dilithium_args *)_args;
     int ret, verified;
@@ -1119,9 +1240,10 @@ static void dilithium_verify(void *_args) {
         exit(-1);
     }
 }
+#endif
 #endif /* BENCH_DILITHIUM */
 
-#if BENCH_FALCON
+#ifdef BENCH_FALCON
 /* benchmarking falcon */
 typedef struct falcon_args {
     falcon_key key;
@@ -1131,8 +1253,7 @@ typedef struct falcon_args {
     word32 siglen;
 } falcon_args_t;
 
-static void falcon_setup(struct falcon_args *args, WC_RNG *rng,
-                            int level) {
+static void falcon_setup(struct falcon_args *args, WC_RNG *rng, int level) {
     int ret, verified;
     args->siglen = sizeof(args->sig);
 
@@ -1154,14 +1275,14 @@ static void falcon_setup(struct falcon_args *args, WC_RNG *rng,
     }
 
     if ((ret = wc_falcon_sign_msg(args->msg, sizeof(args->msg), args->sig,
-                                     &args->siglen, &args->key, rng)) < 0) {
+                                  &args->siglen, &args->key, rng)) < 0) {
         printf("wc_falcon_sign_msg returned %d\n", ret);
         exit(-1);
     }
 
     if ((ret = wc_falcon_verify_msg(args->sig, args->siglen, args->msg,
-                                       sizeof(args->msg), &verified,
-                                       &args->key)) < 0) {
+                                    sizeof(args->msg), &verified, &args->key)) <
+        0) {
         printf("wc_falcon_verify_msg returned %d\n", ret);
         exit(-1);
     }
@@ -1174,6 +1295,7 @@ static void falcon_setup(struct falcon_args *args, WC_RNG *rng,
     printf("falcon setup complete\n");
 }
 
+#ifdef BENCH_FALCON_KEYGEN
 static void falcon_keygen(void *_args) {
     struct falcon_args *args = (struct falcon_args *)_args;
     int ret;
@@ -1192,7 +1314,9 @@ static void falcon_keygen(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_FALCON_SIGN
 static void falcon_sign(void *_args) {
     struct falcon_args *args = (struct falcon_args *)_args;
     int ret;
@@ -1200,19 +1324,21 @@ static void falcon_sign(void *_args) {
     word32 siglen = sizeof(sig);
 
     if ((ret = wc_falcon_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
-                                     &args->key, args->rng)) < 0) {
+                                  &args->key, args->rng)) < 0) {
         printf("wc_falcon_sign_msg returned %d\n", ret);
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_FALCON_VERIFY
 static void falcon_verify(void *_args) {
     struct falcon_args *args = (struct falcon_args *)_args;
     int ret, verified;
 
     if ((ret = wc_falcon_verify_msg(args->sig, args->siglen, args->msg,
-                                       sizeof(args->msg), &verified,
-                                       &args->key)) < 0) {
+                                    sizeof(args->msg), &verified, &args->key)) <
+        0) {
         printf("wc_falcon_verify_msg returned %d\n", ret);
         exit(-1);
     }
@@ -1221,9 +1347,10 @@ static void falcon_verify(void *_args) {
         exit(-1);
     }
 }
+#endif
 #endif /* BENCH_FALCON */
 
-#if BENCH_SPHINCS
+#ifdef BENCH_SPHINCS
 /* benchmarking sphincs */
 typedef struct sphincs_args {
     sphincs_key key;
@@ -1233,8 +1360,8 @@ typedef struct sphincs_args {
     word32 siglen;
 } sphincs_args_t;
 
-static void sphincs_setup(struct sphincs_args *args, WC_RNG *rng,
-                            int level, int optim) {
+static void sphincs_setup(struct sphincs_args *args, WC_RNG *rng, int level,
+                          int optim) {
     int ret, verified;
     args->siglen = sizeof(args->sig);
 
@@ -1256,14 +1383,14 @@ static void sphincs_setup(struct sphincs_args *args, WC_RNG *rng,
     }
 
     if ((ret = wc_sphincs_sign_msg(args->msg, sizeof(args->msg), args->sig,
-                                     &args->siglen, &args->key, rng)) < 0) {
+                                   &args->siglen, &args->key, rng)) < 0) {
         printf("wc_sphincs_sign_msg returned %d\n", ret);
         exit(-1);
     }
 
     if ((ret = wc_sphincs_verify_msg(args->sig, args->siglen, args->msg,
-                                       sizeof(args->msg), &verified,
-                                       &args->key)) < 0) {
+                                     sizeof(args->msg), &verified,
+                                     &args->key)) < 0) {
         printf("wc_sphincs_verify_msg returned %d\n", ret);
         exit(-1);
     }
@@ -1276,6 +1403,7 @@ static void sphincs_setup(struct sphincs_args *args, WC_RNG *rng,
     printf("sphincs setup complete\n");
 }
 
+#ifdef BENCH_SPHINCS_KEYGEN
 static void sphincs_keygen(void *_args) {
     struct sphincs_args *args = (struct sphincs_args *)_args;
     int ret;
@@ -1285,7 +1413,8 @@ static void sphincs_keygen(void *_args) {
         printf("wc_sphincs_init returned %d\n", ret);
         exit(-1);
     }
-    if ((ret = wc_sphincs_set_level_and_optim(&key, args->key.level, args->key.optim)) < 0) {
+    if ((ret = wc_sphincs_set_level_and_optim(&key, args->key.level,
+                                              args->key.optim)) < 0) {
         printf("wc_sphincs_set_level returned %d\n", ret);
         exit(-1);
     }
@@ -1294,7 +1423,9 @@ static void sphincs_keygen(void *_args) {
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_SPHINCS_SIGN
 static void sphincs_sign(void *_args) {
     struct sphincs_args *args = (struct sphincs_args *)_args;
     int ret;
@@ -1302,19 +1433,21 @@ static void sphincs_sign(void *_args) {
     word32 siglen = sizeof(sig);
 
     if ((ret = wc_sphincs_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
-                                     &args->key, args->rng)) < 0) {
+                                   &args->key, args->rng)) < 0) {
         printf("wc_sphincs_sign_msg returned %d\n", ret);
         exit(-1);
     }
 }
+#endif
 
+#ifdef BENCH_SPHINCS_VERIFY
 static void sphincs_verify(void *_args) {
     struct sphincs_args *args = (struct sphincs_args *)_args;
     int ret, verified;
 
     if ((ret = wc_sphincs_verify_msg(args->sig, args->siglen, args->msg,
-                                       sizeof(args->msg), &verified,
-                                       &args->key)) < 0) {
+                                     sizeof(args->msg), &verified,
+                                     &args->key)) < 0) {
         printf("wc_sphincs_verify_msg returned %d\n", ret);
         exit(-1);
     }
@@ -1323,6 +1456,7 @@ static void sphincs_verify(void *_args) {
         exit(-1);
     }
 }
+#endif
 #endif /* BENCH_SPHINCS */
 
 int main(void) {
@@ -1340,297 +1474,409 @@ int main(void) {
     size_t len = BENCH_ROUNDS;
 
     /* setup */
-#if BENCH_SPHINCS
+#ifdef BENCH_SPHINCS
     sphincs_args_t sphincs_args;
 #endif
-#if BENCH_FALCON
+#ifdef BENCH_FALCON
     falcon_args_t falcon512_args, falcon1024_args;
     falcon_setup(&falcon512_args, &rng, 1);
     falcon_setup(&falcon1024_args, &rng, 5);
 #endif
-#if BENCH_DILITHIUM
+#ifdef BENCH_DILITHIUM
     dilithium_args_t mldsa44_args, mldsa65_args, mldsa87_args;
     dilithium_setup(&mldsa44_args, &rng, 2);
     dilithium_setup(&mldsa65_args, &rng, 3);
     dilithium_setup(&mldsa87_args, &rng, 5);
 #endif
-#if BENCH_ED448
+#ifdef BENCH_ED448
     ed448_args_t ed448_args;
     ed448_setup(&ed448_args, &rng);
 #endif
-#if BENCH_ED25519
+#ifdef BENCH_ED25519
     ed25519_args_t ed25519_args;
     ed25519_setup(&ed25519_args, &rng);
 #endif
-#if BENCH_ECDSA
+#ifdef BENCH_ECDSA
     struct ecdsa_args ecdsa256_args, ecdsa384_args, ecdsa521_args;
     ecdsa_setup(&ecdsa256_args, &rng, ECC_SECP256R1);
     ecdsa_setup(&ecdsa384_args, &rng, ECC_SECP384R1);
     ecdsa_setup(&ecdsa521_args, &rng, ECC_SECP521R1);
 #endif
+
+#ifdef BENCH_X25519
     struct x25519_args x25519_agree_args;
     x25519_setup(&x25519_agree_args, &rng);
+#endif
+
+#ifdef BENCH_X448
     struct x448_args x448_agree_args;
     x448_setup(&x448_agree_args, &rng);
+#endif
+
+#ifdef BENCH_ECDHE
     struct ecdhe_args ecdhe256_args, ecdhe384_args, ecdhe521_args;
     ecdhe_setup(&ecdhe256_args, &rng, ECC_SECP256R1);
     ecdhe_setup(&ecdhe384_args, &rng, ECC_SECP384R1);
     ecdhe_setup(&ecdhe521_args, &rng, ECC_SECP521R1);
+#endif
+
+#ifdef BENCH_MLKEM
     struct mlkem_args mlkem512_args, mlkem768_args, mlkem1024_args;
     mlkem_setup(&mlkem512_args, 1, &rng);
     mlkem_setup(&mlkem768_args, 3, &rng);
     mlkem_setup(&mlkem1024_args, 5, &rng);
-#if BENCH_HQC
+#endif
+
+#ifdef BENCH_HQC
     struct hqc_args hqc128_args, hqc192_args, hqc256_args;
     hqc_setup(&hqc128_args, 1, &rng);
     hqc_setup(&hqc192_args, 3, &rng);
     hqc_setup(&hqc256_args, 5, &rng);
 #endif
+
+#ifdef BENCH_MLKEM
     struct otmlkem_args otmlkem512_args, otmlkem768_args, otmlkem1024_args;
     otmlkem_setup(&otmlkem512_args, 1, &rng);
     otmlkem_setup(&otmlkem768_args, 3, &rng);
     otmlkem_setup(&otmlkem1024_args, 5, &rng);
-#if BENCH_RSA2048
+#endif
+
+#ifdef BENCH_RSA2048
     struct rsa_args rsa2048_args;
     rsa2048_setup(&rsa2048_args, &rng);
 #endif
 
-    /* bench */
     printf("name,op,median,p90,p99\n");
     while (1) {
         bench_black_box(bench_sleep, NULL, durs, len);
         print_results(durs, len, "sleep,sleep");
 
-#if BENCH_FALCON
+#ifdef BENCH_FALCON
+#ifdef BENCH_FALCON_KEYGEN
         bench_black_box(falcon_keygen, &falcon512_args, durs, len);
         print_results(durs, len, "Falcon-512,keygen");
-        bench_black_box(falcon_sign, &falcon512_args, durs, len);
-        print_results(durs, len, "Falcon-512,sign");
-        bench_black_box(falcon_verify, &falcon512_args, durs, len);
-        print_results(durs, len, "Falcon-512,verify");
-
         bench_black_box(falcon_keygen, &falcon1024_args, durs, len);
         print_results(durs, len, "Falcon-1024,keygen");
+#endif
+#ifdef BENCH_FALCON_SIGN
+        bench_black_box(falcon_sign, &falcon512_args, durs, len);
+        print_results(durs, len, "Falcon-512,sign");
         bench_black_box(falcon_sign, &falcon1024_args, durs, len);
         print_results(durs, len, "Falcon-1024,sign");
+#endif
+#ifdef BENCH_FALCON_VERIFY
+        bench_black_box(falcon_verify, &falcon512_args, durs, len);
+        print_results(durs, len, "Falcon-512,verify");
         bench_black_box(falcon_verify, &falcon1024_args, durs, len);
         print_results(durs, len, "Falcon-1024,verify");
 #endif
+#endif
 
-#if BENCH_DILITHIUM
+#ifdef BENCH_DILITHIUM
+#ifdef BENCH_DILITHIUM_KEYGEN
         bench_black_box(dilithium_keygen, &mldsa44_args, durs, len);
         print_results(durs, len, "ML-DSA-44,keygen");
-        bench_black_box(dilithium_sign, &mldsa44_args, durs, len);
-        print_results(durs, len, "ML-DSA-44,sign");
-        bench_black_box(dilithium_verify, &mldsa44_args, durs, len);
-        print_results(durs, len, "ML-DSA-44,verify");
-
         bench_black_box(dilithium_keygen, &mldsa65_args, durs, len);
         print_results(durs, len, "ML-DSA-65,keygen");
-        bench_black_box(dilithium_sign, &mldsa65_args, durs, len);
-        print_results(durs, len, "ML-DSA-65,sign");
-        bench_black_box(dilithium_verify, &mldsa65_args, durs, len);
-        print_results(durs, len, "ML-DSA-65,verify");
-
         bench_black_box(dilithium_keygen, &mldsa87_args, durs, len);
         print_results(durs, len, "ML-DSA-87,keygen");
+#endif
+#ifdef BENCH_DILITHIUM_SIGN
+        bench_black_box(dilithium_sign, &mldsa44_args, durs, len);
+        print_results(durs, len, "ML-DSA-44,sign");
+        bench_black_box(dilithium_sign, &mldsa65_args, durs, len);
+        print_results(durs, len, "ML-DSA-65,sign");
         bench_black_box(dilithium_sign, &mldsa87_args, durs, len);
         print_results(durs, len, "ML-DSA-87,sign");
+#endif
+#ifdef BENCH_DILITHIUM_VERIFY
+        bench_black_box(dilithium_verify, &mldsa44_args, durs, len);
+        print_results(durs, len, "ML-DSA-44,verify");
+        bench_black_box(dilithium_verify, &mldsa65_args, durs, len);
+        print_results(durs, len, "ML-DSA-65,verify");
         bench_black_box(dilithium_verify, &mldsa87_args, durs, len);
         print_results(durs, len, "ML-DSA-87,verify");
 #endif
+#endif
 
-#if BENCH_ED448
+#ifdef BENCH_ED448
+#ifdef BENCH_ED448_KEYGEN
         bench_black_box(ed448_keygen, &ed448_args, durs, len);
         print_results(durs, len, "ed448,keygen");
+#endif
+#ifdef BENCH_ED448_SIGN
         bench_black_box(ed448_sign, &ed448_args, durs, len);
         print_results(durs, len, "ed448,sign");
+#endif
+#ifdef BENCH_ED448_VERIFY
         bench_black_box(ed448_verify, &ed448_args, durs, len);
         print_results(durs, len, "ed448,verify");
 #endif
+#endif
 
-#if BENCH_ED25519
+#ifdef BENCH_ED25519
+#ifdef BENCH_ED25519_KEYGEN
         bench_black_box(ed25519_keygen, &ed25519_args, durs, len);
         print_results(durs, len, "ed25519,keygen");
+#endif
+#ifdef BENCH_ED25519_SIGN
         bench_black_box(ed25519_sign, &ed25519_args, durs, len);
         print_results(durs, len, "ed25519,sign");
+#endif
+#ifdef BENCH_ED25519_VERIFY
         bench_black_box(ed25519_verify, &ed25519_args, durs, len);
         print_results(durs, len, "ed25519,verify");
 #endif
+#endif
 
-#if BENCH_ECDSA
+#ifdef BENCH_ECDSA
+#ifdef BENCH_ECDSA_KEYGEN
         bench_black_box(ecdsa_keygen, &ecdsa256_args, durs, len);
         print_results(durs, len, "sha256ecdsa,keygen");
-        bench_black_box(ecdsa_sign, &ecdsa256_args, durs, len);
-        print_results(durs, len, "sha256ecdsa,sign");
-        bench_black_box(ecdsa_verify, &ecdsa256_args, durs, len);
-        print_results(durs, len, "sha256ecdsa,verify");
-
         bench_black_box(ecdsa_keygen, &ecdsa384_args, durs, len);
         print_results(durs, len, "sha384ecdsa,keygen");
-        bench_black_box(ecdsa_sign, &ecdsa384_args, durs, len);
-        print_results(durs, len, "sha384ecdsa,sign");
-        bench_black_box(ecdsa_verify, &ecdsa384_args, durs, len);
-        print_results(durs, len, "sha384ecdsa,verify");
-
         bench_black_box(ecdsa_keygen, &ecdsa521_args, durs, len);
         print_results(durs, len, "sha521ecdsa,keygen");
+#endif
+#ifdef BENCH_ECDSA_SIGN
+        bench_black_box(ecdsa_sign, &ecdsa256_args, durs, len);
+        print_results(durs, len, "sha256ecdsa,sign");
+        bench_black_box(ecdsa_sign, &ecdsa384_args, durs, len);
+        print_results(durs, len, "sha384ecdsa,sign");
         bench_black_box(ecdsa_sign, &ecdsa521_args, durs, len);
         print_results(durs, len, "sha521ecdsa,sign");
+#endif
+#ifdef BENCH_ECDSA_VERIFY
+        bench_black_box(ecdsa_verify, &ecdsa256_args, durs, len);
+        print_results(durs, len, "sha256ecdsa,verify");
+        bench_black_box(ecdsa_verify, &ecdsa384_args, durs, len);
+        print_results(durs, len, "sha384ecdsa,verify");
         bench_black_box(ecdsa_verify, &ecdsa521_args, durs, len);
         print_results(durs, len, "sha521ecdsa,verify");
 #endif
+#endif
 
-#if BENCH_RSA2048
-#if !NO_BENCH_RSA2048_KEYGEN /* do not bench RSA keygen */
+#ifdef BENCH_RSA2048
+#ifdef BENCH_RSA2048_KEYGEN
         bench_black_box(rsa2048_keygen, &rng, durs, len);
         print_results(durs, len, "RSA-2048,keygen");
 #endif
+#ifdef BENCH_RSA2048_SIGN
         bench_black_box(rsa2048_sign, &rsa2048_args, durs, len);
         print_results(durs, len, "RSA-2048,sign");
+#endif
+#ifdef BENCH_RSA2048_VERIFY
         bench_black_box(rsa2048_verify, &rsa2048_args, durs, len);
         print_results(durs, len, "RSA-2048,verify");
 #endif
+#endif
 
+#ifdef BENCH_X25519
+#ifdef BENCH_X25519_KEYGEN
         bench_black_box(x25519_keygen, &rng, durs, len);
         print_results(durs, len, "x25519,keygen");
+#endif
+#ifdef BENCH_X25519_AGREE
         bench_black_box(x25519_agree, &x25519_agree_args, durs, len);
         print_results(durs, len, "x25519,agree");
+#endif
+#endif
 
+#ifdef BENCH_X448
+#ifdef BENCH_X448_KEYGEN
         bench_black_box(x448_keygen, &rng, durs, len);
         print_results(durs, len, "x448,keygen");
+#endif
+#ifdef BENCH_X448_AGREE
         bench_black_box(x448_agree, &x448_agree_args, durs, len);
         print_results(durs, len, "x448,agree");
+#endif
+#endif
 
+#ifdef BENCH_ECDHE
+#ifdef BENCH_ECDHE_KEYGEN
         bench_black_box(ecdhe256_keygen, &rng, durs, len);
         print_results(durs, len, "ECDHE (P-256),keygen");
-        bench_black_box(ecdhe_agree, &ecdhe256_args, durs, len);
-        print_results(durs, len, "ECDHE (P-256),agree");
-
         bench_black_box(ecdhe384_keygen, &rng, durs, len);
         print_results(durs, len, "ECDHE (P-384),keygen");
-        bench_black_box(ecdhe_agree, &ecdhe384_args, durs, len);
-        print_results(durs, len, "ECDHE (P-384),agree");
-
         bench_black_box(ecdhe521_keygen, &rng, durs, len);
         print_results(durs, len, "ECDHE (P-521),keygen");
+#endif
+#ifdef BENCH_ECDHE_AGREE
+        bench_black_box(ecdhe_agree, &ecdhe256_args, durs, len);
+        print_results(durs, len, "ECDHE (P-256),agree");
+        bench_black_box(ecdhe_agree, &ecdhe384_args, durs, len);
+        print_results(durs, len, "ECDHE (P-384),agree");
         bench_black_box(ecdhe_agree, &ecdhe521_args, durs, len);
         print_results(durs, len, "ECDHE (P-521),agree");
+#endif
+#endif /* BENCH_ECDHE */
 
+#ifdef BENCH_MLKEM
+#ifdef BENCH_MLKEM_KEYGEN
         bench_black_box(mlkem512_keygen, &rng, durs, len);
         print_results(durs, len, "ML-KEM-512,keygen");
-        bench_black_box(mlkem_encap, &mlkem512_args, durs, len);
-        print_results(durs, len, "ML-KEM-512,encap");
-        bench_black_box(mlkem_decap, &mlkem512_args, durs, len);
-        print_results(durs, len, "ML-KEM-512,decap");
-
         bench_black_box(mlkem768_keygen, &rng, durs, len);
         print_results(durs, len, "ML-KEM-768,keygen");
-        bench_black_box(mlkem_encap, &mlkem768_args, durs, len);
-        print_results(durs, len, "ML-KEM-768,encap");
-        bench_black_box(mlkem_decap, &mlkem768_args, durs, len);
-        print_results(durs, len, "ML-KEM-768,decap");
-
         bench_black_box(mlkem1024_keygen, &rng, durs, len);
         print_results(durs, len, "ML-KEM-1024,keygen");
+#endif
+#ifdef BENCH_MLKEM_ENCAP
+        bench_black_box(mlkem_encap, &mlkem512_args, durs, len);
+        print_results(durs, len, "ML-KEM-512,encap");
+        bench_black_box(mlkem_encap, &mlkem768_args, durs, len);
+        print_results(durs, len, "ML-KEM-768,encap");
         bench_black_box(mlkem_encap, &mlkem1024_args, durs, len);
         print_results(durs, len, "ML-KEM-1024,encap");
+#endif
+#ifdef BENCH_MLKEM_DECAP
+        bench_black_box(mlkem_decap, &mlkem512_args, durs, len);
+        print_results(durs, len, "ML-KEM-512,decap");
+        bench_black_box(mlkem_decap, &mlkem768_args, durs, len);
+        print_results(durs, len, "ML-KEM-768,decap");
         bench_black_box(mlkem_decap, &mlkem1024_args, durs, len);
         print_results(durs, len, "ML-KEM-1024,decap");
+#endif
+#endif /* BENCH_MLKEM */
 
-#if BENCH_HQC
+#ifdef BENCH_HQC
+#ifdef BENCH_HQC_KEYGEN
         bench_black_box(hqc128_keygen, &rng, durs, len);
         print_results(durs, len, "HQC-128,keygen");
-        bench_black_box(hqc_encap, &hqc128_args, durs, len);
-        print_results(durs, len, "HQC-128,encap");
-        bench_black_box(hqc_decap, &hqc128_args, durs, len);
-        print_results(durs, len, "HQC-128,decap");
-
         bench_black_box(hqc192_keygen, &rng, durs, len);
         print_results(durs, len, "HQC-192,keygen");
-        bench_black_box(hqc_encap, &hqc192_args, durs, len);
-        print_results(durs, len, "HQC-192,encap");
-        bench_black_box(hqc_decap, &hqc192_args, durs, len);
-        print_results(durs, len, "HQC-192,decap");
-
         bench_black_box(hqc256_keygen, &rng, durs, len);
         print_results(durs, len, "HQC-256,keygen");
+#endif
+#ifdef BENCH_HQC_ENCAP
+        bench_black_box(hqc_encap, &hqc128_args, durs, len);
+        print_results(durs, len, "HQC-128,encap");
+        bench_black_box(hqc_encap, &hqc192_args, durs, len);
+        print_results(durs, len, "HQC-192,encap");
         bench_black_box(hqc_encap, &hqc256_args, durs, len);
         print_results(durs, len, "HQC-256,encap");
+#endif
+#ifdef BENCH_HQC_DECAP
+        bench_black_box(hqc_decap, &hqc128_args, durs, len);
+        print_results(durs, len, "HQC-128,decap");
+        bench_black_box(hqc_decap, &hqc192_args, durs, len);
+        print_results(durs, len, "HQC-192,decap");
         bench_black_box(hqc_decap, &hqc256_args, durs, len);
         print_results(durs, len, "HQC-256,decap");
+#endif
 #endif /* BENCH_HQC */
 
+#ifdef BENCH_MLKEM
+#ifdef BENCH_MLKEM_KEYGEN
         bench_black_box(otmlkem512_keygen, &rng, durs, len);
         print_results(durs, len, "OT-ML-KEM-512,keygen");
-        bench_black_box(otmlkem_encap, &otmlkem512_args, durs, len);
-        print_results(durs, len, "OT-ML-KEM-512,encap");
-        bench_black_box(otmlkem_decap, &otmlkem512_args, durs, len);
-        print_results(durs, len, "OT-ML-KEM-512,decap");
-
         bench_black_box(otmlkem768_keygen, &rng, durs, len);
         print_results(durs, len, "OT-ML-KEM-768,keygen");
-        bench_black_box(otmlkem_encap, &otmlkem768_args, durs, len);
-        print_results(durs, len, "OT-ML-KEM-768,encap");
-        bench_black_box(otmlkem_decap, &otmlkem768_args, durs, len);
-        print_results(durs, len, "OT-ML-KEM-768,decap");
-
         bench_black_box(otmlkem1024_keygen, &rng, durs, len);
         print_results(durs, len, "OT-ML-KEM-1024,keygen");
+#endif
+#ifdef BENCH_MLKEM_ENCAP
+        bench_black_box(otmlkem_encap, &otmlkem512_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-512,encap");
+        bench_black_box(otmlkem_encap, &otmlkem768_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-768,encap");
         bench_black_box(otmlkem_encap, &otmlkem1024_args, durs, len);
         print_results(durs, len, "OT-ML-KEM-1024,encap");
+#endif
+#ifdef BENCH_MLKEM_DECAP
+        bench_black_box(otmlkem_decap, &otmlkem512_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-512,decap");
+        bench_black_box(otmlkem_decap, &otmlkem768_args, durs, len);
+        print_results(durs, len, "OT-ML-KEM-768,decap");
         bench_black_box(otmlkem_decap, &otmlkem1024_args, durs, len);
         print_results(durs, len, "OT-ML-KEM-1024,decap");
+#endif
+#endif /* BENCH_MLKEM */
 
-#if BENCH_SPHINCS
+#ifdef BENCH_SPHINCS
         sphincs_setup(&sphincs_args, &rng, 1, FAST_VARIANT);
+#ifdef BENCH_SPHINCS_KEYGEN
         bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-128-FAST,keygen");
+#endif
+#ifdef BENCH_SPHINCS_SIGN
         bench_black_box(sphincs_sign, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-128-FAST,sign");
+#endif
+#ifdef BENCH_SPHINCS_VERIFY
         bench_black_box(sphincs_verify, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-128-FAST,verify");
+#endif
 
         sphincs_setup(&sphincs_args, &rng, 3, FAST_VARIANT);
+#ifdef BENCH_SPHINCS_KEYGEN
         bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-192-FAST,keygen");
+#endif
+#ifdef BENCH_SPHINCS_SIGN
         bench_black_box(sphincs_sign, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-192-FAST,sign");
+#endif
+#ifdef BENCH_SPHINCS_VERIFY
         bench_black_box(sphincs_verify, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-192-FAST,verify");
+#endif
 
         sphincs_setup(&sphincs_args, &rng, 5, FAST_VARIANT);
+#ifdef BENCH_SPHINCS_KEYGEN
         bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-256-FAST,keygen");
+#endif
+#ifdef BENCH_SPHINCS_SIGN
         bench_black_box(sphincs_sign, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-256-FAST,sign");
+#endif
+#ifdef BENCH_SPHINCS_VERIFY
         bench_black_box(sphincs_verify, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-256-FAST,verify");
+#endif
 
         sphincs_setup(&sphincs_args, &rng, 1, SMALL_VARIANT);
+#ifdef BENCH_SPHINCS_KEYGEN
         bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-128-SMALL,keygen");
+#endif
+#ifdef BENCH_SPHINCS_SIGN
         bench_black_box(sphincs_sign, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-128-SMALL,sign");
+#endif
+#ifdef BENCH_SPHINCS_VERIFY
         bench_black_box(sphincs_verify, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-128-SMALL,verify");
+#endif
 
         sphincs_setup(&sphincs_args, &rng, 3, SMALL_VARIANT);
+#ifdef BENCH_SPHINCS_KEYGEN
         bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-192-SMALL,keygen");
+#endif
+#ifdef BENCH_SPHINCS_SIGN
         bench_black_box(sphincs_sign, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-192-SMALL,sign");
+#endif
+#ifdef BENCH_SPHINCS_VERIFY
         bench_black_box(sphincs_verify, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-192-SMALL,verify");
+#endif
 
         sphincs_setup(&sphincs_args, &rng, 5, SMALL_VARIANT);
+#ifdef BENCH_SPHINCS_KEYGEN
         bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-256-SMALL,keygen");
+#endif
+#ifdef BENCH_SPHINCS_SIGN
         bench_black_box(sphincs_sign, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-256-SMALL,sign");
+#endif
+#ifdef BENCH_SPHINCS_VERIFY
         bench_black_box(sphincs_verify, &sphincs_args, durs, len);
         print_results(durs, len, "SPHINCS-256-SMALL,verify");
+#endif
 #endif /* BENCH_SPHINCS */
-
     }
 }

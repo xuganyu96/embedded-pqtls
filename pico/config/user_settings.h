@@ -548,7 +548,8 @@ unsigned long get_rand_32(void);
 /* Post-quantum cryptography (PQC) */
 /* ------------------------------------------------------------------------- */
 #define HAVE_DILITHIUM
-#define WOLFSSL_WC_DILITHIUM
+// #define WOLFSSL_WC_DILITHIUM
+#define PQCLEAN_DILITHIUM
 // GYX: enable it to use Dilithium instead of ML-DSA
 // #define WOLFSSL_DILITHIUM_FIPS204_DRAFT
 #define WOLFSSL_HAVE_MLKEM
