@@ -33,10 +33,16 @@
 #include <wolfssl/wolfcrypt/rsa.h>
 
 #include "pico-pqtls/utils.h"
+#include "wolfssl/wolfcrypt/hash.h"
 
 #define SIG_MSG_SIZE 48
 #define WARMUP_ROUNDS 10
 #define BENCH_ROUNDS 10
+
+#define BENCH_RSA2048 0
+#define NO_BENCH_RSA2048_KEYGEN 1
+#define BENCH_ECDSA 1
+#define BENCH_HQC 0
 
 /* Benchmark a black box by running it many times. The CPU cycles counts are
  * written to the input timestamp arrays.
@@ -143,6 +149,7 @@ static void x25519_setup(struct x25519_args *args, WC_RNG *rng) {
         printf("wc_curve25519_make_key returned %d\n", ret);
         exit(-1);
     }
+    printf("x25519 setup complete\n");
 }
 
 static void x25519_agree(void *args) {
@@ -183,6 +190,7 @@ static void x448_setup(struct x448_args *args, WC_RNG *rng) {
         printf("wc_curve448_make_key returned %d\n", ret);
         exit(-1);
     }
+    printf("x448 setup complete\n");
 }
 
 static void x448_agree(void *args) {
@@ -256,6 +264,7 @@ static void ecdhe_setup(struct ecdhe_args *args, WC_RNG *rng, int curve_id) {
     }
     args->alice.rng = rng;
     args->bob.rng = rng;
+    printf("ecdhe (%s) setup complete\n", wc_ecc_get_name(curve_id));
 }
 
 static void ecdhe_agree(void *args) {
@@ -336,6 +345,7 @@ static void mlkem_setup(struct mlkem_args *args, int level, WC_RNG *rng) {
         exit(-1);
     }
     args->rng = rng;
+    printf("mlkem (level=%d) setup complete\n", level);
 }
 
 static void mlkem_encap(void *_args) {
@@ -437,6 +447,7 @@ static void hqc_setup(struct hqc_args *args, int level, WC_RNG *rng) {
         exit(-1);
     }
     args->rng = rng;
+    printf("hqc (level=%d) setup complete\n", level);
 }
 
 static void hqc_encap(void *_args) {
@@ -538,6 +549,7 @@ static void otmlkem_setup(struct otmlkem_args *args, int level, WC_RNG *rng) {
         exit(-1);
     }
     args->rng = rng;
+    printf("otmlkem (level=%d) setup complete\n", level);
 }
 
 static void otmlkem_encap(void *_args) {
@@ -575,13 +587,15 @@ static void otmlkem_decap(void *_args) {
 
 /* Benchmarking digital signatures
  *
- * For each digital signature schemes we will bench three operations: keygen, sign, verify
- * Keygen can be benched with only the RNG. Benching sign requires a ready-made key, and
- * benching verify requires ready-made key, message, and signature.
+ * For each digital signature schemes we will bench three operations: keygen,
+ * sign, verify Keygen can be benched with only the RNG. Benching sign requires
+ * a ready-made key, and benching verify requires ready-made key, message, and
+ * signature.
  *
- * For benching sign/verify, the message size will be 48 bytes. This is because the highest
- * level TLS 1.3 cipher suite uses SHA384.
+ * For benching sign/verify, the message size will be 48 bytes. This is because
+ * the highest level TLS 1.3 cipher suite uses SHA384.
  */
+#define MSG_SIZE 48
 
 static void rsa2048_keygen(void *args) {
     WC_RNG *rng = (WC_RNG *)args;
@@ -602,25 +616,232 @@ static void rsa2048_keygen(void *args) {
 struct rsa_args {
     WC_RNG *rng;
     RsaKey key;
-    byte msg[SIG_MSG_SIZE];
+    byte msg[MSG_SIZE];
     byte sig[RSA_MAX_SIZE / 8];
 };
 
+/* Generate keypair, sign a random message */
 static void rsa2048_setup(struct rsa_args *args, WC_RNG *rng) {
     int ret;
+
     if ((ret = wc_InitRsaKey(&args->key, NULL)) < 0) {
         printf("wc_InitRsaKey returned %d\n", ret);
         exit(-1);
     }
-    if ((ret = wc_MakeRsaKey(&args->key, RSA_MIN_SIZE, WC_RSA_EXPONENT, rng)) < 0) {
+    if ((ret = wc_MakeRsaKey(&args->key, RSA_MIN_SIZE, WC_RSA_EXPONENT, rng)) <
+        0) {
         printf("wc_MakeRsaKey returned %d\n", ret);
         exit(-1);
     }
+
+    /* to sign with RsaPSS we first need to hash the message */
+    byte digest[32];
+    byte pss[RSA_MAX_SIZE / 8];
     if ((ret = wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg))) < 0) {
         printf("wc_RNG_GenerateBlock returned %d\n", ret);
         exit(-1);
     }
-    // TODO: finish this
+    if ((ret = wc_Sha256Hash(args->msg, sizeof(args->msg), digest)) < 0) {
+        printf("wc_Sha256Hash returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RsaPSS_Sign(digest, sizeof(digest), args->sig,
+                              sizeof(args->sig), WC_HASH_TYPE_SHA256,
+                              WC_MGF1SHA256, &args->key, rng)) < 0) {
+        printf("RsaPSS_Sign returned %d\n", ret);
+        exit(-1);
+    }
+    printf("RsaPSS size %d\n", ret);
+
+    if ((ret = wc_RsaPSS_VerifyCheck(args->sig, sizeof(args->sig), pss,
+                                     sizeof(pss), digest, sizeof(digest),
+                                     WC_HASH_TYPE_SHA256, WC_MGF1SHA256,
+                                     &args->key)) < 0) {
+        printf("RsaPSS_Verify returned %d\n", ret);
+        exit(-1);
+    }
+
+    args->rng = rng;
+    printf("RSA2048 setup complete\n");
+}
+
+static void rsa2048_sign(void *_args) {
+    struct rsa_args *args = (struct rsa_args *)_args;
+    int ret;
+    byte digest[32];
+    if ((ret = wc_Sha256Hash(args->msg, sizeof(args->msg), digest)) < 0) {
+        printf("wc_Sha256Hash returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RsaPSS_Sign(digest, sizeof(digest), args->sig,
+                              sizeof(args->sig), WC_HASH_TYPE_SHA256,
+                              WC_MGF1SHA256, &args->key, args->rng)) < 0) {
+        printf("RsaPSS_Sign returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void rsa2048_verify(void *_args) {
+    struct rsa_args *args = (struct rsa_args *)_args;
+    int ret;
+    byte digest[32], pss[RSA_MAX_SIZE / 8];
+    if ((ret = wc_Sha256Hash(args->msg, sizeof(args->msg), digest)) < 0) {
+        printf("wc_Sha256Hash returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RsaPSS_VerifyCheck(args->sig, sizeof(args->sig), pss,
+                                     sizeof(pss), digest, sizeof(digest),
+                                     WC_HASH_TYPE_SHA256, WC_MGF1SHA256,
+                                     &args->key)) < 0) {
+        printf("RsaPSS_Verify returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+/* ECDSA benchmarks */
+struct ecdsa_args {
+    ecc_key key;
+    WC_RNG *rng;
+    byte msg[MSG_SIZE];
+    byte sig[160];
+    word32 siglen;
+};
+
+static void ecdsa_setup(struct ecdsa_args *args, WC_RNG *rng, int curve_id) {
+    int ret;
+    args->siglen = sizeof(args->sig);
+    if ((ret = wc_ecc_init(&args->key)) < 0) {
+        printf("wc_ecc_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(curve_id),
+                               &args->key)) < 0) {
+        printf("wc_ecc_make_key returned %d\n", ret);
+        exit(-1);
+    }
+    wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg));
+
+    byte digest[64];
+    word32 digestlen = 64;
+    switch (curve_id) {
+    case ECC_SECP256R1:
+        digestlen = 32;
+        ret = wc_Sha256Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    case ECC_SECP384R1:
+        digestlen = 48;
+        ret = wc_Sha384Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    case ECC_SECP521R1:
+        digestlen = 64;
+        ret = wc_Sha512Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    }
+    if (ret < 0) {
+        printf("ShaXXXHash returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ecc_sign_hash(digest, digestlen, args->sig, &args->siglen,
+                                rng, &args->key)) < 0) {
+        printf("wc_ecc_sign_hash returned %d\n", ret);
+        exit(-1);
+    }
+    printf("ecc siglen=%d\n", args->siglen);
+
+    int verified;
+    if ((ret = wc_ecc_verify_hash(args->sig, args->siglen, digest, digestlen,
+                                  &verified, &args->key)) < 0) {
+        printf("wc_ecc_verify_hash returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("invalid ecc sig\n");
+        exit(-1);
+    }
+
+    args->rng = rng;
+    printf("ECDSA (%s) setup complete\n", wc_ecc_get_name(curve_id));
+}
+
+/* does not mutate the args, only read the curve_id and use the RNG */
+static void ecdsa_keygen(void *_args) {
+    struct ecdsa_args *args = (struct ecdsa_args *)_args;
+    ecc_key key;
+    int ret;
+    int curve_id = args->key.dp->id;
+
+    if ((ret = wc_ecc_init(&key)) < 0) {
+        printf("wc_ecc_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ecc_make_key(
+             args->rng, wc_ecc_get_curve_size_from_id(curve_id), &key)) < 0) {
+        printf("wc_ecc_make_key returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void ecdsa_sign(void *_args) {
+    struct ecdsa_args *args = (struct ecdsa_args *)_args;
+    int ret;
+    byte digest[64], sig[160];
+    word32 digestlen = 64;
+    word32 siglen = 160;
+
+    switch (args->key.dp->id) {
+    case ECC_SECP256R1:
+        digestlen = 32;
+        ret = wc_Sha256Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    case ECC_SECP384R1:
+        digestlen = 48;
+        ret = wc_Sha384Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    case ECC_SECP521R1:
+        digestlen = 64;
+        ret = wc_Sha512Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    }
+    if (ret < 0) {
+        printf("ShaXXXHash returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ecc_sign_hash(digest, digestlen, sig, &siglen, args->rng,
+                                &args->key)) < 0) {
+        printf("wc_ecc_sign_hash returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void ecdsa_verify(void *_args) {
+    struct ecdsa_args *args = (struct ecdsa_args *)_args;
+    int ret, verified;
+    byte digest[64];
+    word32 digestlen;
+
+    switch (args->key.dp->id) {
+    case ECC_SECP256R1:
+        digestlen = 32;
+        ret = wc_Sha256Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    case ECC_SECP384R1:
+        digestlen = 48;
+        ret = wc_Sha384Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    case ECC_SECP521R1:
+        digestlen = 64;
+        ret = wc_Sha512Hash(args->msg, sizeof(args->msg), digest);
+        break;
+    }
+    if ((ret = wc_ecc_verify_hash(args->sig, args->siglen, digest, digestlen,
+                                  &verified, &args->key)) < 0) {
+        printf("wc_ecc_verify_hash returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("invalid ecc sig\n");
+        exit(-1);
+    }
 }
 
 int main(void) {
@@ -638,6 +859,12 @@ int main(void) {
     size_t len = BENCH_ROUNDS;
 
     /* setup */
+#if BENCH_ECDSA
+    struct ecdsa_args ecdsa256_args, ecdsa384_args, ecdsa521_args;
+    ecdsa_setup(&ecdsa256_args, &rng, ECC_SECP256R1);
+    ecdsa_setup(&ecdsa384_args, &rng, ECC_SECP384R1);
+    ecdsa_setup(&ecdsa521_args, &rng, ECC_SECP521R1);
+#endif
     struct x25519_args x25519_agree_args;
     x25519_setup(&x25519_agree_args, &rng);
     struct x448_args x448_agree_args;
@@ -650,20 +877,60 @@ int main(void) {
     mlkem_setup(&mlkem512_args, 1, &rng);
     mlkem_setup(&mlkem768_args, 3, &rng);
     mlkem_setup(&mlkem1024_args, 5, &rng);
+#if BENCH_HQC
     struct hqc_args hqc128_args, hqc192_args, hqc256_args;
     hqc_setup(&hqc128_args, 1, &rng);
     hqc_setup(&hqc192_args, 3, &rng);
     hqc_setup(&hqc256_args, 5, &rng);
+#endif
     struct otmlkem_args otmlkem512_args, otmlkem768_args, otmlkem1024_args;
     otmlkem_setup(&otmlkem512_args, 1, &rng);
     otmlkem_setup(&otmlkem768_args, 3, &rng);
     otmlkem_setup(&otmlkem1024_args, 5, &rng);
+#if BENCH_RSA2048
+    struct rsa_args rsa2048_args;
+    rsa2048_setup(&rsa2048_args, &rng);
+#endif
 
     /* bench */
     printf("name,op,median,p90,p99\n");
     while (1) {
         bench_black_box(bench_sleep, NULL, durs, len);
         print_results(durs, len, "sleep,sleep");
+
+#if BENCH_ECDSA
+        bench_black_box(ecdsa_keygen, &ecdsa256_args, durs, len);
+        print_results(durs, len, "sha256ecdsa,keygen");
+        bench_black_box(ecdsa_sign, &ecdsa256_args, durs, len);
+        print_results(durs, len, "sha256ecdsa,sign");
+        bench_black_box(ecdsa_verify, &ecdsa256_args, durs, len);
+        print_results(durs, len, "sha256ecdsa,verify");
+
+        bench_black_box(ecdsa_keygen, &ecdsa384_args, durs, len);
+        print_results(durs, len, "sha384ecdsa,keygen");
+        bench_black_box(ecdsa_sign, &ecdsa384_args, durs, len);
+        print_results(durs, len, "sha384ecdsa,sign");
+        bench_black_box(ecdsa_verify, &ecdsa384_args, durs, len);
+        print_results(durs, len, "sha384ecdsa,verify");
+
+        bench_black_box(ecdsa_keygen, &ecdsa521_args, durs, len);
+        print_results(durs, len, "sha521ecdsa,keygen");
+        bench_black_box(ecdsa_sign, &ecdsa521_args, durs, len);
+        print_results(durs, len, "sha521ecdsa,sign");
+        bench_black_box(ecdsa_verify, &ecdsa521_args, durs, len);
+        print_results(durs, len, "sha521ecdsa,verify");
+#endif
+
+#if BENCH_RSA2048
+#if !NO_BENCH_RSA2048_KEYGEN /* do not bench RSA keygen */
+        bench_black_box(rsa2048_keygen, &rng, durs, len);
+        print_results(durs, len, "RSA-2048,keygen");
+#endif
+        bench_black_box(rsa2048_sign, &rsa2048_args, durs, len);
+        print_results(durs, len, "RSA-2048,sign");
+        bench_black_box(rsa2048_verify, &rsa2048_args, durs, len);
+        print_results(durs, len, "RSA-2048,verify");
+#endif
 
         bench_black_box(x25519_keygen, &rng, durs, len);
         print_results(durs, len, "x25519,keygen");
@@ -711,6 +978,7 @@ int main(void) {
         bench_black_box(mlkem_decap, &mlkem1024_args, durs, len);
         print_results(durs, len, "ML-KEM-1024,decap");
 
+#if BENCH_HQC
         bench_black_box(hqc128_keygen, &rng, durs, len);
         print_results(durs, len, "HQC-128,keygen");
         bench_black_box(hqc_encap, &hqc128_args, durs, len);
@@ -731,6 +999,7 @@ int main(void) {
         print_results(durs, len, "HQC-256,encap");
         bench_black_box(hqc_decap, &hqc256_args, durs, len);
         print_results(durs, len, "HQC-256,decap");
+#endif /* BENCH_HQC */
 
         bench_black_box(otmlkem512_keygen, &rng, durs, len);
         print_results(durs, len, "OT-ML-KEM-512,keygen");

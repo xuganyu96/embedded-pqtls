@@ -1,3 +1,8 @@
+- [ ] Finish the benchmarking program
+- [ ] Post graphs
+- [ ] Fix all metadata
+- [ ] Chapter 2 security models re-write
+
 # Thesis write-up
 A peer's Master's thesis has 50 pages of main content. For a first draft I want to have at least 60 pages of stuff, then trim down as needed.
 

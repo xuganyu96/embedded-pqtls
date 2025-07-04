@@ -1,38 +1,49 @@
-#include <stdio.h>
+#include "wolfssl/wolfcrypt/hash.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <wolfssl/wolfcrypt/random.h>
-#include <crypto_kem/ot-ml-kem-1024/clean/api.h>
-#include <common/randombytes.h>
+#include <wolfssl/wolfcrypt/rsa.h>
+#include <wolfssl/wolfcrypt/settings.h>
 
 int main(void) {
-    uint8_t pk[PQCLEAN_OTMLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES];
-    uint8_t sk[PQCLEAN_OTMLKEM1024_CLEAN_CRYPTO_SECRETKEYBYTES];
-    uint8_t ct[PQCLEAN_OTMLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES];
-    uint8_t ss[PQCLEAN_OTMLKEM1024_CLEAN_CRYPTO_BYTES];
-    uint8_t ss_cmp[PQCLEAN_OTMLKEM1024_CLEAN_CRYPTO_BYTES];
+    RsaKey key;
     WC_RNG rng;
-    int ret;
     wc_InitRng(&rng);
-    PQCLEAN_set_wc_rng(&rng);
+    int ret;
 
-    ret = PQCLEAN_OTMLKEM1024_CLEAN_crypto_kem_keypair(pk, sk);
-    if (ret != 0){
-        fprintf(stderr, "keygen failed\n");
-    };
-    ret = PQCLEAN_OTMLKEM1024_CLEAN_crypto_kem_enc(ct, ss, pk);
-    if (ret != 0){
-        fprintf(stderr, "encap failed\n");
-    };
-    ret = PQCLEAN_OTMLKEM1024_CLEAN_crypto_kem_dec(ss_cmp, ct, sk);
-    if (ret != 0){
-        fprintf(stderr, "decap failed\n");
-    };
-    if (memcmp(ss, ss_cmp, sizeof(ss)) != 0) {
-        fprintf(stderr, "decap incorrect\n");
+    byte msg[48];
+    byte digest[32];
+    byte sig[RSA_MAX_SIZE / 8], pss[RSA_MAX_SIZE / 8];
+    wc_RNG_GenerateBlock(&rng, msg, sizeof(msg));
+
+    if ((ret = wc_InitRsaKey(&key, NULL)) < 0) {
+        printf("InitRsaKey returned %d\n", ret);
+        return -1;
+    }
+    if ((ret = wc_MakeRsaKey(&key, RSA_MIN_SIZE, WC_RSA_EXPONENT, &rng)) < 0) {
+        printf("MakeRsaKey returned %d\n", ret);
+        return -1;
+    }
+    if ((ret = wc_Sha256Hash(msg, sizeof(msg), digest)) < 0) {
+        printf("wc_Sha256Hash returned %d\n", ret);
+        return -1;
+    }
+    if ((ret = wc_RsaPSS_Sign(digest, sizeof(digest), sig, sizeof(sig),
+                              WC_HASH_TYPE_SHA256, WC_MGF1SHA256, &key, &rng)) <
+        0) {
+        printf("RsaPSS_Sign returned %d\n", ret);
+        return -1;
+    }
+    printf("RsaPSS size %d\n", ret);
+
+    if ((ret = wc_RsaPSS_VerifyCheck(sig, sizeof(sig), pss, sizeof(pss), digest,
+                                     sizeof(digest), WC_HASH_TYPE_SHA256,
+                                     WC_MGF1SHA256, &key)) < 0) {
+        printf("RsaPSS_Verify returned %d\n", ret);
+        return -1;
     }
     printf("Ok.\n");
-
     return 0;
 }
