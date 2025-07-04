@@ -1,48 +1,37 @@
-/* bench_main.c
- *
- * Copyright (C) 2006-2022 wolfSSL Inc.
- *
- * This file is part of wolfSSL.
- *
- * wolfSSL is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * wolfSSL is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
- */
-
 #include <hardware/clocks.h>
 #include <pico/stdlib.h>
 
 #include <wolfssl/ssl.h>
 #include <wolfssl/wolfcrypt/curve25519.h>
 #include <wolfssl/wolfcrypt/curve448.h>
+#include <wolfssl/wolfcrypt/dilithium.h>
 #include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/ed25519.h>
+#include <wolfssl/wolfcrypt/ed448.h>
+#include <wolfssl/wolfcrypt/falcon.h>
 #include <wolfssl/wolfcrypt/hqc.h>
 #include <wolfssl/wolfcrypt/otmlkem.h>
 #include <wolfssl/wolfcrypt/pqclean_mlkem.h>
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/rsa.h>
+#include <wolfssl/wolfcrypt/sphincs.h>
 
 #include "pico-pqtls/utils.h"
 #include "wolfssl/wolfcrypt/hash.h"
 
 #define SIG_MSG_SIZE 48
 #define WARMUP_ROUNDS 10
-#define BENCH_ROUNDS 10
+#define BENCH_ROUNDS 100
 
-#define BENCH_RSA2048 0
+#define BENCH_RSA2048 1
 #define NO_BENCH_RSA2048_KEYGEN 1
 #define BENCH_ECDSA 1
-#define BENCH_HQC 0
+#define BENCH_HQC 1
+#define BENCH_ED25519 1
+#define BENCH_ED448 1
+#define BENCH_DILITHIUM 1
+#define BENCH_FALCON 1
+#define BENCH_SPHINCS 1
 
 /* Benchmark a black box by running it many times. The CPU cycles counts are
  * written to the input timestamp arrays.
@@ -844,6 +833,498 @@ static void ecdsa_verify(void *_args) {
     }
 }
 
+#if BENCH_ED25519
+/* benchmarking Ed25519 */
+typedef struct ed25519_args {
+    ed25519_key key;
+    WC_RNG *rng;
+    byte msg[MSG_SIZE];
+    byte sig[ED25519_SIG_SIZE];
+    word32 siglen;
+} ed25519_args_t;
+
+static void ed25519_setup(struct ed25519_args *args, WC_RNG *rng) {
+    int ret, verified;
+    args->siglen = ED25519_SIG_SIZE;
+
+    if ((ret = wc_ed25519_init(&args->key)) < 0) {
+        printf("wc_ed25519_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ed25519_make_key(rng, ED25519_KEY_SIZE, &args->key)) < 0) {
+        printf("wc_ed25519_make_key returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg))) < 0) {
+        printf("Failed to sample random message\n");
+        exit(-1);
+    }
+
+    if ((ret = wc_ed25519_sign_msg(args->msg, sizeof(args->msg), args->sig,
+                                   &args->siglen, &args->key)) < 0) {
+        printf("wc_ed25519_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+
+    if ((ret = wc_ed25519_verify_msg(args->sig, args->siglen, args->msg,
+                                     sizeof(args->msg), &verified,
+                                     &args->key)) < 0) {
+        printf("wc_ed25519_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("ed25519 signature invalid\n");
+        exit(-1);
+    }
+
+    args->rng = rng;
+    printf("ed25519 setup complete\n");
+}
+
+static void ed25519_keygen(void *_args) {
+    struct ed25519_args *args = (struct ed25519_args *)_args;
+    int ret;
+
+    ed25519_key key;
+    if ((ret = wc_ed25519_init(&key)) < 0) {
+        printf("wc_ed25519_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ed25519_make_key(args->rng, ED25519_KEY_SIZE, &key)) < 0) {
+        printf("wc_ed25519_make_key returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void ed25519_sign(void *_args) {
+    struct ed25519_args *args = (struct ed25519_args *)_args;
+    int ret;
+    byte sig[ED25519_SIG_SIZE];
+    word32 siglen = sizeof(sig);
+
+    if ((ret = wc_ed25519_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
+                                   &args->key)) < 0) {
+        printf("wc_ed25519_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void ed25519_verify(void *_args) {
+    struct ed25519_args *args = (struct ed25519_args *)_args;
+    int ret, verified;
+
+    if ((ret = wc_ed25519_verify_msg(args->sig, args->siglen, args->msg,
+                                     sizeof(args->msg), &verified,
+                                     &args->key)) < 0) {
+        printf("wc_ed25519_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("ed25519 signature invalid\n");
+        exit(-1);
+    }
+}
+#endif /* BENCH_ED25519 */
+
+#if BENCH_ED448
+/* benchmarking Ed448 */
+typedef struct ed448_args {
+    ed448_key key;
+    WC_RNG *rng;
+    byte msg[MSG_SIZE];
+    byte sig[ED448_SIG_SIZE];
+    word32 siglen;
+} ed448_args_t;
+
+static void ed448_setup(struct ed448_args *args, WC_RNG *rng) {
+    int ret, verified;
+    args->siglen = ED448_SIG_SIZE;
+
+    if ((ret = wc_ed448_init(&args->key)) < 0) {
+        printf("wc_ed448_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ed448_make_key(rng, ED448_KEY_SIZE, &args->key)) < 0) {
+        printf("wc_ed448_make_key returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg))) < 0) {
+        printf("Failed to sample random message\n");
+        exit(-1);
+    }
+
+    if ((ret = wc_ed448_sign_msg(args->msg, sizeof(args->msg), args->sig,
+                                 &args->siglen, &args->key, NULL, 0)) < 0) {
+        printf("wc_ed448_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+
+    if ((ret = wc_ed448_verify_msg(args->sig, args->siglen, args->msg,
+                                   sizeof(args->msg), &verified, &args->key,
+                                   NULL, 0)) < 0) {
+        printf("wc_ed448_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("ed448 signature invalid\n");
+        exit(-1);
+    }
+
+    args->rng = rng;
+    printf("ed448 setup complete\n");
+}
+
+static void ed448_keygen(void *_args) {
+    struct ed448_args *args = (struct ed448_args *)_args;
+    int ret;
+
+    ed448_key key;
+    if ((ret = wc_ed448_init(&key)) < 0) {
+        printf("wc_ed448_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_ed448_make_key(args->rng, ED448_KEY_SIZE, &key)) < 0) {
+        printf("wc_ed448_make_key returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void ed448_sign(void *_args) {
+    struct ed448_args *args = (struct ed448_args *)_args;
+    int ret;
+    byte sig[ED448_SIG_SIZE];
+    word32 siglen = sizeof(sig);
+
+    if ((ret = wc_ed448_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
+                                 &args->key, NULL, 0)) < 0) {
+        printf("wc_ed448_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void ed448_verify(void *_args) {
+    struct ed448_args *args = (struct ed448_args *)_args;
+    int ret, verified;
+
+    if ((ret = wc_ed448_verify_msg(args->sig, args->siglen, args->msg,
+                                   sizeof(args->msg), &verified, &args->key,
+                                   NULL, 0)) < 0) {
+        printf("wc_ed448_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("ed448 signature invalid\n");
+        exit(-1);
+    }
+}
+#endif /* BENCH_ED448 */
+
+#if BENCH_DILITHIUM
+/* benchmarking dilithium */
+typedef struct dilithium_args {
+    dilithium_key key;
+    WC_RNG *rng;
+    byte msg[MSG_SIZE];
+    byte sig[DILITHIUM_LEVEL5_SIG_SIZE];
+    word32 siglen;
+} dilithium_args_t;
+
+static void dilithium_setup(struct dilithium_args *args, WC_RNG *rng,
+                            int level) {
+    int ret, verified;
+    args->siglen = sizeof(args->sig);
+
+    if ((ret = wc_dilithium_init(&args->key)) < 0) {
+        printf("wc_dilithium_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_dilithium_set_level(&args->key, level)) < 0) {
+        printf("wc_dilithium_set_level returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_dilithium_make_key(&args->key, rng)) < 0) {
+        printf("wc_dilithium_make_key returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg))) < 0) {
+        printf("Failed to sample random message\n");
+        exit(-1);
+    }
+
+    if ((ret = wc_dilithium_sign_msg(args->msg, sizeof(args->msg), args->sig,
+                                     &args->siglen, &args->key, rng)) < 0) {
+        printf("wc_dilithium_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+
+    if ((ret = wc_dilithium_verify_msg(args->sig, args->siglen, args->msg,
+                                       sizeof(args->msg), &verified,
+                                       &args->key)) < 0) {
+        printf("wc_dilithium_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("dilithium signature invalid\n");
+        exit(-1);
+    }
+
+    args->rng = rng;
+    printf("dilithium setup complete\n");
+}
+
+static void dilithium_keygen(void *_args) {
+    struct dilithium_args *args = (struct dilithium_args *)_args;
+    int ret;
+
+    dilithium_key key;
+    if ((ret = wc_dilithium_init(&key)) < 0) {
+        printf("wc_dilithium_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_dilithium_set_level(&key, args->key.level)) < 0) {
+        printf("wc_dilithium_set_level returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_dilithium_make_key(&key, args->rng)) < 0) {
+        printf("wc_dilithium_make_key returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void dilithium_sign(void *_args) {
+    struct dilithium_args *args = (struct dilithium_args *)_args;
+    int ret;
+    byte sig[DILITHIUM_LEVEL5_SIG_SIZE];
+    word32 siglen = sizeof(sig);
+
+    if ((ret = wc_dilithium_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
+                                     &args->key, args->rng)) < 0) {
+        printf("wc_dilithium_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void dilithium_verify(void *_args) {
+    struct dilithium_args *args = (struct dilithium_args *)_args;
+    int ret, verified;
+
+    if ((ret = wc_dilithium_verify_msg(args->sig, args->siglen, args->msg,
+                                       sizeof(args->msg), &verified,
+                                       &args->key)) < 0) {
+        printf("wc_dilithium_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("dilithium signature invalid\n");
+        exit(-1);
+    }
+}
+#endif /* BENCH_DILITHIUM */
+
+#if BENCH_FALCON
+/* benchmarking falcon */
+typedef struct falcon_args {
+    falcon_key key;
+    WC_RNG *rng;
+    byte msg[MSG_SIZE];
+    byte sig[FALCON_LEVEL5_SIG_SIZE];
+    word32 siglen;
+} falcon_args_t;
+
+static void falcon_setup(struct falcon_args *args, WC_RNG *rng,
+                            int level) {
+    int ret, verified;
+    args->siglen = sizeof(args->sig);
+
+    if ((ret = wc_falcon_init(&args->key)) < 0) {
+        printf("wc_falcon_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_falcon_set_level(&args->key, level)) < 0) {
+        printf("wc_falcon_set_level returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_falcon_make_key(&args->key, rng)) < 0) {
+        printf("wc_falcon_make_key returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg))) < 0) {
+        printf("Failed to sample random message\n");
+        exit(-1);
+    }
+
+    if ((ret = wc_falcon_sign_msg(args->msg, sizeof(args->msg), args->sig,
+                                     &args->siglen, &args->key, rng)) < 0) {
+        printf("wc_falcon_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+
+    if ((ret = wc_falcon_verify_msg(args->sig, args->siglen, args->msg,
+                                       sizeof(args->msg), &verified,
+                                       &args->key)) < 0) {
+        printf("wc_falcon_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("falcon signature invalid\n");
+        exit(-1);
+    }
+
+    args->rng = rng;
+    printf("falcon setup complete\n");
+}
+
+static void falcon_keygen(void *_args) {
+    struct falcon_args *args = (struct falcon_args *)_args;
+    int ret;
+
+    falcon_key key;
+    if ((ret = wc_falcon_init(&key)) < 0) {
+        printf("wc_falcon_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_falcon_set_level(&key, args->key.level)) < 0) {
+        printf("wc_falcon_set_level returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_falcon_make_key(&key, args->rng)) < 0) {
+        printf("wc_falcon_make_key returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void falcon_sign(void *_args) {
+    struct falcon_args *args = (struct falcon_args *)_args;
+    int ret;
+    byte sig[FALCON_LEVEL5_SIG_SIZE];
+    word32 siglen = sizeof(sig);
+
+    if ((ret = wc_falcon_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
+                                     &args->key, args->rng)) < 0) {
+        printf("wc_falcon_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void falcon_verify(void *_args) {
+    struct falcon_args *args = (struct falcon_args *)_args;
+    int ret, verified;
+
+    if ((ret = wc_falcon_verify_msg(args->sig, args->siglen, args->msg,
+                                       sizeof(args->msg), &verified,
+                                       &args->key)) < 0) {
+        printf("wc_falcon_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("falcon signature invalid\n");
+        exit(-1);
+    }
+}
+#endif /* BENCH_FALCON */
+
+#if BENCH_SPHINCS
+/* benchmarking sphincs */
+typedef struct sphincs_args {
+    sphincs_key key;
+    WC_RNG *rng;
+    byte msg[MSG_SIZE];
+    byte sig[SPHINCS_MAX_SIG_SIZE];
+    word32 siglen;
+} sphincs_args_t;
+
+static void sphincs_setup(struct sphincs_args *args, WC_RNG *rng,
+                            int level, int optim) {
+    int ret, verified;
+    args->siglen = sizeof(args->sig);
+
+    if ((ret = wc_sphincs_init(&args->key)) < 0) {
+        printf("wc_sphincs_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_sphincs_set_level_and_optim(&args->key, level, optim)) < 0) {
+        printf("wc_sphincs_set_level returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_sphincs_make_key(&args->key, rng)) < 0) {
+        printf("wc_sphincs_make_key returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_RNG_GenerateBlock(rng, args->msg, sizeof(args->msg))) < 0) {
+        printf("Failed to sample random message\n");
+        exit(-1);
+    }
+
+    if ((ret = wc_sphincs_sign_msg(args->msg, sizeof(args->msg), args->sig,
+                                     &args->siglen, &args->key, rng)) < 0) {
+        printf("wc_sphincs_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+
+    if ((ret = wc_sphincs_verify_msg(args->sig, args->siglen, args->msg,
+                                       sizeof(args->msg), &verified,
+                                       &args->key)) < 0) {
+        printf("wc_sphincs_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("sphincs signature invalid\n");
+        exit(-1);
+    }
+
+    args->rng = rng;
+    printf("sphincs setup complete\n");
+}
+
+static void sphincs_keygen(void *_args) {
+    struct sphincs_args *args = (struct sphincs_args *)_args;
+    int ret;
+
+    sphincs_key key;
+    if ((ret = wc_sphincs_init(&key)) < 0) {
+        printf("wc_sphincs_init returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_sphincs_set_level_and_optim(&key, args->key.level, args->key.optim)) < 0) {
+        printf("wc_sphincs_set_level returned %d\n", ret);
+        exit(-1);
+    }
+    if ((ret = wc_sphincs_make_key(&key, args->rng)) < 0) {
+        printf("wc_sphincs_make_key returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void sphincs_sign(void *_args) {
+    struct sphincs_args *args = (struct sphincs_args *)_args;
+    int ret;
+    byte sig[SPHINCS_MAX_SIG_SIZE];
+    word32 siglen = sizeof(sig);
+
+    if ((ret = wc_sphincs_sign_msg(args->msg, sizeof(args->msg), sig, &siglen,
+                                     &args->key, args->rng)) < 0) {
+        printf("wc_sphincs_sign_msg returned %d\n", ret);
+        exit(-1);
+    }
+}
+
+static void sphincs_verify(void *_args) {
+    struct sphincs_args *args = (struct sphincs_args *)_args;
+    int ret, verified;
+
+    if ((ret = wc_sphincs_verify_msg(args->sig, args->siglen, args->msg,
+                                       sizeof(args->msg), &verified,
+                                       &args->key)) < 0) {
+        printf("wc_sphincs_verify_msg returned %d\n", ret);
+        exit(-1);
+    }
+    if (!verified) {
+        printf("sphincs signature invalid\n");
+        exit(-1);
+    }
+}
+#endif /* BENCH_SPHINCS */
+
 int main(void) {
     stdio_init_all();
     countdown_s(5);
@@ -859,6 +1340,28 @@ int main(void) {
     size_t len = BENCH_ROUNDS;
 
     /* setup */
+#if BENCH_SPHINCS
+    sphincs_args_t sphincs_args;
+#endif
+#if BENCH_FALCON
+    falcon_args_t falcon512_args, falcon1024_args;
+    falcon_setup(&falcon512_args, &rng, 1);
+    falcon_setup(&falcon1024_args, &rng, 5);
+#endif
+#if BENCH_DILITHIUM
+    dilithium_args_t mldsa44_args, mldsa65_args, mldsa87_args;
+    dilithium_setup(&mldsa44_args, &rng, 2);
+    dilithium_setup(&mldsa65_args, &rng, 3);
+    dilithium_setup(&mldsa87_args, &rng, 5);
+#endif
+#if BENCH_ED448
+    ed448_args_t ed448_args;
+    ed448_setup(&ed448_args, &rng);
+#endif
+#if BENCH_ED25519
+    ed25519_args_t ed25519_args;
+    ed25519_setup(&ed25519_args, &rng);
+#endif
 #if BENCH_ECDSA
     struct ecdsa_args ecdsa256_args, ecdsa384_args, ecdsa521_args;
     ecdsa_setup(&ecdsa256_args, &rng, ECC_SECP256R1);
@@ -897,6 +1400,63 @@ int main(void) {
     while (1) {
         bench_black_box(bench_sleep, NULL, durs, len);
         print_results(durs, len, "sleep,sleep");
+
+#if BENCH_FALCON
+        bench_black_box(falcon_keygen, &falcon512_args, durs, len);
+        print_results(durs, len, "Falcon-512,keygen");
+        bench_black_box(falcon_sign, &falcon512_args, durs, len);
+        print_results(durs, len, "Falcon-512,sign");
+        bench_black_box(falcon_verify, &falcon512_args, durs, len);
+        print_results(durs, len, "Falcon-512,verify");
+
+        bench_black_box(falcon_keygen, &falcon1024_args, durs, len);
+        print_results(durs, len, "Falcon-1024,keygen");
+        bench_black_box(falcon_sign, &falcon1024_args, durs, len);
+        print_results(durs, len, "Falcon-1024,sign");
+        bench_black_box(falcon_verify, &falcon1024_args, durs, len);
+        print_results(durs, len, "Falcon-1024,verify");
+#endif
+
+#if BENCH_DILITHIUM
+        bench_black_box(dilithium_keygen, &mldsa44_args, durs, len);
+        print_results(durs, len, "ML-DSA-44,keygen");
+        bench_black_box(dilithium_sign, &mldsa44_args, durs, len);
+        print_results(durs, len, "ML-DSA-44,sign");
+        bench_black_box(dilithium_verify, &mldsa44_args, durs, len);
+        print_results(durs, len, "ML-DSA-44,verify");
+
+        bench_black_box(dilithium_keygen, &mldsa65_args, durs, len);
+        print_results(durs, len, "ML-DSA-65,keygen");
+        bench_black_box(dilithium_sign, &mldsa65_args, durs, len);
+        print_results(durs, len, "ML-DSA-65,sign");
+        bench_black_box(dilithium_verify, &mldsa65_args, durs, len);
+        print_results(durs, len, "ML-DSA-65,verify");
+
+        bench_black_box(dilithium_keygen, &mldsa87_args, durs, len);
+        print_results(durs, len, "ML-DSA-87,keygen");
+        bench_black_box(dilithium_sign, &mldsa87_args, durs, len);
+        print_results(durs, len, "ML-DSA-87,sign");
+        bench_black_box(dilithium_verify, &mldsa87_args, durs, len);
+        print_results(durs, len, "ML-DSA-87,verify");
+#endif
+
+#if BENCH_ED448
+        bench_black_box(ed448_keygen, &ed448_args, durs, len);
+        print_results(durs, len, "ed448,keygen");
+        bench_black_box(ed448_sign, &ed448_args, durs, len);
+        print_results(durs, len, "ed448,sign");
+        bench_black_box(ed448_verify, &ed448_args, durs, len);
+        print_results(durs, len, "ed448,verify");
+#endif
+
+#if BENCH_ED25519
+        bench_black_box(ed25519_keygen, &ed25519_args, durs, len);
+        print_results(durs, len, "ed25519,keygen");
+        bench_black_box(ed25519_sign, &ed25519_args, durs, len);
+        print_results(durs, len, "ed25519,sign");
+        bench_black_box(ed25519_verify, &ed25519_args, durs, len);
+        print_results(durs, len, "ed25519,verify");
+#endif
 
 #if BENCH_ECDSA
         bench_black_box(ecdsa_keygen, &ecdsa256_args, durs, len);
@@ -1021,5 +1581,56 @@ int main(void) {
         print_results(durs, len, "OT-ML-KEM-1024,encap");
         bench_black_box(otmlkem_decap, &otmlkem1024_args, durs, len);
         print_results(durs, len, "OT-ML-KEM-1024,decap");
+
+#if BENCH_SPHINCS
+        sphincs_setup(&sphincs_args, &rng, 1, FAST_VARIANT);
+        bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-128-FAST,keygen");
+        bench_black_box(sphincs_sign, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-128-FAST,sign");
+        bench_black_box(sphincs_verify, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-128-FAST,verify");
+
+        sphincs_setup(&sphincs_args, &rng, 3, FAST_VARIANT);
+        bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-192-FAST,keygen");
+        bench_black_box(sphincs_sign, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-192-FAST,sign");
+        bench_black_box(sphincs_verify, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-192-FAST,verify");
+
+        sphincs_setup(&sphincs_args, &rng, 5, FAST_VARIANT);
+        bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-256-FAST,keygen");
+        bench_black_box(sphincs_sign, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-256-FAST,sign");
+        bench_black_box(sphincs_verify, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-256-FAST,verify");
+
+        sphincs_setup(&sphincs_args, &rng, 1, SMALL_VARIANT);
+        bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-128-SMALL,keygen");
+        bench_black_box(sphincs_sign, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-128-SMALL,sign");
+        bench_black_box(sphincs_verify, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-128-SMALL,verify");
+
+        sphincs_setup(&sphincs_args, &rng, 3, SMALL_VARIANT);
+        bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-192-SMALL,keygen");
+        bench_black_box(sphincs_sign, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-192-SMALL,sign");
+        bench_black_box(sphincs_verify, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-192-SMALL,verify");
+
+        sphincs_setup(&sphincs_args, &rng, 5, SMALL_VARIANT);
+        bench_black_box(sphincs_keygen, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-256-SMALL,keygen");
+        bench_black_box(sphincs_sign, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-256-SMALL,sign");
+        bench_black_box(sphincs_verify, &sphincs_args, durs, len);
+        print_results(durs, len, "SPHINCS-256-SMALL,verify");
+#endif /* BENCH_SPHINCS */
+
     }
 }
