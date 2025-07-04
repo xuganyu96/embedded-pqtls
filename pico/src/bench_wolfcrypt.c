@@ -1880,6 +1880,7 @@ int main(void) {
 #endif /* BENCH_SPHINCS */
     }
 
+    printf("Ok.\n");
     while (1) {
     }
 }
