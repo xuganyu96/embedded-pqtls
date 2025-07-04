@@ -1561,7 +1561,7 @@ int main(void) {
 #endif
 
     printf("name,op,median,p90,p99\n");
-    while (1) {
+    for (int round = 0; round < 1; round++) {
 #ifdef BENCH_FALCON
 #ifdef BENCH_FALCON_KEYGEN
         bench_black_box(falcon_keygen, &falcon512_args, durs, len);
@@ -1890,4 +1890,6 @@ int main(void) {
 #endif
 #endif /* BENCH_SPHINCS */
     }
+
+    return 0;
 }

@@ -20,8 +20,8 @@
 #include "pico-pqtls/utils.h"
 
 #define SIG_MSG_SIZE 48
-#define WARMUP_ROUNDS 10
-#define BENCH_ROUNDS 200
+#define WARMUP_ROUNDS 5
+#define BENCH_ROUNDS 100
 
 #define BENCH_X25519
 #define BENCH_X25519_KEYGEN
@@ -1547,7 +1547,7 @@ int main(void) {
 #endif
 
     printf("name,op,median,p90,p99\n");
-    while (1) {
+    for (int round = 0; round < 1; round++) {
         bench_black_box(bench_sleep, NULL, durs, len);
         print_results(durs, len, "sleep,sleep");
 
@@ -1878,5 +1878,8 @@ int main(void) {
         print_results(durs, len, "SPHINCS-256-SMALL,verify");
 #endif
 #endif /* BENCH_SPHINCS */
+    }
+
+    while (1) {
     }
 }

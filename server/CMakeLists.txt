@@ -99,6 +99,6 @@ target_link_libraries(tls13server wolfssl)
 add_executable(tls13client src/tls13client.c)
 target_link_libraries(tls13client wolfssl)
 
-add_executable(test src/test.c)
-target_link_libraries(test wolfssl pqclean)
+add_executable(bench_wolfcrypt src/bench_wolfcrypt.c)
+target_link_libraries(bench_wolfcrypt wolfssl pqclean)
 
