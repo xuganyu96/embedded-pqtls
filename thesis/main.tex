@@ -399,8 +399,25 @@ I understand that my thesis may be made electronically available to the public.
 \addcontentsline{toc}{chapter}{Abstract}
 \begin{center}\textbf{Abstract}\end{center}
 
-This is the abstract.
+Transport Layer Security (TLS) is the most widely used cryptographic protocol on the Internet.
+It integrates tightly with the transport layer of the network (TCP) and ensures confidentiality, integrity, and authenticity of the data transmitted at application data layer.
+TLS achieves these security properties via using a combination of cryptographic primitives including Diffie-Hellman key exchange, digital signatures, cryptographic hash functions, and authenticated encryption schemes.
+The public-key cryptographic primitives based on number theories and elliptic curves are at the risk of becoming insecure due to advances in quantum computing algorithms and the advent of large quantum computers, which demands an urgent transition to post-quantum cryptography.
 
+Public experimentation with transitioning to a post-quantum TLS began as early as 2016 with Google's CECPQ1.
+Through nearly a decade of collaboration among industry, academia, and governments, the transition to a post-quantum TLS is well underway.
+There is an abundance of literature and technical resources that explored the performance and security impact of replacing Diffie-Hellman key exchange with post-quantum KEMs and replacing RSA/ECDSA/EdDSA with post-quatnum digital signatures.
+Several groups have also proposed protocol-level optimzation to partially mitigate the performance penalty from post-quantum primitives.
+However, deploying PQ-TLS to embedded clients received comparatively less attention: the performance impact is less well-understood, and there is less existing resources for evaluating PQ-TLS on various embedded platforms.
+
+In this thesis, we implemented post-quantum TLS on top of WolfSSL using PQC implementations from the PQClean project, then tested the performacne of TLS handshake with a Raspberry Pi Pico 2 W as client and a desktop server.
+In our testing, we found lattice-based KEM and digital signatures to perform competitively with elliptic-curve Diffie-Hellman and digital signatures despite having larger communication costs.
+
+We also proposed and implemented two performance optimization for post-quantum TLS.
+First is using IND-1CCA KEM for the key exchange phase, for which we proposed an original KEM transformation that converts a passively secure PKE into an IND-1CCA KEM, which we call the ``encrypt-then-MAC'' transformation.
+Compared to the Fujisaki-Okamoto transformation, our ``encrypt-then-MAC'' transformation removes the need for re-encryption in decapsulation, which translates to more than 70\% reduction in CPU cycles when applied to the CPA subroutines of ML-KEM.
+Second, we implemented KEMTLS on top of WolfSSL, which uses KEM instead of digital signature for authentication.
+In our testing we found KEM-based authentication to have comparable performance with signature-based authentication.
 
 \cleardoublepage
 \phantomsection    % allows hyperref to link to the correct page
@@ -2381,12 +2398,9 @@ Note that these sizes are measured with PEM encoding, whereas the \texttt{Certif
 Since PEM is the base-64 encoding of the raw bytes of DER plus a human-readable header and footer, the sizes presented in Table \ref{tab:cert-chain-sizes} are proportionally larger than what is actually transmitted in a handshake.
 
 \begin{table}[htbp]
-\centering
-\caption{
-    Server certificate chain size (bytes).
-}
-\label{tab:cert-chain-sizes}
-\footnotesize\begin{tabular}{lrllr}
+\centering\scriptsize
+% TODO: some server-chain included root, which should not happen
+\begin{tabular}{lrllr}
 \toprule
     \textbf{Root} 
     & \textbf{Root cert size} 
@@ -2397,37 +2411,59 @@ Since PEM is the base-64 encoding of the raw bytes of DER plus a human-readable 
 \midrule
 \multicolumn{5}{c}{Classical} \\
 \midrule
-    RSA-2048 & 1265 & RSA-2048 & RSA-2408 & 2506 \\
-    ECDSA P-256 & ??? & ECDSA P-256 & ECDSA P-256 & ??? \\
-    Ed25519 & ??? & Ed25519 & Ed25519 & ??? \\
-    ECDSA P-384 & ??? & ECDSA P-384 & ECDSA P-384 & ??? \\
-    Ed448 & ??? & Ed448 & Ed448 & ??? \\
-    ECDSA P-521 & ??? & ECDSA P-521 & ECDSA P-521 & ??? \\
+    RSA-2048        &{\sf 1265}     & RSA-2048      & RSA-2048      &{\sf 2506}         \\
+    ECDSA (P-256)   &{\sf 729}      & ECDSA (P-256) & ECDSA (P-256) &{\sf 1429}         \\
+    ECDSA (P-384)   &{\sf 810}      & ECDSA (P-384) & ECDSA (P-384) &{\sf 2406}         \\
+    ECDSA (P-521)   &{\sf 912}      & ECDSA (P-521) & ECDSA (P-521) &{\sf 2711}         \\
+    Ed25519         & {\sf 639}     & Ed25519       & Ed25519       & {\sf 1893}        \\
+    Ed448           & {\sf 741}     & Ed448         & Ed448         & {\sf 2199}        \\
 \midrule
 \multicolumn{5}{c}{PQ-TLS} \\
 \midrule
-    ML-DSA-44 & ??? & ML-DSA-44 & ML-DSA-44 & ??? \\
-    ML-DSA-65 & ??? & ML-DSA-65 & ML-DSA-65 & ??? \\
-    ML-DSA-87 & ??? & ML-DSA-87 & ML-DSA-87 & ??? \\
-    Falcon-512 & ??? & Falcon-512 & Falcon-512 & ??? \\
-    Falcon-1024 & ??? & Falcon-1024 & Falcon-1024 & ??? \\
-    SPHINCS-128f & ??? & SPHINCS-128f & SPHINCS-128f & ??? \\
-    SPHINCS-192f & ??? & SPHINCS-192f & SPHINCS-192f & ??? \\
-    SPHINCS-256f & ??? & SPHINCS-256f & SPHINCS-256f & ??? \\
-    SPHINCS-128s  & ??? & SPHINCS-128s  & SPHINCS-128s  & ??? \\
-    SPHINCS-192s   & ??? & SPHINCS-192s   & SPHINCS-192s   & ??? \\
-    SPHINCS-256s   & ??? & SPHINCS-256s   & SPHINCS-256s   & ??? \\
-    Falcon-512 & ??? & Falcon-512 & ML-DSA-44 & ??? \\
-    Falcon-1024 & ??? & Falcon-1024 & ML-DSA-65 & ??? \\
-    SPHINCS-128s  & ??? & SPHINCS-128s  & ML-DSA-44 & ??? \\
+    ML-DSA-44       & {\sf 5596}    & ML-DSA-44     & ML-DSA-44     & {\sf 16763}       \\
+    Falcon-512      & {\sf 2630}    & Falcon-512    & Falcon-512    & {\sf 7874}        \\
+    Falcon-512      & {\sf 2630}    & Falcon-512    & ML-DSA-44     & {\sf 8447}        \\
+    Falcon-512      & {\sf 2634}    & ML-DSA-44     & ML-DSA-44     & {\sf 11404}       \\
+    ML-DSA-65       & {\sf 7668}    & ML-DSA-65     & ML-DSA-44     & {\sf 14446}       \\
+    Falcon-1024     & {\sf 4678}    & Falcon-1024   & Falcon-1024   & {\sf 14017}       \\
+    Falcon-1024     & {\sf 4686}    & Falcon-1024   & ML-DSA-65     & {\sf 14249}       \\
+    Falcon-1024     & {\sf 4686}    & Falcon-1024   & ML-DSA-87     & {\sf 15110}       \\
+    ML-DSA-65       & {\sf 7668}    & ML-DSA-65     & ML-DSA-65     & {\sf 22979}       \\
+    ML-DSA-87       &{\sf 10320}    & ML-DSA-87     & ML-DSA-87     &{\sf 30936}        \\
+    SPHINCS-128f    &{\sf 23710}    & ML-DSA-44     & ML-DSA-44     &{\sf 54734}        \\
+    SPHINCS-128s    &{\sf 11206}    & ML-DSA-44     & ML-DSA-44     &{\sf 29726}        \\
+    SPHINCS-128s    &{\sf 11206}    & SPHINCS-128s  & Falcon-512    &{\sf 34772}        \\
+    SPHINCS-128s    &{\sf 11206}    & SPHINCS-128s  & ML-DSA-44     &{\sf 34772}        \\
+    SPHINCS-128s    &{\sf 11206}    & SPHINCS-128s  & SPHINCS-128s  &{\sf 33594}        \\
+    SPHINCS-192s    &{\sf 22561}    & SPHINCS-192s  & ML-DSA-65     &{\sf 70246}        \\
+    SPHINCS-256s    &{\sf 40956}    & SPHINCS-256s  & Falcon-1024   &{\sf 125187}       \\
+    SPHINCS-256s    &{\sf 40956}    & SPHINCS-256s  & ML-DSA-87     &{\sf 126276}       \\
 \midrule
 \multicolumn{5}{c}{KEMTLS} \\
 \midrule
-    ML-DSA-44 & ??? & ML-DSA-44 & ML-KEM-512 & ??? \\
-    Falcon-512 & ??? & Falcon-512 & ML-KEM-512 & ??? \\
-    SPHINCS-128s  & ??? & SPHINCS-128s  & HQC-128 & ??? \\
+    ML-DSA-44       & {\sf 5596}    & ML-DSA-44     & ML-KEM-512    & {\sf 16073}       \\
+    ML-DSA-44       & {\sf 5596}    & ML-DSA-44     & HQC-128       & {\sf 18035}       \\
+    Falcon-512      & {\sf 2634}    & Falcon-512    & ML-KEM-512    & {\sf 7744}        \\
+    ML-DSA-65       & {\sf 7668}    & ML-DSA-65     & ML-KEM-512    & {\sf 13751}       \\
+    ML-DSA-65       & {\sf 7668}    & ML-DSA-65     & ML-KEM-768    & {\sf 21939}       \\
+    ML-DSA-65       & {\sf 7668}    & ML-DSA-65     & HQC-128       & {\sf 15713}       \\
+    Falcon-1024     & {\sf 4682}    & Falcon-1024   & ML-KEM-768    & {\sf 13201}       \\
+    Falcon-1024     & {\sf 4678}    & Falcon-1024   & ML-KEM-1024   & {\sf 13721}       \\
+    ML-DSA-87       & {\sf 10320}   & ML-DSA-87     & ML-KEM-1024   & {\sf 29547}       \\
+    ML-DSA-87       &{\sf 10320}    & ML-DSA-87     & ML-KEM-1024   &{\sf 29547}        \\
+    ML-DSA-87       &{\sf 10320}    & ML-DSA-87     & ML-KEM-768    &{\sf 29027}        \\
+    SPHINCS-128s    &{\sf 11206}    & SPHINCS-128s  & HQC-128       &{\sf 36608}        \\
+    SPHINCS-128s    &{\sf 11206}    & SPHINCS-128s  & ML-KEM-512    &{\sf 34646}        \\
+    SPHINCS-192s    &{\sf 22561}    & SPHINCS-192s  & HQC-192       &{\sf 73728}        \\
+    SPHINCS-192s    &{\sf 22561}    & SPHINCS-192s  & ML-KEM-768    &{\sf 69206}        \\
+    SPHINCS-256s    &{\sf 40956}    & SPHINCS-256s  & HQC-256       &{\sf 132577}       \\
+    SPHINCS-256s    &{\sf 40956}    & SPHINCS-256s  & ML-KEM-1024   &{\sf 124891}       \\
 \bottomrule
 \end{tabular}
+\caption{
+    Server certificate chain size (bytes).
+}
+\label{tab:cert-chain-sizes}
 \end{table}
 
 \section{Cryptographic operations performance}\label{sec:crypto-primitive-performance}
@@ -2782,6 +2818,24 @@ HQC-256             & SPHINCS-256s    & SPHINCS-256s     & HQC-256          & \t
 
 
 \subsection{Discussion}
+
+\paragraph{Comparing PQ-TLS performance with classical TLS} At comparable NIST security level, lattice-based primitives showed competitive if not superior performance compared to RSA and elliptic-curve primitives (Figure \ref{fig:handshake-latencies-lattice-vs-nt}).
+For ephemeral key exchange, ML-KEM-512 consumed less CPU time and overall time than X25519. 
+ML-KEM-768 consumed approximately equal amount of CPU time as X25519, but consumed more overall time, likely due to the larger public key and ciphertext sizes.
+We speculate that the competitive performance can be largely attributed to the fact that ML-KEM and ML-DSA have smaller arithmetics: RSA-2048 operates 2048-bit integers, X25519/Ed25519 oeprates with 256-bit integers, while ML-KEM (using a modulus of 3349) and ML-DSA (using a modulus of 8380417) arithmetics all fit within the 32-bit register of the RP-2350.
+
+As expected, SPHINCS+ and HQC performed worse. 
+HQC for key exchange consumed 50-100x more CPU time than X25519/X448 and ML-KEM at comparable security level.
+On the other hand, signature verification for the small variant of SPHINCS+ consumed approx. 15-20 times the CPU time as ECC and lattice-based scheme.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/imgs/pq-classic-hs-durs.png}
+    \caption{Handshake latency: lattice-based vs number-theoretic cipher suite}
+    \label{fig:handshake-latencies-lattice-vs-nt}
+\end{figure}
+
+
 \paragraph{IND-1CCA KEM} We expected meaningful performance improvements from removing \textit{re-encryption} from an FO-protected IND-CCA secure KEM.
 Prior implementations on SIKE/Kyber/Lightsaber \cite{DBLP:conf/eurocrypt/Huguenin-Dumittan22} and ML-KEM \cite{DBLP:conf/esorics/ZhengZDSZYZ24} reported decapsulation speedup ranging from 2x to 6x.
 Where server and client both have powerful desktop CPUs, cryptographic operations do not bottleneck the handshake, and the improvements in decapsulation speed only translate to minimal improvements in handshake speed (Table \ref{tab:esorics/ZhengZDSZYZ24}).
@@ -2811,28 +2865,10 @@ Figure \ref{fig:comparing-cca-and-1cca-kems} compares the distribution of key ex
 
 \begin{figure}[H]
     \centering
-    % TODO: make ML-KEM vs OT-ML-KEM graph
+    \includegraphics[width=\linewidth]{benchmarks/imgs/cca-vs-1cca-kex-dur.png}
+    \includegraphics[width=\linewidth]{benchmarks/imgs/cca-vs-1cca-hs-dur.png}
     \caption{Comparing key exchange latency between CCA and 1CCA ML-KEM}
     \label{fig:comparing-cca-and-1cca-kems}
-\end{figure}
-
-\paragraph{ML-DSA vs. Falcon} ML-DSA and Falcon are both lattice-based digital signature schemes selected by NIST for standardization (ML-DSA was standardized in August 2024; Falcon was selected but still in the process of being standardized).
-However, there are notable differences between their designs and performance characteristics that make one suitable than the other in certain scenarios.
-Falcon has smaller signature size (752 vs 2420 bytes at NIST level 1, 1462 vs 4627 at level 5) and smaller public key size (897 vs 1312 at level 1, 1793 vs 2592 at level 5).
-According to eBACS \cite{eBACS2025}, on a Cortex-A72 (Raspberry Pi 4B)\footnote{\scriptsize \url{https://bench.cr.yp.to/results-sign/aarch64-pi4b.html}}, Falcon has significantly faster signing and verification than ML-DSA.
-Because ML-DSA signs using the ``Fiat-Shamir with abort'' \cite{DBLP:conf/asiacrypt/Lyubashevsky09} strategy, signing time can have large variances depending on the input randomness, while Falcon's signing routine does not have this issue.
-On the other hand, Falcon's signing routine uses a discrete Gaussian sampler, which requires constant-time floating point arithmetics with at least 53-bits of precision.
-The float-point arithmetics requirement is not only difficult to fulfill, such as on legacy CPUs and/or embedded devices, but also difficult to implement without risk of introducing side-channel vulnerabilities \cite{}.
-
-While each signature scheme can make a valid certificate chain, given the performance and security characteristics mentioned above, we recommend using Falcon only for offline signatures (signatures are produced ahead of the handshake) while using ML-DSA for online signature (signatures are produced during handshake).
-For example, root and intermediate CAs can issue certificates using the Falcon, and server signs \texttt{CertificateVerify} with ML-DSA.
-Figure \ref{fig:comparing-mldsa-falcon-cert-chains} compares the performance across various Falcon/ML-DSA certificate chain configurations.
-
-\begin{figure}[H]
-    \centering
-    % TODO: graph ML-DSA/Falcon chains
-    \caption{Comparing ML-DSA/Falcon mixture chains}
-    \label{fig:comparing-mldsa-falcon-cert-chains}
 \end{figure}
 
 \paragraph{PQ-TLS vs KEMTLS}
@@ -2844,9 +2880,30 @@ Other implementations \cite{DBLP:conf/latincrypt/CeliFSTVWWW21,DBLP:conf/space/G
 
 \begin{figure}[H]
     \centering
-    % TODO: graph KEMTLS
+    \includegraphics[width=\linewidth]{benchmarks/imgs/pqtls-kemtls-auth-dur.png}
+    \includegraphics[width=\linewidth]{benchmarks/imgs/pqtls-kemtls-hs-dur.png}
     \caption{Comparing KEMTLS with PQ-TLS}
     \label{fig:comparing-kemtls-and-pqtls}
+\end{figure}
+
+
+\paragraph{Practical recommendations} ML-DSA and Falcon are both lattice-based digital signature schemes selected by NIST for standardization (ML-DSA was standardized in August 2024; Falcon was selected but still in the process of being standardized).
+However, there are notable differences between their designs and performance characteristics that make one suitable than the other in certain scenarios.
+Falcon has smaller signature size (752 vs 2420 bytes at NIST level 1, 1462 vs 4627 at level 5) and smaller public key size (897 vs 1312 at level 1, 1793 vs 2592 at level 5).
+According to eBACS \cite{eBACS2025}, on a Cortex-A72 (Raspberry Pi 4B)\footnote{\scriptsize \url{https://bench.cr.yp.to/results-sign/aarch64-pi4b.html}}, Falcon has significantly faster signing and verification than ML-DSA.
+Because ML-DSA signs using the ``Fiat-Shamir with abort'' \cite{DBLP:conf/asiacrypt/Lyubashevsky09} strategy, signing time can have large variances depending on the input randomness, while Falcon's signing routine does not have this issue.
+On the other hand, Falcon's signing routine uses a discrete Gaussian sampler, which requires constant-time floating point arithmetics with at least 53-bits of precision.
+The float-point arithmetics requirement is not only difficult to fulfill, such as on legacy CPUs and/or embedded devices, but also difficult to implement without risk of introducing side-channel vulnerabilities.
+
+While each signature scheme can make a valid certificate chain, given the performance and security characteristics mentioned above, we recommend using Falcon only for offline signatures (signatures are produced ahead of the handshake) while using ML-DSA for online signature (signatures are produced during handshake).
+For example, root and intermediate CAs can issue certificates using the Falcon, and server signs \texttt{CertificateVerify} with ML-DSA.
+Figure \ref{fig:comparing-mldsa-falcon-cert-chains} compares the performance across various Falcon/ML-DSA certificate chain configurations.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/imgs/mldsa-falcon-hs-dur.png}
+    \caption{Comparing ML-DSA/Falcon mixture chains}
+    \label{fig:comparing-mldsa-falcon-cert-chains}
 \end{figure}
 
 \chapter{Conclusion and future works}\label{sec:conclusions-and-future-works}
