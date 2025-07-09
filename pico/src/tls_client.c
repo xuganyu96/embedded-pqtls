@@ -11,21 +11,21 @@
 
 #define SLEEP_MS (100)
 
-#include "pico-pqtls/cafiles/ed25519.h"
+#include "pico-pqtls/cafiles/mldsa44-mldsa44-mlkem512-mldsa44.h"
 #if !defined(AUTH_SUITE) || !defined(CA_CERT)
 #error "AUTH_SUITE or CA_CERT missing"
 #endif
 
 static ntp_client_t ntp_client;
 
-#define KEX_NAME "x25519"
+#define KEX_NAME "mlkem512"
 static int kex_groups[] = {
     // WOLFSSL_ECC_SECP256R1,
     // WOLFSSL_ECC_SECP384R1,
     // WOLFSSL_ECC_SECP521R1,
-    WOLFSSL_ECC_X25519,
+    // WOLFSSL_ECC_X25519,
     // WOLFSSL_ECC_X448,
-    // WOLFSSL_ML_KEM_512,
+    WOLFSSL_ML_KEM_512,
     // WOLFSSL_ML_KEM_768,
     // WOLFSSL_ML_KEM_1024,
     // HQC_128,
@@ -275,14 +275,14 @@ int main(void) {
         }
 #ifdef WOLFSSL_HAVE_TELEMETRY
         uint64_t kex_cpu_dur, kex_crypto_cpu_dur, kex_dur, auth_crypto_dur,
-            auth_dur, hs_dur;
+            auth_dur, hs_dur, time2clientapp;
         if (wolfSSL_telemetry_ts_to_durs(ssl, &kex_cpu_dur, &kex_crypto_cpu_dur,
                                          &kex_dur, &auth_crypto_dur, &auth_dur,
-                                         &hs_dur) == 0) {
+                                         &hs_dur, &time2clientapp) == 0) {
             printf("%s,%s,%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
-                   ",%" PRIu64 ",%" PRIu64 "\n",
+                   ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "\n",
                    KEX_NAME, AUTH_SUITE, kex_cpu_dur, kex_crypto_cpu_dur,
-                   kex_dur, auth_crypto_dur, auth_dur, hs_dur);
+                   kex_dur, auth_crypto_dur, auth_dur, hs_dur, time2clientapp);
         } else {
 #ifdef DEBUG_WOLFSSL
             printf("ERROR: Telemetry incomplete\n");
