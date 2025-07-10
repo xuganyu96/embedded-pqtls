@@ -345,14 +345,14 @@ int main(int argc, char *argv[]) {
         printf("Handshake succeeded %s\n", args.hostname);
 #ifdef WOLFSSL_HAVE_TELEMETRY
         uint64_t kex_cpu_dur, kex_crypto_cpu_dur, kex_dur, auth_crypto_dur,
-            auth_dur, hs_dur;
+            auth_dur, hs_dur, t2capp;
         if (wolfSSL_telemetry_ts_to_durs(ssl, &kex_cpu_dur, &kex_crypto_cpu_dur,
                                          &kex_dur, &auth_crypto_dur, &auth_dur,
-                                         &hs_dur) == 0) {
+                                         &hs_dur, &t2capp) == 0) {
             printf("%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
-                   ",%" PRIu64 "\n",
+                   ",%" PRIu64 ",%" PRIu64 "\n",
                    kex_cpu_dur, kex_crypto_cpu_dur, kex_dur, auth_crypto_dur,
-                   auth_dur, hs_dur);
+                   auth_dur, hs_dur, t2capp);
         } else {
             printf("ERROR: Telemetry incomplete\n");
         }
