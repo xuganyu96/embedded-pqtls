@@ -1,3 +1,6 @@
+% July 10:
+%   TODO: need to review TLS security/KEMTLS security, and TLS review
+%   TODO: more of "future works"
 % July 8:
 % - extended "related works" in Chapter 1
 % - proofread, minor revisions
@@ -167,6 +170,7 @@
 \usepackage{amsmath,amsfonts,amssymb,amsthm}
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{rotating}
 
 \definecolor{gh-gray}{gray}{0.95}
 \definecolor{gh-blue}{rgb}{0.0,0.0,0.6}
@@ -1534,7 +1538,7 @@ A OW-PCA adversary can then simulate the modified IND-CCA game for the KEM adver
 
 \section{Practical instantiation with ML-KEM}\label{sec:instantiation-with-mlkem}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
 
     \begin{minipage}[t]{0.34\textwidth}
@@ -1589,7 +1593,7 @@ Then the $\kem^{\not\bot}_m$ variant of the FO transformation (Figure \ref{fig:u
 We apply the encrypt-then-MAC transformation to the K-PKE routines of ML-KEM and call the transformed KEM \emph{one-time ML-KEM (OT-ML-KEM)} (Figure \ref{fig:ot-ml-kem-routines}).
 The key generation routines are identical between OT-ML-KEM and ML-KEM. The OT-ML-KEM encapsulation and decapsulation routines make additional use a {\sf MAC} and a {\sf KDF}.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
 
     \begin{minipage}[t]{0.5\textwidth}
@@ -2364,7 +2368,7 @@ Finally Section \ref{sec:handshake-performance} details the performance of post-
 
 \section{Experiment setup}\label{sec:experiment-setup}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.45\linewidth]{benchmarks/imgs/pico-2-w.jpg}\hfill
     \includegraphics[width=0.45\linewidth]{benchmarks/imgs/pico-w-network.png}
@@ -2699,52 +2703,6 @@ Within the key exchange phase we mainly care about three metrics: \begin{itemize
     \item \emph{Crypto time}: the time spent on generating client's key share and processing server's key share. With ECDHE, this means running \texttt{keygen} and \texttt{agree} each once; with KEM, this means running \texttt{keygen} and \texttt{decap} each once. Crypto time should be a subset of CPU time, since the client needs to process other components of the two messages and update the key schedule to derive handshake secret. It is computed as \texttt{keygen\_done - keygen\_start + decap\_done - decap\_start}
 \end{itemize}
 
-\begin{table}[H]
-\scriptsize
-\centering
-\begin{tabular}{lrrrrrrr r}
-\toprule
-    \textbf{Key exchange}
-    & \multicolumn{2}{c}{\textbf{Crypto time}}
-    & \multicolumn{2}{c}{\textbf{CPU time}}
-    & \multicolumn{2}{c}{\textbf{Total time}}
-    & \textbf{Crypto time \%} \\
-    \cmidrule(lr){2-3}
-    \cmidrule(lr){4-5}
-    \cmidrule(lr){6-7}
-    & Median & Std & Median & Std & Median & Std & \\
-    \midrule
-    \multicolumn{8}{c}{\bf NIST level 1} \\
-    \midrule
-    P-256            & {\sf 381534.5} & {\sf 125.85} & {\sf 383791.5} & {\sf 144.38} & {\sf 388032.5} & {\sf 2854.89} & {\sf 98.3\%} \\
-    X25519           & {\sf 26913.0} & {\sf 5.38} & {\sf 29024.5} & {\sf 42.34} & {\sf 31593.5} & {\sf 5059.76} & {\sf 85.2\%} \\
-    ML-KEM-512       & {\sf 15831.0} & {\sf 86.41} & {\sf 20030.0} & {\sf 140.38} & {\sf 24741.5} & {\sf 8941.26} & {\sf 64.0\%} \\
-    OT-ML-KEM-512    & {\sf 10356.0} & {\sf 32.69} & {\sf 14065.0} & {\sf 39.22} & {\sf 20840.0} & {\sf 4206.79} & {\sf 49.7\%} \\
-    HQC-128          & {\sf 1314945.0} & {\sf 15.04} & {\sf 1322884.0} & {\sf 58.63} & {\sf 1341244.5} & {\sf 5498.32} & {\sf 98.0\%} \\
-
-    \midrule
-    \multicolumn{8}{c}{\bf NIST level 3} \\
-    \midrule
-    P-384          & {\sf 1069659.0} & {\sf 429.63} & {\sf 1071922.0} & {\sf 434.90} & {\sf 1080339.0} & {\sf 3748.19} & {\sf 99.0\%} \\
-    X448           & {\sf 118485.0} & {\sf 25.76} & {\sf 120654.0} & {\sf 48.13} & {\sf 123820.0} & {\sf 8489.68} & {\sf 95.7\%} \\
-    ML-KEM-768     & {\sf 24274.0} & {\sf 119.43} & {\sf 28985.0} & {\sf 217.70} & {\sf 33967.5} & {\sf 5717.48} & {\sf 71.4\%} \\
-    OT-ML-KEM-768  & {\sf 15262.0} & {\sf 47.17} & {\sf 20071.0} & {\sf 57.84} & {\sf 26195.5} & {\sf 3441.57} & {\sf 58.3\%} \\
-    HQC-192        & {\sf 3993142.0} & {\sf 20.39} & {\sf 4004725.0} & {\sf 95.34} & {\sf 4040805.0} & {\sf 6251.72} & {\sf 98.8\%} \\
-
-    \midrule
-    \multicolumn{8}{c}{\bf NIST level 5} \\
-    \midrule
-    P-521          & {\sf 2216709.0} & {\sf 145.19} & {\sf 2218991.5} & {\sf 173.34} & {\sf 2231103.0} & {\sf 2421.84} & {\sf 99.4\%} \\
-    ML-KEM-1024    & {\sf 36455.0} & {\sf 134.64} & {\sf 41991.0} & {\sf 137.78} & {\sf 51070.5} & {\sf 5987.77} & {\sf 71.4\%} \\
-    OT-ML-KEM-1024 & {\sf 22302.0} & {\sf 64.37} & {\sf 27879.0} & {\sf 68.68} & {\sf 36102.5} & {\sf 2453.64} & {\sf 61.8\%} \\
-    HQC-256        & {\sf 7296353.0} & {\sf 25.59} & {\sf 7314304.0} & {\sf 139.59} & {\sf 7380111.0} & {\sf 11151.01} & {\sf 98.9\%} \\
-\bottomrule
-\end{tabular}
-\caption{Key exchange phase duration ($\us$)}
-\label{tab:kex-perf}
-\end{table}
-
-
 For the authentication phase we mainly care about three metrics: \begin{itemize}
     \item \emph{Certificate transmission time}: the duration between \texttt{sh\_done} and \texttt{cert\_start}.
     This is a heuristic of the time it took to receive server's \texttt{Certificate}, but it is not a precise measurement due to network processing happening asynchronously with client's processing \texttt{ServerHello}.
@@ -2752,196 +2710,271 @@ For the authentication phase we mainly care about three metrics: \begin{itemize}
     \item \emph{Total time}: the duration of the entire authentication phase, which counts from \texttt{cert\_start} to \texttt{hs\_done}.
 \end{itemize}
 
-\begin{table}[H]
-\centering\scriptsize
-\begin{tabular}{lllrrrr}
-\toprule
-    % TODO: remove standard deviations, add "Cert TX time"
-    \multicolumn{3}{c}{\bf Certificate chain}
-    & \multicolumn{2}{c}{\bf Crypto time}
-    & \multicolumn{2}{c}{\bf Total time} \\
-    \cmidrule(lr){1-3}
-    \cmidrule(lr){4-5}
-    \cmidrule(lr){6-7}
-    Root & Int & Leaf & Median & Std & Median & Std \\
-    \midrule
-    \multicolumn{7}{c}{\bf NIST Level 1} \\
-    \midrule
-    RSA-2048 & RSA-2048 & RSA-2048 & 17930.0 & 26.03 & 80593.0 & 128.60  \\
-    Ed25519 & Ed25519 & Ed25519 & 16423.0 & 118.44 & 75621.0 & 229.35  \\
-    ECDSA (P-256) & ECDSA (P-256) & ECDSA (P-256) & 128629.0 & 1239.37 & 405919.0 & 1273.67  \\
-    ML-DSA-44 & ML-DSA-44 & ML-DSA-44 & 23248.0 & 21.35 & 117080.5 & 473.17  \\
-    ML-DSA-44 & ML-DSA-44 & ML-KEM-512 & 13328.0 & 29.75 & 140961.5 & 18934.54  \\
-    Falcon-512 & Falcon-512 & ML-DSA-44 & 23177.0 & 18.14 & 82447.5 & 364.27  \\
-    Falcon-512 & Falcon-512 & Falcon-512 & 6654.0 & 8.60 & 58831.0 & 322.49  \\
-    Falcon-512 & Falcon-512 & ML-KEM-512 & 14915.0 & 33.44 & 107118.5 & 17081.24  \\
-    SPHINCS-128s & SPHINCS-128s & ML-DSA-44 & 6666.0 & 6.47 & 763353.0 & 412.39  \\
-    SPHINCS-128s & SPHINCS-128s & Falcon-512 & 6668.0 & 7.33 & 785569.0 & 737.73  \\
-    SPHINCS-128s & SPHINCS-128s & SPHINCS-128s & 339141.5 & 7758.01 & 1130286.0 & 7723.88  \\
-    SPHINCS-128s & SPHINCS-128s & ML-KEM-512 & 14465.0 & 32.09 & 841305.0 & 32294.14  \\
-    SPHINCS-128s & SPHINCS-128s & HQC-128 & 663889.0 & 31.43 & 1480765.0 & 8998.96  \\
-    ML-DSA-65 & ML-DSA-65 & ML-KEM-512 & 13608.0 & 31.50 & 180912.5 & 7019.93  \\
-    \midrule
-    \multicolumn{7}{c}{\bf NIST Level 3} \\
-    \midrule
-    Ed448 & Ed448 & Ed448 & 75382.5 & 445.79 & 266462.0 & 1806.87  \\
-    ECDSA (P-384) & ECDSA (P-384) & ECDSA (P-384) & 334915.0 & 2891.93 & 1027251.5 & 2899.69  \\
-    ML-DSA-65 & ML-DSA-65 & ML-DSA-65 & 38417.0 & 20.57 & 176606.0 & 743.49  \\
-    ML-DSA-65 & ML-DSA-65 & ML-KEM-768 & 17898.0 & 31.36 & 190830.5 & 9042.40  \\
-    ML-DSA-87 & ML-DSA-87 & ML-KEM-768 & 18430.0 & 32.95 & 249737.5 & 3306.57  \\
-    Falcon-1024 & Falcon-1024 & ML-DSA-65 & 39575.0 & 30.08 & 116527.0 & 242.57  \\
-    Falcon-1024 & Falcon-1024 & ML-KEM-768 & 17939.5 & 30.90 & 124804.5 & 3175.23  \\
-    SPHINCS-192s & SPHINCS-192s & ML-DSA-65 & 39606.0 & 34.21 & 1168531.0 & 781.00  \\
-    SPHINCS-192s & SPHINCS-192s & ML-KEM-768 & 17086.0 & 28.74 & 1162462.5 & 17567.99  \\
-    SPHINCS-192s & SPHINCS-192s & HQC-192 & 2003681.0 & 30.27 & 3156085.0 & 14530.18  \\
-    \midrule
-    \multicolumn{7}{c}{\bf NIST Level 5} \\
-    \midrule
-    ECDSA (P-521) & ECDSA (P-521) & ECDSA (P-521) & 686970.0 & 4300.04 & 2082331.0 & 4280.15  \\
-    ML-DSA-87 & ML-DSA-87 & ML-DSA-87 & 65371.0 & 20.25 & 274107.5 & 745.21  \\
-    ML-DSA-87 & ML-DSA-87 & ML-KEM-1024 & 24457.0 & 31.45 & 258661.5 & 3805.98  \\
-    Falcon-1024 & Falcon-1024 & ML-DSA-87 & 67465.0 & 35.45 & 152648.0 & 514.94  \\
-    Falcon-1024 & Falcon-1024 & Falcon-1024 & 12380.0 & 10.69 & 82915.0 & 497.63  \\
-    Falcon-1024 & Falcon-1024 & ML-KEM-1024 & 23645.0 & 30.02 & 133261.5 & 2427.82  \\
-    SPHINCS-256s & SPHINCS-256s & ML-DSA-87 & 65518.0 & 30.69 & 1711808.5 & 1232.87  \\
-    SPHINCS-256s & SPHINCS-256s & Falcon-1024 & 12728.0 & 11.59 & 1617799.0 & 1399.10  \\
-    SPHINCS-256s & SPHINCS-256s & ML-KEM-1024 & 23893.0 & 31.55 & 1723219.5 & 17025.75  \\
-    SPHINCS-256s & SPHINCS-256s & HQC-256 & 3653333.0 & 29.30 & 5442551.0 & 11790.08  \\
-\bottomrule
-\end{tabular}
-\caption{Authentication durations ($\us$)}
-\label{tab:auth-perf}
-\end{table}
-
 Last but not least, we report two metrics that cover the entire handshake: \emph{time until client application data} and \emph{time until explicit server authentication}.
 When using signature-based authentication, these two numbers are identical: it is the duration from \texttt{ch\_start} until the moment when client finishes sending its \texttt{Finished}.
 After client sends \texttt{Finished}, it can start sending application data, and the server is explicitly authenticated.
 When using KEM-based authentication, however, client can start sending application data after it sends \texttt{Finished} but before receiving server's \texttt{Finished}.
 At this moment, server is implicitly authenticated, and application data is encrypted with a key such that only the intended peer can decrypt it.
 Server is explicitly authenticated at the cost of one more round trip.
-These metrics are reported in Table \ref{tab:handshake-performance}.
 
-\begin{table}[htbp]
-\scriptsize
-\centering
-% TODO: remove standard deviation, add `time to app data`
-\begin{tabular}{llllrr}
+Table \ref{tab:all-performance-data} reports the median for all statistics discussed above
+
+\begin{sidewaystable}[htbp]
+\centering\scriptsize
+\begin{tabular}{lllrrrrrrr}
 \toprule
-\textbf{KEX}
-& \multicolumn{3}{c}{\bf Auth}
-& \multicolumn{2}{c}{\bf Latency} \\
-\cmidrule(lr){2-4}\cmidrule(lr){5-6}
-& Root            & Int             & Leaf            & Median           & Std \\
+    \multicolumn{3}{c}{\bf PKC Suite} 
+    & \multicolumn{3}{c}{\bf KEX} 
+    & \multicolumn{2}{c}{\bf Auth} 
+    & \multicolumn{2}{c}{\bf Handshake} \\
+    \cmidrule(lr){1-3}
+    \cmidrule(lr){4-6}
+    \cmidrule(lr){7-8}
+    \cmidrule(lr){9-10}
+    KEX & CA & Leaf & Crypto & CPU & Total & Cert TX & Total & App data & Exp. Auth \\
 \midrule
-\multicolumn{6}{c}{\bf Classical} \\
-\midrule
-P-256           & RSA-2048      & RSA-2048      & RSA-2048      & \texttt{486970.0}     & \texttt{103761.19} \\
-P-256           & ECDSA P-256   & ECDSA P-256   & ECDSA P-256   & \texttt{810259.5}     & \texttt{21448.88}  \\
-X25519          & Ed25519       & Ed25519       & Ed25519       & \texttt{128405.5}     & \texttt{3812.24}  \\
-P-384           & ECDSA P-384   & ECDSA P-384   & ECDSA P-384   & \texttt{2125437.5}    & \texttt{6455.31}   \\
-X448            & Ed448         & Ed448         & Ed448         & \texttt{512519.0}     & \texttt{78039.25}  \\
-P-521           & ECDSA P-521   & ECDSA P-521   & ECDSA P-521   & \texttt{4327127.5}    & \texttt{4050.10}   \\
-\midrule
-\multicolumn{6}{c}{\bf PQ-TLS} \\
-\midrule
-ML-KEM-512      & ML-DSA-44     & ML-DSA-44     & ML-DSA-44     & \texttt{164019.5}     & \texttt{7742.55}   \\
-ML-KEM-512      & Falcon-512    & Falcon-512    & ML-DSA-44     & \texttt{128625.0}     & \texttt{2595.18}   \\
-ML-KEM-512      & Falcon-512    & Falcon-512    & Falcon-512    & \texttt{102441.0}     & \texttt{843.83}    \\
-ML-KEM-512      & SPHINCS-128s  & SPHINCS-128s  & ML-DSA-44     & \texttt{832089.0}     & \texttt{5538.95}   \\
-ML-KEM-512      & SPHINCS-128s  & SPHINCS-128s  & Falcon-512    & \texttt{870800.5}     & \texttt{30137.05}    \\
-OT-ML-KEM-512   & ML-DSA-44     & ML-DSA-44     & ML-DSA-44     & \texttt{161103.0}     & \texttt{4288.22}   \\
-HQC-128         & SPHINCS-128s  & SPHINCS-128s  & SPHINCS-128s  & \texttt{2540080.0}    & \texttt{128924.41} \\
-ML-KEM-768      & ML-DSA-65     & ML-DSA-65     & ML-DSA-65     & \texttt{244529.0}     & \texttt{6588.06}   \\
-ML-KEM-768      & Falcon-1024   & Falcon-1024   & ML-DSA-65     & \texttt{176427.5}     & \texttt{6183.20}   \\
-ML-KEM-768      & SPHINCS-192s  & SPHINCS-192s  & ML-DSA-65     & \texttt{1286830.5}    & \texttt{29914.98}  \\
-OT-ML-KEM-768   & ML-DSA-65     & ML-DSA-65     & ML-DSA-65     & \texttt{239182.0}     & \texttt{12654.08}  \\
-HQC-192         & SPHINCS-192s  & SPHINCS-192s  & ML-DSA-65     & \texttt{5299501.0}    & \texttt{304464.20} \\
-ML-KEM-1024     & ML-DSA-87     & ML-DSA-87     & ML-DSA-87     & \texttt{366860.5}     & \texttt{16685.48}  \\
-ML-KEM-1024     & Falcon-1024   & Falcon-1024   & Falcon-1024   & \texttt{157197.0}     & \texttt{7805.75}   \\
-ML-KEM-1024     & Falcon-1024   & Falcon-1024   & ML-DSA-87     & \texttt{228236.0}     & \texttt{4998.10}   \\
-ML-KEM-1024     & SPHINCS-256s  & SPHINCS-256s  & ML-DSA-87     & \texttt{1893276.0}    & \texttt{39903.86}  \\
-ML-KEM-1024     & SPHINCS-256s  & SPHINCS-256s  & Falcon-1024   & \texttt{1792750.0}    & \texttt{36736.82}  \\
-OT-ML-KEM-1024  & ML-DSA-87     & ML-DSA-87     & ML-DSA-87     & \texttt{349064.0}     & \texttt{19547.31}  \\
-HQC-256         & SPHINCS-256s  & SPHINCS-256s  & ML-DSA-87     & \texttt{9243921.0}    & \texttt{40152.74}  \\
-\midrule
-\multicolumn{6}{c}{\bf KEMTLS} \\
-\midrule
-ML-KEM-512      & ML-DSA-44     & ML-DSA-44     & ML-KEM-512    & \texttt{189151.5}     & \texttt{20774.16}  \\
-ML-KEM-512      & ML-DSA-65     & ML-DSA-65     & ML-KEM-512    & \texttt{241421.0}     & \texttt{28136.83}  \\
-ML-KEM-512      & Falcon-512    & Falcon-512    & ML-KEM-512    & \texttt{157687.0}     & \texttt{37145.59}  \\
-% ML-KEM-512      & SPHINCS-128s  & SPHINCS-128s  & ML-KEM-512    & \texttt{925493.0}     & \texttt{74438.44}  \\
-HQC-128         & SPHINCS-128s  & SPHINCS-128s  & HQC-128       & \texttt{2918399.0}    & \texttt{223598.25} \\
-ML-KEM-768      & ML-DSA-65     & ML-DSA-65     & ML-KEM-768    & \texttt{275167.0}     & \texttt{29293.25}  \\
-ML-KEM-768      & ML-DSA-87     & ML-DSA-87     & ML-KEM-768    & \texttt{326002.0}     & \texttt{35235.57}  \\
-ML-KEM-768      & Falcon-1024   & Falcon-1024   & ML-KEM-768    & \texttt{183946.5}     & \texttt{16618.27}  \\
-ML-KEM-768      & SPHINCS-192s  & SPHINCS-192s  & ML-KEM-768    & \texttt{1277371.5}    & \texttt{51458.02}  \\
-HQC-192         & SPHINCS-192s  & SPHINCS-192s  & HQC-192       & \texttt{7304369.0}    & \texttt{243299.18} \\
-ML-KEM-1024     & ML-DSA-87     & ML-DSA-87     & ML-KEM-1024   & \texttt{354981.0}     & \texttt{35428.57}  \\
-ML-KEM-1024     & Falcon-1024   & Falcon-1024   & ML-KEM-1024   & \texttt{210244.5}     & \texttt{30846.48}  \\
-ML-KEM-1024     & SPHINCS-256s  & SPHINCS-256s  & ML-KEM-1024   & \texttt{1899104.0}    & \texttt{226068.66} \\
-HQC-256         & SPHINCS-256s  & SPHINCS-256s  & HQC-256       & \texttt{12987320.5}   & \texttt{445509.98} \\
+    OT-ML-KEM-512 & Falcon-512 & ML-KEM-512 
+    & {\sf 10.42} & {\sf 14.38} & {\sf 18.14} & {\sf 17.01} & {\sf 98.94} & {\sf 84.17} & {\sf 135.43} \\
+    ML-KEM-512 & Falcon-512 & ML-KEM-512 
+    & {\sf 15.94} & {\sf 19.89} & {\sf 23.46} & {\sf 17.05} & {\sf 98.60} & {\sf 89.42} & {\sf 140.09} \\
+    ML-KEM-512 & Falcon-512 & Falcon-512 
+    & {\sf 15.80} & {\sf 20.00} & {\sf 23.68} & {\sf 20.12} & {\sf 58.83} & {\sf 102.44} & {\sf 102.44} \\
+    X25519 & Ed25519 & Ed25519 
+    & {\sf 26.90} & {\sf 29.05} & {\sf 31.38} & {\sf 19.65} & {\sf 76.92} & {\sf 128.40} & {\sf 128.40} \\
+    ML-KEM-512 & Falcon-512 & ML-DSA-44 
+    & {\sf 15.79} & {\sf 20.00} & {\sf 25.00} & {\sf 21.41} & {\sf 82.44} & {\sf 128.62} & {\sf 128.62} \\
+    ML-KEM-768 & Falcon-1024 & ML-KEM-768 
+    & {\sf 24.24} & {\sf 29.48} & {\sf 34.31} & {\sf 22.80} & {\sf 127.49} & {\sf 133.16} & {\sf 184.63} \\
+    ML-KEM-512 & ML-DSA-44 & ML-KEM-512 
+    & {\sf 15.83} & {\sf 19.85} & {\sf 23.47} & {\sf 24.36} & {\sf 144.16} & {\sf 140.61} & {\sf 192.33} \\
+    ML-KEM-1024 & Falcon-1024 & Falcon-1024 
+    & {\sf 36.45} & {\sf 41.94} & {\sf 51.32} & {\sf 22.69} & {\sf 82.91} & {\sf 157.01} & {\sf 157.01} \\
+    ML-KEM-1024 & Falcon-1024 & ML-KEM-1024 
+    & {\sf 36.42} & {\sf 42.61} & {\sf 50.77} & {\sf 24.14} & {\sf 137.68} & {\sf 160.04} & {\sf 213.55} \\
+    OT-ML-KEM-512 & ML-DSA-44 & ML-DSA-44 
+    & {\sf 10.35} & {\sf 14.06} & {\sf 20.84} & {\sf 23.83} & {\sf 117.08} & {\sf 161.10} & {\sf 161.10} \\
+    ML-KEM-512 & ML-DSA-44 & ML-DSA-44 
+    & {\sf 15.82} & {\sf 19.85} & {\sf 22.24} & {\sf 25.91} & {\sf 123.03} & {\sf 171.16} & {\sf 171.16} \\
+    ML-KEM-768 & Falcon-1024 & ML-DSA-65 
+    & {\sf 24.28} & {\sf 28.99} & {\sf 34.30} & {\sf 24.87} & {\sf 116.52} & {\sf 175.06} & {\sf 175.06} \\
+    ML-KEM-512 & ML-DSA-65 & ML-KEM-512 
+    & {\sf 15.90} & {\sf 19.82} & {\sf 25.36} & {\sf 26.76} & {\sf 182.55} & {\sf 180.48} & {\sf 234.60} \\
+    ML-KEM-768 & ML-DSA-65 & ML-KEM-768 
+    & {\sf 24.44} & {\sf 29.40} & {\sf 34.95} & {\sf 31.18} & {\sf 187.60} & {\sf 200.75} & {\sf 252.87} \\
+    ML-KEM-512 & ML-DSA-65 & ML-DSA-44 
+    & {\sf 15.86} & {\sf 19.79} & {\sf 22.53} & {\sf 30.58} & {\sf 160.09} & {\sf 213.67} & {\sf 213.67} \\
+    ML-KEM-1024 & Falcon-1024 & ML-DSA-87 
+    & {\sf 36.45} & {\sf 41.96} & {\sf 50.87} & {\sf 23.63} & {\sf 152.64} & {\sf 227.28} & {\sf 227.28} \\
+    otML-KEM-768 & ML-DSA-65 & ML-DSA-65 
+    & {\sf 15.26} & {\sf 20.07} & {\sf 26.19} & {\sf 32.40} & {\sf 176.67} & {\sf 235.82} & {\sf 235.82} \\
+    ML-KEM-768 & ML-DSA-65 & ML-DSA-65 
+    & {\sf 24.35} & {\sf 29.16} & {\sf 33.01} & {\sf 32.43} & {\sf 176.57} & {\sf 242.66} & {\sf 242.66} \\
+    ML-KEM-768 & ML-DSA-87 & ML-KEM-768 
+    & {\sf 24.59} & {\sf 29.65} & {\sf 32.43} & {\sf 35.16} & {\sf 252.55} & {\sf 269.04} & {\sf 321.45} \\
+    ML-KEM-1024 & ML-DSA-87 & ML-KEM-1024 
+    & {\sf 36.96} & {\sf 42.91} & {\sf 52.69} & {\sf 36.05} & {\sf 265.39} & {\sf 300.16} & {\sf 359.08} \\
+    otML-KEM-1024 & ML-DSA-87 & ML-DSA-87 
+    & {\sf 22.30} & {\sf 27.87} & {\sf 36.10} & {\sf 37.82} & {\sf 272.97} & {\sf 347.02} & {\sf 347.02} \\
+    ML-KEM-1024 & ML-DSA-87 & ML-DSA-87 
+    & {\sf 36.42} & {\sf 42.02} & {\sf 51.04} & {\sf 38.96} & {\sf 274.23} & {\sf 364.68} & {\sf 364.68} \\
+    ECDHE (P-256) & RSA-2048 & RSA-2048 
+    & {\sf 381.53} & {\sf 383.80} & {\sf 388.00} & {\sf 15.35} & {\sf 80.59} & {\sf 484.22} & {\sf 484.22} \\
+    x448 & Ed448 & Ed448 
+    & {\sf 118.48} & {\sf 120.70} & {\sf 123.23} & {\sf 13.83} & {\sf 260.90} & {\sf 398.13} & {\sf 398.13} \\
+    ECDHE (P-256) & ECDSA (P-256) & ECDSA (P-256) 
+    & {\sf 368.66} & {\sf 370.88} & {\sf 374.75} & {\sf 13.92} & {\sf 396.85} & {\sf 785.78} & {\sf 785.78} \\
+    ML-KEM-512 & SPHINCs-128s & ML-DSA-44 
+    & {\sf 15.84} & {\sf 20.13} & {\sf 24.10} & {\sf 42.97} & {\sf 763.35} & {\sf 832.08} & {\sf 832.08} \\
+    ML-KEM-512 & SPHINCs-128s & Falcon-512 
+    & {\sf 15.84} & {\sf 20.14} & {\sf 27.92} & {\sf 52.47} & {\sf 785.56} & {\sf 870.80} & {\sf 870.80} \\
+    ML-KEM-512 & SPHINCs-128s & ML-KEM-512 
+    & {\sf 16.34} & {\sf 20.28} & {\sf 27.06} & {\sf 40.85} & {\sf 925.16} & {\sf 937.47} & {\sf 1000.18} \\
+    ML-KEM-768 & SPHINCs-192s & ML-KEM-768 
+    & {\sf 24.25} & {\sf 29.16} & {\sf 33.59} & {\sf 69.06} & {\sf 1187.92} & {\sf 1237.78} & {\sf 1296.93} \\
+    ML-KEM-768 & SPHINCs-192s & ML-DSA-65 
+    & {\sf 24.22} & {\sf 28.70} & {\sf 34.58} & {\sf 78.91} & {\sf 1168.51} & {\sf 1284.51} & {\sf 1284.51} \\
+    ML-KEM-1024 & SPHINCs-256s & Falcon-1024 
+    & {\sf 36.42} & {\sf 41.91} & {\sf 51.08} & {\sf 116.38} & {\sf 1617.79} & {\sf 1786.86} & {\sf 1786.86} \\
+    ML-KEM-1024 & SPHINCs-256s & ML-KEM-1024 
+    & {\sf 36.57} & {\sf 42.25} & {\sf 50.39} & {\sf 111.88} & {\sf 1723.76} & {\sf 1833.62} & {\sf 1888.12} \\
+    ML-KEM-1024 & SPHINCs-256s & ML-DSA-87 
+    & {\sf 36.50} & {\sf 41.99} & {\sf 52.25} & {\sf 122.90} & {\sf 1711.70} & {\sf 1889.93} & {\sf 1889.93} \\
+    ECDHE (P-384) & ECDSA (P-384) & ECDSA (P-384) 
+    & {\sf 1069.65} & {\sf 1071.92} & {\sf 1080.33} & {\sf 16.55} & {\sf 1027.25} & {\sf 2125.43} & {\sf 2125.43} \\
+    HQC-128 & SPHINCs-128s & SPHINCs-128s 
+    & {\sf 1314.94} & {\sf 1322.86} & {\sf 1340.58} & {\sf 50.14} & {\sf 1130.28} & {\sf 2523.21} & {\sf 2523.21} \\
+    HQC-128 & SPHINCs-128s & HQC-128 
+    & {\sf 1315.06} & {\sf 1322.25} & {\sf 1339.80} & {\sf 49.76} & {\sf 1591.32} & {\sf 2928.46} & {\sf 2986.82} \\
+    ECDHE (P-521) & ECDSA (P-521) & ECDSA (P-521) 
+    & {\sf 2216.70} & {\sf 2218.99} & {\sf 2231.10} & {\sf 12.91} & {\sf 2082.33} & {\sf 4327.12} & {\sf 4327.12} \\
+    HQC-192 & SPHINCs-192s & ML-DSA-65 
+    & {\sf 3993.13} & {\sf 4004.71} & {\sf 4040.27} & {\sf 87.24} & {\sf 1168.54} & {\sf 5297.30} & {\sf 5297.30} \\
+    HQC-192 & SPHINCs-192s & HQC-192 
+    & {\sf 3993.01} & {\sf 4006.22} & {\sf 4044.01} & {\sf 97.01} & {\sf 3188.02} & {\sf 7278.21} & {\sf 7337.77} \\
+    HQC-256 & SPHINCs-256s & ML-DSA-87 
+    & {\sf 7296.34} & {\sf 7314.21} & {\sf 7379.37} & {\sf 145.63} & {\sf 1711.86} & {\sf 9239.71} & {\sf 9239.71} \\
+    HQC-256 & SPHINCs-256s & HQC-256 
+    & {\sf 7296.36} & {\sf 7315.06} & {\sf 7380.46} & {\sf 157.05} & {\sf 5457.84} & {\sf 12927.91} & {\sf 13003.19} \\
 \bottomrule
 \end{tabular}
-\caption{Handshake latency ($\us$)}
-\label{tab:handshake-performance}
-\end{table}
+\caption{Median handshake statistics (ms)}
+\label{tab:all-performance-data}
+\end{sidewaystable}
 
+\section{Discussion}\label{sec:performance-discussion}
 
-\subsection{Discussion}\label{sec:performance-discussion}
-
-\subsubsection{Post-quantum TLS performance}\label{sec:discussion-pq-tls-performance}
+\subsection{Post-quantum TLS performance}\label{sec:discussion-pq-tls-performance}
 From Table \ref{tab:crypto-primitives-rp2350} we can see that on the RP2350, ML-KEM-512's key generation and decapsulation is as fast if not faster than X25519's key generation and agree operation.
-ML-DSA-44's signature verification is slower than Ed25519 by 32\%, while Falcon-512's signature cerification is faster by 67\%.
-Overall, a post-quantum TLS handshake utilizing lattice-based KEM and signature has competitive latency with handshakes using elliptic-curve Diffie-Hellman and signatures, despite the increased message size and the slower signing operation.
-This shows that client's cryptographic operation is the bottleneck of the handshake.
-Table \ref{tab:lattice-vs-ecc-handshake} compares the performance of lattice-based handshake and elliptic-curve handshake.
+ML-DSA-44's signature verification is slower than Ed25519 (+32\%), while Falcon-512's signature verification is faster (-67\%).
+Overall, a post-quantum TLS handshake utilizing lattice-based KEM and signature has competitive latency with handshakes using elliptic-curve key exchange and signatures.
+In production deployment with fast servers and broadband networks, lattice-based primitives' slower signing routine and larger message sizes do not incur noticeable performance penalty; instead, a TLS handshake is bottlenecked by the embedded client's cryptographic operations.
+Table \ref{tab:lattice-vs-ecc-handshake} and Figure \ref{fig:ecc-vs-lattice} the performance of lattice-based handshake and elliptic-curve handshake.
 
 \begin{table}[htbp]
-    \centering
-    \begin{tabular}{c|c}
-         &  \\
-         & 
+    \centering\scriptsize
+    \begin{tabular}{lllrrrr}
+    \toprule
+        \multicolumn{3}{c}{\bf PKC suite}
+        & {\bf KEX}
+        & {\bf Certs TX}
+        & {\bf Auth}
+        & {\bf Handshake}
+        \\
+        \cmidrule(lr){1-3}
+        KEX & CA & Leaf \\
+    \midrule
+        X25519     & \multicolumn{2}{c}{Ed25519}
+        & {\sf 31.38 ms}  & {\sf 19.65 ms}    & {\sf 76.92 ms}  & {\sf 128.40 ms} \\
+        ECDHE (P-256)     & \multicolumn{2}{c}{RSA-2048}
+        & {\sf 388.00 ms} & {\sf 15.35 ms}    & {\sf 80.59 ms}  & {\sf 484.22 ms} \\
+        ECDHE (P-256)     & \multicolumn{2}{c}{ECDSA (P-256)}
+        & {\sf 374.75 ms} & {\sf 13.92 ms}    & {\sf 396.85 ms}  & {\sf 785.78 ms} \\
+        ML-KEM-512 & \multicolumn{2}{c}{ML-DSA-44}
+        & {\sf 22.24 ms}  & {\sf 25.91 ms}    & {\sf 123.03 ms} & {\sf 171.16 ms} \\
+        ML-KEM-512 & \multicolumn{2}{c}{Falcon-512}
+        & {\sf 23.68 ms}  & {\sf 20.12 ms}    & {\sf 58.83 ms}  & {\sf 102.44 ms} \\
+    \midrule
+        X448       & \multicolumn{2}{c}{Ed448}
+        & {\sf 123.23 ms} & {\sf 13.83 ms} & {\sf 260.90 ms} & {\sf 398.13 ms} \\
+        ECDHE (P-384)   & \multicolumn{2}{c}{ECDSA (P521)}
+        & {\sf 1080.33 ms} & {\sf 16.55 ms} & {\sf 1027.25 ms} & {\sf 2125.43 ms} \\
+        ML-KEM-768 & \multicolumn{2}{c}{ML-DSA-65}  
+        & {\sf 33.01 ms}  & {\sf 32.43 ms}    & {\sf 176.57 ms} & {\sf 242.66 ms} \\
+    \midrule
+        ECDHE (P-521)   & \multicolumn{2}{c}{ECDSA (P521)}
+        & {\sf 2231.10 ms} & {\sf 12.91 ms} & {\sf 2082.33 ms} & {\sf 4327.12 ms} \\
+        ML-KEM-1024 & \multicolumn{2}{c}{ML-DSA-87}
+        & {\sf 51.04 ms} & {\sf 38.96 ms} & {\sf 274.23 ms} & {364.68 ms} \\
+        ML-KEM-1024 & \multicolumn{2}{c}{Falcon-1024}
+        & {\sf 51.32 ms} & {\sf 22.69 ms} & {\sf 82.91 ms} & {157.01 ms} \\
+    \bottomrule
     \end{tabular}
     \caption{lattice-based vs elliptic-curve TLS handshake}
     \label{tab:lattice-vs-ecc-handshake}
 \end{table}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/graphs/ecc-vs-lattice.png}
+    \caption{elliptic-curve vs lattice in TLS handshake}
+    \label{fig:ecc-vs-lattice}
+\end{figure}
+
 Falcon has generally the best overall performance amongst all post-quantum signature schemes due to its compact public key and signatures, and its fast verification on the client.
 However, Falcon's signing routine needs to sample from a discrete Gaussian distribution, which requires {\it constant-time floating-point arithmetic with at least 53-bit precision}.
 This requirement can be hard to fulfill, especially on legacy hardware, so it might not be feasible to use Falcon for online signatures.
 Fortunately, we can still use Falcon for offline signatures and still see meaningful performance improvements.
-Table \ref{tab:falcon-online-offline} compares using Falcon as online signatures and using Falcon as offline signatures.
+Table \ref{tab:falcon-online-offline} and Figure \ref{fig:falcon-online-offline} compare using Falcon as online signatures and using Falcon as offline signatures.
 
 \begin{table}[htbp]
-    \centering
-    \begin{tabular}{c|c}
-         &  \\
-         & 
+    \centering\scriptsize
+    \begin{tabular}{lllrrr}
+    \toprule
+        \multicolumn{3}{c}{\bf PKC suite}
+        & {\bf Certs TX} & {\bf Auth} & {\bf Handshake} \\
+        \cmidrule(lr){1-3}
+        KEX & CA & Leaf \\
+    \midrule
+        ML-KEM-512 
+        & Falcon-512 & Falcon-512 & {\sf 20.12 ms} & {\sf 58.83 ms}  & {\sf 102.44 ms} \\
+        & Falcon-512 & ML-DSA-44 & {\sf 21.41 ms} & {\sf 82.44 ms} & {\sf 128.62 ms} \\
+        & ML-DSA-44  & ML-DSA-44 & {\sf 25.91 ms}    & {\sf 123.03 ms} & {\sf 171.16 ms} \\
+    \midrule
+        ML-KEM-768
+        & ML-DSA-65 & ML-DSA-65 & {\sf 32.43 ms} & {\sf 176.57 ms} & {\sf 242.66 ms} \\
+        & Falcon-1024 & ML-DSA-65 & {\sf 24.87 ms} & {\sf 116.52 ms} & {\sf 175.06 ms} \\
+    \midrule
+        ML-KEM-1024
+        & Falcon-1024 & Falcon-1024 & {\sf 22.69 ms} & {\sf 82.91 ms} & {\sf 157.01 ms} \\
+        & Falcon-1024 & ML-DSA-87 & {\sf 23.63 ms} & {\sf 152.64 ms} & {\sf 227.28 ms} \\
+        & ML-DSA-87 & ML-DSA-87 & {\sf 38.96 ms} & {\sf 274.23 ms} & {\sf 364.68 ms} \\
+    \bottomrule
     \end{tabular}
-    \caption{Falcon: online vs offline}
+    \caption{Comparing Falcon online, Falcon offline, and ML-DSA}
     \label{tab:falcon-online-offline}
 \end{table}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level1.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level3.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level5.png}
+    \caption{Comparing Falcon online, Falcon offline, and ML-DSA}
+    \label{fig:falcon-online-offline}
+\end{figure}
 
 In real-world deployments, Certificate Authorities' public keys usually have much longer lifetime than leaf public keys.
 For example, in the certificate chain for \url{www.github.com}, the leaf certificate is valid for one year, and intermediate CA is valid for 12 years, and the root CA is valid for 28 years.
 Therefore, CA' may require using signature schemes at a higher security level or with a more conservative security assumption.
-Table \ref{tab:ca-mixed-security-level} summarizes the performance of using a mixture of security level for CA certificates.
+Table \ref{tab:ca-mixed-security-level} and Figure \ref{fig:ca-mixed-security-level} summarize the performance of using a mixture of security level for CA certificates.
 
 \begin{table}[htbp]
-    \centering
-    \begin{tabular}{c|c}
-         &  \\
-         & 
+    \centering\scriptsize
+    \begin{tabular}{lllrrr}
+    \toprule
+        \multicolumn{3}{c}{\bf PKC suite}
+        & {\bf Certs TX} & {\bf Auth} & {\bf Handshake} \\
+        \cmidrule(lr){1-3}
+        KEX & CA & Leaf \\
+    \midrule
+        ML-KEM-512
+        & ML-DSA-44  & ML-DSA-44 & {\sf 25.91 ms} & {\sf 123.03 ms} & {\sf 171.16 ms} \\
+        & ML-DSA-65  & ML-DSA-44  & {\sf 30.58 ms} & {\sf 160.09 ms} & {\sf 213.67 ms} \\
+        & SPHINCS-128s & ML-DSA-44  & {\sf 42.97 ms} & {\sf 763.35 ms} & {\sf 832.08 ms} \\
+    \midrule
+        ML-KEM-768
+        & ML-DSA-65 & ML-DSA-65 & {\sf 32.43 ms} & {\sf 176.57 ms} & {\sf 242.66 ms} \\
+        & Falcon-1024 & ML-DSA-65 & {\sf 24.87 ms} & {\sf 116.52 ms} & {\sf 175.06 ms} \\
+        & ML-DSA-87 & ML-DSA-65 & {\sf 37.09 ms} & {\sf 245.43 ms} & {\sf 315.08 ms} \\
+        & SPHINCS-192s & ML-DSA-65 & {\sf 78.91 ms} & {\sf 1168.51 ms} & {\sf 1284.51 ms} \\
+    \midrule
+        ML-KEM-1024
+        & ML-DSA-87 & ML-DSA-87 & {\sf 38.96 ms} & {\sf 274.23 ms} & {\sf 364.68 ms} \\
+        & SPHINCS-256s & ML-DSA-87 & {\sf 122.90 ms} & {\sf 1711.70 ms} & {\sf 1889.93ms} \\
+    \bottomrule
     \end{tabular}
-    \caption{Certificate Authority with mixed security levels}
+    \caption{Certificate Authority with upgraded security levels}
     \label{tab:ca-mixed-security-level}
 \end{table}
 
-\subsubsection{IND-1CCA KEM vs IND-CCA KEM}\label{sec:ind1cca-vs-indcca-kem}
-As shown in Table \ref{tab:kex-perf}, a significant percentage of key exchange time is spent on cryptographic operations from the client side, and the slower the KEM, the more KEM operations dominate the performance of key exchange.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level1.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level3.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level5.png}
+    \caption{Certificate Authority with upgraded security levels}
+    \label{fig:ca-mixed-security-level}
+\end{figure}
+
+Using HQC for key exchange (or KEMTLS) is currently not advisable.
+Not only is HQC significantly slower than ML-KEM for key exchange or authentication, the most recent reference implementation (April 2025) was also found to have a flawed FO-transform that damages the CCA security \footnote{\url{https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/Wiu4ZQo3fP8}}.
+At the time of writing this thesis, the CCA security flaw in HQC's reference implementation is not yet resolved.
+
+\subsection{IND-1CCA KEM vs IND-CCA KEM}\label{sec:ind1cca-vs-indcca-kem}
+A significant percentage of key exchange time is spent on cryptographic operations from the client side, and the slower the KEM, the more KEM operations dominate the performance of key exchange.
 As expected, the decapsulation savings of IND-1CCA KEM brought significant speedup of the key exchange phase.
 However, improvements in key exchange time is drowned out by the far more time consuming authentication phase, switching to IND-1CCA KEM reduced handshake latency by only up to 5\%.
-Table \ref{tab:comparing-cca-1cca-kem} compares the performance of handshake between these two classes of KEMs for key exchange.
+Table \ref{tab:comparing-cca-1cca-kem} and Figure \ref{fig:comparing-cca-1cca-kem} compare the performance of handshake between these two classes of KEMs for key exchange.
 
 \begin{table}[htbp]
     \centering\scriptsize
@@ -2962,11 +2995,19 @@ Table \ref{tab:comparing-cca-1cca-kem} compares the performance of handshake bet
     OT-ML-KEM-1024  & ML-DSA-87     & {\sf 36.10 ms}    & {\sf 272.97 ms} & {\sf 347.02 ms} & -- \\
     \bottomrule
     \end{tabular}
-    \caption{Comparing handshake performance between CCA and 1CCA ML-KEM}
+    \caption{Comparing ML-KEM and OT-ML-KEM-512}
     \label{tab:comparing-cca-1cca-kem}
 \end{table}
 
-\subsubsection{KEM-based vs. signature-based authentication}\label{sec:kemtls-vs-pqtls}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/graphs/ind1cca-kex-dur.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/ind1cca-hs-dur.png}
+    \caption{Comparing ML-KEM and OT-ML-KEM-512}
+    \label{fig:comparing-cca-1cca-kem}
+\end{figure}
+
+\subsection{KEM-based vs. signature-based authentication}\label{sec:kemtls-vs-pqtls}
 KEM-based authentication has two main performance advantage over signature-based authentication.
 First, at comparable security level, ML-KEM public keys are smaller than Falcon/ML-DSA public keys, and ML-KEM ciphertexts are smaller than ML-DSA ciphertexts.
 Smaller public keys means a smaller server certificate chain and thus less time spent on transmitting the certificate.
@@ -2978,7 +3019,7 @@ In signature-based authentication, client needs to wait for server's public-key 
 As pointed out in \cite{DBLP:conf/ccs/SchwabeSW20}, sending implicitly authenticated application data is slightly less secure than explicit authentication, but the security of implicitly authenticated data will be retroactively upgraded to explicit authentication after processing server's \texttt{Finished}, and there is no practical attack exploiting the gap between implicit and explicit authentication.
 
 To summarize, compared to signature-based authentication, KEM-based authentication provides small savings public-key certificate size and moderate reduction in latency until client can start sending application data.
-A comparison can be found in table \ref{tab:comparing-kemtls-pqtls}.
+A comparison can be found in Table \ref{tab:comparing-kemtls-pqtls} and Figure \ref{fig:comparing-kemtls-pqtls}.
 
 \begin{table}[htbp]
     \centering\scriptsize
@@ -3010,6 +3051,17 @@ A comparison can be found in table \ref{tab:comparing-kemtls-pqtls}.
     \label{tab:comparing-kemtls-pqtls}
 \end{table}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-falcon512.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa44.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa65-kex-mlkem512.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa65-kex-mlkem768.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-falcon1024.png}
+    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa87.png}
+    \caption{KEM-based vs. signature-based authentication}
+    \label{fig:comparing-kemtls-pqtls}
+\end{figure}
 
 \chapter{Conclusion and future works}\label{sec:conclusions-and-future-works}
 \section{Summary of thesis}\label{sec:summary-of-thesis}
@@ -3107,7 +3159,7 @@ Where the expectation is taken with respect to the probability distribution of a
 
 \paragraph{Security} The security of PKE's is conventionally discussed using adversarial games played between a challenger and an adversary \cite{DBLP:conf/stoc/GoldwasserM82}. In the OW-ATK game (Figure \ref{fig:pke-ow-atk-game}), the challenger samples a random keypair and a random encryption. The adversary is given the public key, the random encryption (also called the challenge ciphertext), and access to ATK, then asked to decrypt the challenge ciphertext.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
     \begin{algorithm}[H]
@@ -3126,7 +3178,7 @@ Where the expectation is taken with respect to the probability distribution of a
 
 The advantage of an adversary is its probability of producing the correct decryption: $\text{Adv}^\text{OW-ATK}_\pke(A) = P[\hat{m} = m^\ast]$. A PKE is said to be OW-ATK secure if no efficient adversary can win the OW-ATK game with non-negligible probability.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}[t]{0.5\textwidth}
         \begin{algorithm}[H]
@@ -3146,7 +3198,7 @@ The advantage of an adversary is its probability of producing the correct decryp
 
 In the IND-ATK game (Figure \ref{fig:pke-ind-atk-game}), the adversary chooses two distinct messages and receives the encryption of one of them, randomly selected by the challenger. The advantage of an adversary is its probability of correctly distinguishing the ciphertext of one message from the other beyond blind guess: $\text{Adv}^\text{IND-ATK}_\pke(A) = \vert P[\hat{b} = b] - \frac{1}{2}\vert$. A PKE is said to be IND-ATK secure if no efficient adversary can win the IND-ATK game with non-negligible advantage.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}[t]{0.4\textwidth}
         \begin{algorithm}[H]
@@ -3188,7 +3240,7 @@ $$
 
 \paragraph{Security} Similar to PKE security, the security of KEM is discussed using adversarial games. In the IND-ATK game (Figure \ref{fig:kem-ind-atk-game}), the challenger generates a random keypair and encapsulates a random secret; the adversary is given the public key and the ciphertext, then asked to distinguish the shared secret from a random bit string.
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}[t]{0.5\textwidth}
         \begin{algorithm}[H]
@@ -3227,7 +3279,7 @@ By default, all adversaries are assumed to have the public key, with which they 
 
 \paragraph{Security} The standard security notion for a MAC is \textit{existential unforgeability under chosen message attack (EUF-CMA)}. We define it using an adversarial game in which an adversary has access to a signing oracle $\mathcal{O}^\sign: m \mapsto \sign(k, m)$ and tries to produce a valid message-tag pair that has not been queried from the signing oracle (Figure \ref{fig:euf-cma-game}).
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}[t]{0.6\textwidth}
     \begin{algorithm}[H]
@@ -3247,7 +3299,7 @@ The advantage of the adversary is the probability that it successfully produces 
 \chapter{ML-KEM}\label{sec:review-ml-kem}
 Below are high-level summaries of the PKE sub-routines and the KEM routines of ML-KEM:
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
 
     \begin{minipage}[t]{0.33\textwidth}
@@ -3296,7 +3348,7 @@ Below are high-level summaries of the PKE sub-routines and the KEM routines of M
 \end{figure}
 
 
-\begin{figure}[h]
+\begin{figure}[htbp]
     \centering
     
     \begin{minipage}[t]{0.4\textwidth}
