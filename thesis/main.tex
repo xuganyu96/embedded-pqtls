@@ -1,3 +1,8 @@
+% July 11: proofread
+%     - [x] Tentative target date: send to professor by July 13
+%     - [x] Revise Chapter 2
+%     - [x Fill in missing citations
+% 
 % July 10:
 %   TODO: need to review TLS security/KEMTLS security, and TLS review
 %   TODO: more of "future works"
@@ -17,21 +22,6 @@
 
 % Degree completion deadlines:
 % https://uwaterloo.ca/engineering/graduate-students/current-students/graduating-students/degree-completition-deadlines
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -133,10 +123,10 @@
     pdfmenubar=true,        % show Acrobat’s menu?
     pdffitwindow=false,     % window fit to page when opened
     pdfstartview={FitH},    % fits the width of the page to the window
-%    pdftitle={uWaterloo\ LaTeX\ Thesis\ Template},    % title: CHANGE THIS TEXT!
-%    pdfauthor={Author},    % author: CHANGE THIS TEXT! and uncomment this line
-%    pdfsubject={Subject},  % subject: CHANGE THIS TEXT! and uncomment this line
-%    pdfkeywords={keyword1} {key2} {key3}, % list of keywords, and uncomment this line if desired
+    pdftitle={Optimizing post-quantum TLS on embedded clients},    % title: 
+    pdfauthor={Ganyu Xu},    % author: 
+    pdfsubject={Optimizing post-quantum TLS on embedded clients},  % subject: 
+    pdfkeywords={post quantum cryptography} {transport layer security} {embedded systems}, % list of keywords, and uncomment this line if desired
     pdfnewwindow=true,      % links in new window
     colorlinks=true,        % false: boxed links; true: colored links
     linkcolor=blue,         % color of internal links
@@ -171,6 +161,9 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{rotating}
+\usepackage{etoolbox}
+% \newcommand{\buildtype}{dev}
+\newcommand{\buildtype}{release}
 
 \definecolor{gh-gray}{gray}{0.95}
 \definecolor{gh-blue}{rgb}{0.0,0.0,0.6}
@@ -222,6 +215,9 @@
 \newcommand{\adv}{\texttt{Adv}}
 \newcommand{\fotplus}{\texttt{FOT+}}
 \newcommand{\us}{\mu s}
+\newcommand{\dhe}{{\texttt{DHE}}}
+\newcommand{\sig}{{\texttt{SIG}}}
+\newcommand{\id}{{\texttt{Id}}}
 \def\mlkemplus{\text{ML-KEM}^+}
 \usepackage{multirow}
 % \Urlmuskip=0mu  plus 10mu  % fix underfull hbox for URL in footnote
@@ -318,7 +314,9 @@ description={Random vector: a location in n-dimensional Cartesian space, where e
         \vspace*{1.0cm}
 
         \Huge
-        {\bf Optimizing embedded TLS client performance ({\today} draft)}
+        {\bf Optimizing post-quantum TLS on embedded clients
+            % ({\today} draft)
+        }
 
         \vspace*{1.0cm}
 
@@ -367,46 +365,50 @@ description={Random vector: a location in n-dimensional Cartesian space, where e
 The following served on the Examining Committee for this thesis. The decision of the Examining Committee is by majority vote.
   \bigskip
   
-  \noindent
-\begin{tabbing}
-Internal-External Member: \=  \kill % using longest text to define tab length
-External Examiner: \>  Bruce Bruce \\ 
-\> Professor, Dept. of Philosophy of Zoology, University of Wallamaloo \\
-\end{tabbing} 
-  \bigskip
+%   \noindent
+% \begin{tabbing}
+% Internal-External Member: \=  \kill % using longest text to define tab length
+% External Examiner: \>  Bruce Bruce \\ 
+% \> Professor, Dept. of Philosophy of Zoology, University of Wallamaloo \\
+% \end{tabbing} 
+%   \bigskip
   
   \noindent
 \begin{tabbing}
 Internal-External Member: \=  \kill % using longest text to define tab length
-Supervisor(s): \> Ann Elk \\
-\> Professor, Dept. of Zoology, University of Waterloo \\
-\> Andrea Anaconda \\
-\> Professor Emeritus, Dept. of Zoology, University of Waterloo \\
+Supervisor(s): \> Guang Gong \\
+\> Professor, Electrical \& Computer Engineering \\
+\> University of Waterloo \\
 \end{tabbing}
   \bigskip
   
   \noindent
   \begin{tabbing}
 Internal-External Member: \=  \kill % using longest text to define tab length
-Internal Member: \> Pamela Python \\
-\> Professor, Dept. of Zoology, University of Waterloo \\
+Internal Member: \> Hiren Patel \\
+\> Professor, Electrical \& Computer Engineering \\
+\> University of Waterloo \\
+\\
+\> Jesse Van Griensven \\
+\> Adjunct Professor, Mechanical \& Mechatronics Engineering \\
+\> University of Waterloo \\
 \end{tabbing}
   \bigskip
   
-  \noindent
-\begin{tabbing}
-Internal-External Member: \=  \kill % using longest text to define tab length
-Internal-External Member: \> Meta Meta \\
-\> Professor, Dept. of Philosophy, University of Waterloo \\
-\end{tabbing}
-  \bigskip
+%   \noindent
+% \begin{tabbing}
+% Internal-External Member: \=  \kill % using longest text to define tab length
+% Internal-External Member: \> Meta Meta \\
+% \> Professor, Dept. of Philosophy, University of Waterloo \\
+% \end{tabbing}
+%   \bigskip
   
-  \noindent
-\begin{tabbing}
-Internal-External Member: \=  \kill % using longest text to define tab length
-Other Member(s): \> Leeping Fang \\
-\> Professor, Dept. of Fine Art, University of Waterloo \\
-\end{tabbing}
+%   \noindent
+% \begin{tabbing}
+% Internal-External Member: \=  \kill % using longest text to define tab length
+% Other Member(s): \> Leeping Fang \\
+% \> Professor, Dept. of Fine Art, University of Waterloo \\
+% \end{tabbing}
 
 \cleardoublepage
 \phantomsection    % allows hyperref to link to the correct page
@@ -438,43 +440,43 @@ I understand that my thesis may be made electronically available to the public.
 \begin{center}\textbf{Abstract}\end{center}
 
 Transport Layer Security (TLS) is the most widely used cryptographic protocol on the Internet.
-It ensures the confidentiality, integrity, and authenticity of application data using a combination of cryptographic primitives including Diffie-Hellman key exchange, digital signatures, cryptographic hash functions, and authenticated encryption schemes.
-Unfortunately, Peter Shor's quantum algorithm for integer factoriation and recent progress in the engineering of large-scale quantum computers pose an existential threat to the security of number-theoretic and elliptic-curve cryptographic algorithms, and thus the security of the TLS protocol.
+It ensures the confidentiality, integrity, and authenticity of application data using a combination of cryptographic primitives including Diffie-Hellman key exchange, digital signatures, cryptographic hash functions, and authenticated encryption with associated data (AEAD).
+Unfortunately, Peter Shor's quantum integer factorization algorithm and recent progress in engineering large-scale quantum computers posed an existential threat to number-theoretic and elliptic-curve public-key cryptographic algorithms used in TLS.
 The risk of ``harvest-now-decrypt-later'' attacks and the enormity of efforts needed to migrate existing digital infrastructure meant that we needed to start transitioning to using post-quantum cryptography (PQC) as soon as possible.
 
-Since the earliest public experimentation of adopting PQC in TLS by Google, and the start of NIST's PQC standardization project, the collaboration between government, industry, and academia over the last two decades have produced impressive progress towards a quantum-safe future.
-As of today, NIST has standardized three PQC algorithms (ML-KEM, ML-DSA, SLH-DSA), and research projects such as Open Quantum Safe (OQS) have integrated PQC algorithms into popular cryptographic protocols (TLS, SSH, VPN, etc.) for experimental deployment and evaluation.
-% Consumer products like Android, iOS, and Chrome have started rolling out support for hybrid X25519+ML-KEM key exchange in their TLS stack, as well. 
-While the migration to PQC is gathering momentum, deploying PQC to embedded systems received relatively less attention despite the proliferating deployment of IoT devices and the increasing importance of IoT security.
-There are fewer readily available implementation of embedded TLS libraries with PQC support, and less systematic efforts toward understanding the performance and security impact of implementing post-quantum TLS on embedded clients.
+Since the earliest public experimentation of adopting PQC in TLS by Google, and the start of NIST's PQC standardization project, a collaboration between government, industry, and academia over the last two decades have produced impressive progress towards a quantum-safe future.
+As of July 2025, NIST has standardized three PQC algorithms (ML-KEM, ML-DSA, SLH-DSA), and research projects such as Open Quantum Safe (OQS) have integrated PQC algorithms into popular cryptographic protocols (TLS, SSH, VPN, etc.) for experimental deployment and evaluation.
+While the migration to PQC is gathering momentum, deploying PQC to embedded systems received comparatively less attention despite the proliferation of IoT devices and the growing importance of IoT security.
+There are fewer readily available embedded TLS libraries with PQC support, and less systematic efforts toward understanding the performance and security impact of deploying post-quantum TLS on embedded clients.
 
-In this thesis, we provide a clean implementation of post-quantum TLS 1.3 on top of WolfSSL and PQClean, with which we tested and compared the performance of a wide selection of cryptographic configurations on an embedded client.
-We then proposed and/or implemented two protocol-level optimizations: using IND-1CCA KEM instead of IND-CCA KEM for ephemeral key exchange, and using KEM-based authentication (KEMTLS) instead of signature-based authentication.
-In our testing, we found both optimization to bring meaningful performance improvements.
-IND-1CCA KEM removed the expensive {re-encryption} operation, which reduced the CPU cycles of decapsulation by up to 70\%, which translated to up to 30\% reduction in key exchange latency.
-On the other hand, KEM-based authentication reduced ``time until client can send application data'' by up to 15\%.
-Our work laid the foundation for future evaluation of PQC on other embedded devices and contributed to the understanding and improvements of transitioning to post-quantum in the IoT security space.
+In this work, we made several contributions to understanding and optimizing post-quantum TLS on embedded systems.
+First, we reduced client's computational workload in ephemeral key exchange by replacing IND-CCA KEM with IND-1CCA KEM.
+Specifically, we proposed methods for constructing IND-1CCA KEM that avoided the expensive re-encryption technique used in the Fujisaki-Okamoto transformation.
+Second, we implemented KEM-based authentication (KEMTLS) as an alternative to signature-based authentication in TLS.
+Compared to signature-based authentication, KEM-based authentication reduces bandwidth requirements and allows the client to start sending application data at an earlier time.
+Last but not least, we provided a clean, simple implementation of post-quantum TLS and KEMTLS with which we benchmarked the handshake performance on an embedded client.
+By combining these optimization techniques, we reduced client's TLS handshake latency to 84.17 ms, a 34.4\% reduction compared to using elliptic-curve algorithms (128.40 ms).
 
 \cleardoublepage
 \phantomsection    % allows hyperref to link to the correct page
 
-% A C K N O W L E D G E M E N T S
-% -------------------------------
-\addcontentsline{toc}{chapter}{Acknowledgements}
-\begin{center}\textbf{Acknowledgements}\end{center}
+% % A C K N O W L E D G E M E N T S
+% % -------------------------------
+% \addcontentsline{toc}{chapter}{Acknowledgements}
+% \begin{center}\textbf{Acknowledgements}\end{center}
 
-I would like to thank all the little people who made this thesis possible.
-\cleardoublepage
-\phantomsection    % allows hyperref to link to the correct page
+% I would like to thank all the little people who made this thesis possible.
+% \cleardoublepage
+% \phantomsection    % allows hyperref to link to the correct page
 
-% D E D I C A T I O N
-% -------------------
-\addcontentsline{toc}{chapter}{Dedication}
-\begin{center}\textbf{Dedication}\end{center}
+% % D E D I C A T I O N
+% % -------------------
+% \addcontentsline{toc}{chapter}{Dedication}
+% \begin{center}\textbf{Dedication}\end{center}
 
-This is dedicated to the one I love.
-\cleardoublepage
-\phantomsection    % allows hyperref to link to the correct page
+% This is dedicated to the one I love.
+% \cleardoublepage
+% \phantomsection    % allows hyperref to link to the correct page
 
 % T A B L E   O F   C O N T E N T S
 % ---------------------------------
@@ -516,30 +518,33 @@ This is dedicated to the one I love.
 
 \chapter{Introduction}\label{sec:introduction}
 \emph{Transport Layer Security} (TLS) is the most widely used cryptographic protocol on the Internet.
-It allows two communicating parties to establish a secure channel over an insecure or even hostile network.
+It allows two communicating parties to establish a secure channel over an insecure network.
 The secure channel then ensures confidentiality, integrity, and authenticity of the application data.
 \emph{Secure Socket Layer} (SSL), the predecessor of TLS, was originally designed by Netscape (1994) for web browsing (HTTPS), but through more than thirty years of iterations, TLS/SSL has become the default choice for many secure applications, including email (SMTPS, IMAPS, and POP3S), remote desktop (RDP), and sensor networks (MQTT/MQTT-SN).
 
-To achieve its security goals, TLS deploys many cryptographic primitives: Diffie-Hellman key exchange for establishing a shared secret, digital signatures for entity authentication, cryptographic hash functions for message integrity and key derivation, authenticated encryption with associated data (AEAD) for bulk encryption, etc.
-Unfortunately, the security of almost all of these cryptophic primitives is weakened with the discovery of quantum algorithms that are more efficient than their classical counterparts.
-For example, Lov Grover proposed a quantum algorithm that could search through a key space of size $N$ using only $N^\frac{1}{2}$ steps \cite{DBLP:conf/stoc/Grover96}.
-While a classic computer requires on average $2^{128}$ steps to brute-force a 128-bit secret key, a quantum computer executing Grover's quantum search algorithm can brute-force it in only $2^{64}$ steps on average.
-Grover's search algorithm was later extended by Brassard et al. \cite{DBLP:journals/sigact/BrassardHT97} to reduce the collision resistance of an $N$-bit hash function from $2^\frac{N}{2}$ to $2^\frac{N}{3}$.
+To achieve its security goals, TLS deploys many cryptographic algorithms: Diffie-Hellman key exchange for establishing a shared secret, digital signatures for entity authentication, cryptographic hash functions for message integrity and key derivation, authenticated encryption with associated data (AEAD) for bulk encryption, etc.
+Unfortunately, almost all of these cryptographic algorithms are weakened by the discovery of quantum algorithms.
+For example, Lov Grover proposed a quantum algorithm that could search through a key space of size $N$ using only $N^{1/2}$ steps \cite{DBLP:conf/stoc/Grover96}.
+Grover's quantum search algorithm can be implemented to weaken the security of symmetric encryption schemes:
+while a classic computer requires on average $2^{128}$ steps to brute-force a 128-bit secret key, a quantum computer executing Grover's quantum search algorithm can brute-force it in only $2^{64}$ steps on average.
+Grover's search algorithm was later extended by Brassard et al. \cite{DBLP:journals/sigact/BrassardHT97} to reduce the collision resistance of an $N$-bit hash function from $2^{N/2}$ to $2^{N/3}$.
 Fortunately, Grover's search algorithm only provided a quadratic speedup, and the security of symmetric primitives can be scaled up straightforwardly.
-On the other hand, Peter Shor's quantum algorithm for integer factorization \cite{DBLP:conf/focs/Shor94,DBLP:journals/siamcomp/Shor97} provided an exponential speedup that would break today's most popular public-key cryptographic primitives based on number theory and/or elliptic curves.
+On the other hand, Peter Shor's quantum algorithm for integer factorization \cite{DBLP:conf/focs/Shor94,DBLP:journals/siamcomp/Shor97} provided an {\it exponential} speedup that would break today's most popular public-key cryptographic algorithms based on number theory or elliptic curves.
 
-Given widespread adoption of online communication for sensitive information, the threat of large-scale quantum computer demands a swift and complete transition toward post-quantum cryptography (PQC).
-While quantum computer large enough to break today's encryption remains impractical, the need for PQC is still urgent for two reasons: first, developing new cryptographic primitives and protocols requires extensive research efforts and thorough testing before they are considered ready for production deployment, and rolling out new cryptographic algorithms throughout existing infrastructure takes enormous amount of efforts and time; second, secure communication can be intercepted today and its encryption broken some time later when large quantum computers are feasible, the so-called ``harvest-now-decrypt-later'' attack.
+The threat of large-scale quantum computer breaking today's encryption demands a swift and complete adoption of post-quantum cryptography (PQC).
+While quantum computers large enough to solve 2048-bit RSA remains just out of reach with today's technology, the need for PQC is still urgent for two reasons: 
+first, developing new cryptographic primitives and protocols requires extensive research efforts and thorough testing before they are considered ready for production deployment, and rolling out new cryptographic algorithms throughout existing infrastructure takes enormous amount of efforts and time; 
+second, encrypted communication can be intercepted today and its content decrypted sometime later when large quantum computers are feasible, the so-called ``harvest-now-decrypt-later'' attack.
 
-The growing urgency of transitioning to PQC coincides with the rapidly accelerating deployment of Internet-connected embedded devices (Internet of Things, or IoT), which raised an interesting but often underlooked problem of post-quantum IoT security.
-Deploying PQC in IoT devices carries many challenges not found in the discussion involving server, desktop, or even smartphones.
-IoT devices are comparatively underpowered, with 32/16-bit processors that have one or two cores clocked at 100-200MHz and a few hundred kilobytes of memory (iPhone 13 has 6 cores running at up to 3GHz and 4GB of RAM).
-Many of them are also battery-powered, with a single charge expected to last months if not years of intermittent operations.
-In addition, IoT devices are at higher risk of physical intrusion and sophisticated attacks such as side-channel attacks on timing/power/electromagnetic waves and fault/glitch attacks.
+The growing urgency of transitioning to PQC coincides with the rapidly accelerating deployment of Internet-connected embedded devices (Internet of Things, or IoT), which raised an interesting but often overlooked problem of post-quantum IoT security.
+Deploying PQC in IoT devices carries many challenges not found in the discussion involving servers, desktops, or even smartphones \cite{DBLP:journals/iacr/MankowskiWM23}.
+IoT devices are comparatively underpowered, with 32-bit or 16-bit processors that have one or two cores clocked at 100-200MHz and a few hundred kilobytes of memory (by comparison, iPhone 13 has six 64-bit cores running at up to 3GHz and 4GB of RAM).
+Many IoT devices are also battery-powered, with a single charge expected to last months if not years of intermittent operations, making computational efficiency critical to their normal functions.
+Last but not least, IoT devices are at higher risk of physical intrusion and sophisticated side-channel attacks, which require the use of special hardening techniques not found in desktop environments.
 
-In this thesis, we contributed to the discussion of post-quantum IoT security by implementing, benchmarking, and optimizing post-quantum TLS on embedded systems.
-Our work demonstrated the feasibility of deploying PQC with very high security level in real-world communication protocols, and our benchmark data help identify the trade-offs among the vast selection of PQC primitives as well as protocol-level variations.
-Our implementation also served as a starting point for future works evaluating PQ-TLS on other platforms that is easier to work with than prior works.
+In this thesis, we contributed to the discussion of post-quantum IoT security by implementing, benchmarking, and optimizing post-quantum TLS (PQ-TLS) on embedded systems.
+Our work demonstrated the feasibility of deploying PQC with very high security level in TLS, and our benchmark data help identify possible trade-offs among the vast selection of possible configurations.
+Our implementation also served as a starting point for future works evaluating PQ-TLS on other platforms that is easier to work with than prior implementations.
 We hope our contribution help bridge the gap between cryptographic research and practical deployment, and accelerate the broad adoption of PQC in the IoT landscape.
 
 \section{Contributions}\label{sec:contributions}
@@ -552,17 +557,17 @@ We hope our contribution help bridge the gap between cryptographic research and 
         & {\bf OT-ML-KEM-1024} 
         \\
     \midrule
-        {\bf Encapsulation}
-        & {93157 (+1.8\%)}
-        & {146405 (+7.3\%)}
-        & {205763 (+3.3\%)} \\
-        {\bf Decapsulation}
-        & {33733 (-72.2\%)}
-        & {43315 (-76.8\%)}
-        & {51375 (-79.1\%)} \\
+        {\bf Encap (kilocycles/tick)}
+        & {\sf 93.15 (+1.8\%)}
+        & {\sf 146.40 (+7.3\%)}
+        & {\sf 205.76 (+3.3\%)} \\
+        {\bf Decap (kilocycles/tick)}
+        & {\sf 33.73 (-72.2\%)}
+        & {\sf 43.31 (-76.8\%)}
+        & {\sf 51.37 (-79.1\%)} \\
     \bottomrule
     \end{tabular}
-    \caption{OT-ML-KEM performance compared to ML-KEM}
+    \caption{OT-ML-KEM reduced decapsulation CPU cycles by more than 70\% compared to ML-KEM}
     \label{tab:ot-ml-kem-performance-summary}
 \end{table}
 
@@ -587,50 +592,50 @@ We hope our contribution help bridge the gap between cryptographic research and 
 
 Our contributions are as follows: \begin{itemize}
     \item We propose ``encrypt-then-MAC'', a KEM transformation that converts an OW-CPA PKE into an IND-1CCA secure KEM.
-    We instantiated this transformation with the CPA sub-routines of ML-KEM and named it one-time ML-KEM (OT-ML-KEM).
-    Compared to ML-KEM, OT-ML-KEM trades small performance penalty in encapsulation for up to 70\% CPU cycle reduction in decapsulation (Table \ref{tab:ot-ml-kem-performance-summary})
-    \item We implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL.
-    To our knowledge, this is the first implementation where certificate generation, client (embedded and desktop), and server are all implemented on the same TLS/SSL library, thus reducing the complexity of software dependencies and facilitating future evaluation of PQ-TLS/KEMTLS on embedded or desktop environments (Table \ref{tab:tls-impl-dependencies}).
-    % TODO: maybe add a table for the third point?
-    \item We benchmarked handshake performance of post-quantum TLS and KEMTLS on an embedded client using a wide selection of classical and post-quantum cryptographic primitives.
-    From the benchmarking results, we identified several ways to reduce handshake latency.
+    We instantiated this transformation with the CPA sub-routines of ML-KEM, which we named one-time ML-KEM (OT-ML-KEM).
+    Compared to ML-KEM, OT-ML-KEM trades small performance penalty in encapsulation for up to 70\% CPU cycle reduction in decapsulation (Table \ref{tab:ot-ml-kem-performance-summary}).
+    \item We implemented PQ-TLS and KEMTLS on top of WolfSSL.
+    Out implementation is the first implementation where certificate generation, client (embedded and desktop), and server are all implemented on the same TLS/SSL library, reducing the complexity of software dependencies and facilitating future evaluation of PQ-TLS/KEMTLS on embedded or desktop environments (Table \ref{tab:tls-impl-dependencies}).
+    \item We benchmarked handshake performance of PQ-TLS and KEMTLS on an embedded client using a wide selection of classical and post-quantum cryptographic primitives.
+    With a combination of using OT-ML-KEM for ephemeral key exchange and KEM-based authentication, we were able to achieve median client's handshake latency of 84.2 ms, a 34.4\% reduction compared to elliptic-curve algorithms (128.40 ms).
 \end{itemize}
 
 \section{Related works}\label{sec:intro-related-works}
 \paragraph{Post-quantum cryptography} Public-key cryptosystems based on other problems than number theory or elliptic curve have been studied well before aforementioned quantum algorithms were published.
 The earliest examples include the NTRU cryptosystem \cite{DBLP:conf/ants/HoffsteinPS98} (based on lattice problems) and the McEliece cryptosystem \cite{mceliece1978public} (based on error correcting codes).
-Since the publishing of Shor's algorithm, the increased interest in developing quantum resistant cryptographic algorithms has produced many additional schemes based on diverse classes of problems.
-Besides proposals for new lattice-based schemes and code-based schemes, there are novel encryption and signature schemes based on isogeny (SIKE, CSIDH), multivariate equations (Rainbow, UOV), MPC-in-the-head (MIRA, MiRitH), cryptographic hash functions (PICNIC, SPHINCS+), etc.
+Since the publication of Shor's algorithm, the increased interest in developing quantum resistant cryptographic algorithms has produced many additional schemes based on diverse classes of problems.
+Besides proposals for new lattice-based schemes and code-based schemes, there are novel encryption and signature schemes based on isogeny (SIKE \cite{DBLP:conf/pqcrypto/JaoF11}, CSIDH \cite{DBLP:journals/iacr/CastryckLMPR18}), multivariate equations (Rainbow \cite{ding2019rainbow}, UOV \cite{DBLP:conf/eurocrypt/KipnisPG99}), MPC-in-the-head \cite{DBLP:conf/stoc/IshaiKOS07}, and symmetric primitives (PICNIC \cite{DBLP:conf/ccs/ChaseDGORRSZ17}, SPHINCS+ \cite{DBLP:journals/iacr/BernsteinHKNRS19}).
 
 While several governments and international bodies have ongoing efforts to standardize post-quantum algorithms, in this paper we mainly focus on the PQC standardization project run by the National Institute of Standards and Technology (NIST).
 Started in 2016, the project called for key encapsulation mechanisms (KEM) and digital signatures, and after several rounds of revisions, NIST announced the selection of four algorithms for standardization in August 2024: \begin{itemize}
-    \item {\bf ML-KEM} (originally named CRYSTALS-Kyber) is a KEM based on module lattice
-    \item {\bf ML-DSA} (originally named CRYSTALS-Dilithium) is a signature scheme based on module lattice
-    \item {\bf SLH-DSA} (originally named SPHINCS+) is a signature scheme based on cryptographic hash function
-    \item Falcon is a signature scheme based on NTRU lattice. Although Falcon has been selected for standardization, NIST has not yet published a draft for FIPS 206.
+    \item {\bf ML-KEM} \cite{FIPS203} (originally named CRYSTALS-Kyber \cite{DBLP:conf/eurosp/BosDKLLSSSS18}) is a KEM based on module lattice
+    \item {\bf ML-DSA} \cite{FIPS204} (originally named CRYSTALS-Dilithium
+    \cite{DBLP:journals/tches/DucasKLLSSS18}) is a signature scheme based on module lattice
+    \item {\bf SLH-DSA} \cite{FIPS205} (originally named SPHINCS+
+    \cite{DBLP:journals/iacr/BernsteinHKNRS19}) is a signature scheme based on cryptographic hash function
+    \item Falcon \cite{falcon2020spec} is a signature scheme based on NTRU lattice. Although Falcon has been selected for standardization, NIST has not yet published a draft for FIPS 206 (tentatively named FN-DSA).
 \end{itemize}
-In March 2025, NIST selected HQC--a KEM based on error-correcting code--for standardization.
-Additionally, Classic McEliece is under consideration for future selection, and the PQC project is currently calling for and reviewing additional signature schemes as of July 2025.
+In March 2025, NIST selected HQC \cite{melchor2022hqc}--a KEM based on error-correcting code--for standardization.
+Additionally, Classic McEliece \cite{bernstein2022classicmceliece} is under consideration for future selection, and the PQC project is currently calling for and reviewing additional signature schemes as of July 2025 \cite{nist2022call-addtl-signatures}.
 
-Following the start of NIST's PQC standardization project, concrete implementations of PQC algorithms became more widely available.
-This increased availability motivated many projects to collect individual implementations into a central repository, provide thorough audits and testings, then integrate them into real-world protocols (TLS, SSH, WireGuard, Signal, etc.).
+Following the start of NIST's PQC standardization project, practical implementations of PQC algorithms became more widely available, which motivated many projects to collect individual implementations into a central repository, provide thorough audits and testings, then integrate them into real-world protocols (TLS, SSH, WireGuard, Signal, etc.).
 PQClean \cite{DBLP:conf/eurosp/KannwischerSSW22} is one such project that curates ``reference implementations'' (written in ANSI C) and optimized implementations (x86\_64 or ARM assembly) submitted to the PQC standardization project.
-PQClean's maintainers ensure each implementation's correctness and security (free from memory corruption, branching on secrets, etc.), then applies quality-of-life improvements such as a consistent set of API's and namespacing of each algorithm.
-PQClean then serves as upstream to other projects that benchmark and integrate PQC, including pqm4 \cite{DBLP:journals/iacr/KannwischerRSS19,DBLP:journals/iacr/KannwischerKPY24} and Open Quantum Safe \cite{DBLP:conf/sacrypt/StebilaM16}.
+PQClean's maintainers ensure each implementation's correctness and security (free from memory corruption, branching on secrets, etc.), then applies quality-of-life improvements such as a consistent set of API's and namespacing each implementation.
+PQClean now serves as upstream to other projects that benchmark and integrate PQC, including pqm4 \cite{DBLP:journals/iacr/KannwischerRSS19,DBLP:journals/iacr/KannwischerKPY24} and Open Quantum Safe \cite{DBLP:conf/sacrypt/StebilaM16}.
 
-\paragraph{PQ-TLS implementations} Experimentation with post-quantum TLS began as early as 2016, when Google's implemented hybrid key exchange (X25519 + NewHope) called CECPQ1 for TLS 1.2 into Chrome.
-The main goal of CECPQ1 is to demonstrate the feasibility of adopting post-quantum primitives into the existing web infrastructure (the developers were particularly worried about compatibility with TLS middle boxes, which posed a major obstacle for rolling out new TLS versions).
-It was observed that NewHope carried very little computational overhead, and the increase in message size brought only minimal increase in connection latency: median latency increased by 1 millisecond, the 95-th percentile increased by 20 milliseconds, and the 99-th percentile increased by 150 milliseconds.
-Google and CloudFlare followed up in 2018, when they selected two hybrid key exchange schemes (X25519 + NTRU-HRSS and X25519 + SIKE) and implemented them on TLS 1.3 in Chrome.
+\paragraph{PQ-TLS implementations} Experimentation with post-quantum TLS began as early as 2016, when Google implemented hybrid key exchange (X25519 + NewHope \cite{DBLP:conf/uss/AlkimDPS16}, called CECPQ1) for TLS 1.2 into its Chrome web browser \cite{langley2016cecpq1}.
+The main goal of CECPQ1 is to demonstrate the feasibility of adopting post-quantum primitives into the existing web infrastructure (the developers were particularly worried about compatibility with TLS middle boxes, which posed a major obstacle when TLS 1.3 was being rolled out to replace TLS 1.2).
+It was observed that NewHope carried very little computational overhead, and the increase in message size brought only minimal increase in connection latency: median latency increased by 1 ms, the 95th percentile increased by 20 ms, and the 99th percentile increased by 150 ms.
+Google and CloudFlare followed up in 2018, when they selected two hybrid key exchange schemes (X25519 + NTRU-HRSS \cite{hulsing2017ntruhrss} and X25519 + SIKE) and implemented them on TLS 1.3 in Chrome \cite{langley2018cecpq2}.
 The CECPQ2 experiment showed that over broadband Internet, the computational performance of the PQC scheme factors more significantly into connection latency than message size, as X25519+SIKE key exchange was significantly slower than X25519+NTRU-HRSS and the control group despite SIKE having much smaller message size.
 
-The availability of individual reference implementations from NIST's PQC project enabled several scatter-shot experiments \cite{DBLP:conf/noms/DoringG22,cryptoeprint:2019/1276,DBLP:conf/conext/SikeridisKD20,DBLP:conf/ndss/SikeridisKD20,DBLP:conf/conext/SosnowskiWHSSGC23} that deploy a limited set of PQC algorithms and focus only on specific aspects (only PQ key exchange, or only PQ authentication) of TLS.
-Each experiment deployed different client/server hardware, different network setups, and different sources of PQC implementations, which made it difficult to compare results across experiments.
+The availability of individual reference implementations from NIST's PQC project enabled several scatter-shot experiments \cite{DBLP:conf/noms/DoringG22,cryptoeprint:2019/1276,DBLP:conf/conext/SikeridisKD20,DBLP:conf/ndss/SikeridisKD20,DBLP:conf/conext/SosnowskiWHSSGC23,DBLP:conf/ipccc/HannaPVPAAA24,DBLP:journals/iacr/KampanakisC24,DBLP:conf/amcis/SabanciC23,DBLP:conf/c2si/McLoughlinGS23,DBLP:journals/iacr/Scott23,DBLP:conf/asiaccs/PaulKLN22,DBLP:conf/conext/SikeridisHOD22,DBLP:conf/cscml/KampanakisK22,DBLP:journals/iacr/PaulKLN21} that deployed a limited set of PQC algorithms and focused only on specific aspects (only PQ key exchange, or only PQ authentication) of TLS.
+Each experiment used different client/server hardware, different network setups, and different sources of PQC implementations, which made it difficult to compare results across experiments.
 Paquin et al. \cite{DBLP:journals/iacr/PaquinST19,DBLP:conf/pqcrypto/PaquinST20} leveraged \texttt{liboqs} and OpenSSL to provide a more systematic approach that controlled for hardware, network, and software.
-It also took advantage of network emulation software to simulate realistic ``TLS on the Internet'' benchmarks without requiring access to cloud infrastructure.
+% It also took advantage of network emulation software to simulate realistic ``TLS on the Internet'' benchmarks without requiring access to cloud infrastructure.
 
-Burstinghaus-Steinbach et al. published the earliest implementation and evaluation of post-quantum TLS on embedded client \cite{DBLP:conf/ccs/Burstinghaus-Steinbach20,DBLP:journals/iacr/Burstinghaus-Steinbach20}.
-This implementation integrated Kyber and SPHINCS+ into TLS 1.2 using mbedTLS, and the test platforms include Raspberry Pi 3B, ESP32-PICO, Fieldbus Option Card, and LPCXpresso.
+Burstinghaus-Steinbach et al. published the earliest implementation of PQ-TLS on embedded clients \cite{DBLP:conf/ccs/Burstinghaus-Steinbach20,DBLP:journals/iacr/Burstinghaus-Steinbach20}.
+This implementation integrated Kyber and SPHINCS+ into TLS 1.2 using mbedTLS\footnote{\url{https://github.com/Mbed-TLS/mbedtls/tree/development/library}}, and the test platforms include Raspberry Pi 3B, ESP32-PICO, Fieldbus Option Card, and LPCXpresso.
 Tasopoulos et al. \cite{cryptoeprint:2021/1553,DBLP:conf/ispec/GeorgeLFZSS22} published a follow-up implementation, this time integrating an expanded selection of NIST PQC Round 3 and 4 candidates into TLS 1.3 on top of WolfSSL.
 The target platform is a NUCLEO-F439ZI (ARM Cortex-M4).
 Schoffel et al. \cite{DBLP:conf/iotdi/SchoffelLRW21} and later Tasopoulos et al. \cite{DBLP:journals/iacr/TasopoulosDFZSS23,DBLP:conf/cf/TasopoulosDFZSS23} also evaluated the energy consumption of post-quantum TLS on battery-powered IoT device, proving the viability of PQC on extremely low-powered devices.
@@ -638,21 +643,18 @@ Last but not least, Gonzalez and Wiggers \cite{DBLP:conf/space/GonzalezW22} impl
 
 Experimental results from both industry and acdemia seem to have converged on a consensus regarding the performance impact of adopting PQC in TLS:
 lattice-based KEM (i.e. ML-KEM/Kyber and NTRU) and signatures (i.e. ML-DSA and Falcon) are computationally as efficient as their elliptic-curve counterparts, and can serve as drop-in replacements.
-The increased message size can be accommodated within existing TLS specification and network infrastructure (i.e. middle boxes), and the performance penalty is minimal on broadband network.
-Where a pure-quantum TLS is considered too risky, hybrid ECC+PQC key exhange and authentication can be deployed with the guarantee that the overall protocol is secure even if one of the components becomes broken, and the performance penalty is non-trivial but still acceptable.
+The increased message size can be accommodated within existing TLS specification and network infrastructure, and the performance penalty is minimal on broadband network.
+Where a pure-quantum TLS is considered too risky, hybrid ECC+PQC key exhange and authentication can be deployed with the guarantee that the overall protocol is secure even if one of the components becomes broken \cite{DBLP:conf/camad/GarciaAOMR23,DBLP:journals/iacr/BarbosaCDKSVW24,DBLP:conf/dsd/MarchsreiterS22,DBLP:journals/iacr/CrockettPS19}, and the performance penalty is non-trivial but still acceptable.
 Finally, PQC algorithms with conservative security assumptions (hash-based and code-based schemes) are harder to accommodate (e.g. Classic McEliece public key cannot fit into TLS's \texttt{key\_share} extension), and their performance penalty is too much to justify in real-world use cases.
 
 \section{Paper organization}
 The rest of this paper is organized accordingly: \begin{itemize}
     \item Chapter \ref{sec:surveying-post-quantum-TLS} reviews TLS/KEMTLS handshake protocol and their security properties.
-    \item Chapter \ref{sec:faster-tls-kex-w-ind-1cca-kem} introduces the concept of IND-1CCA security, proposes an original IND-1CCA transformation, and discusses its application to TLS key exchange
-    \item Chapter \ref{sec:implementing-pqtls-and-kemtls} describes how we implemented post-quantum TLS and KEMTLS on an embedded client using WolfSSL
-    \item Chapter \ref{sec:performance-of-pqtls-and-kemtls} presents performance evaluation of post-quantum TLS on an embedded client
-    \item Chapter \ref{sec:conclusions-and-future-works} summarizes all presented results and discusses open problems and future directions
+    \item Chapter \ref{sec:faster-tls-kex-w-ind-1cca-kem} proposes an original IND-1CCA transformation, and discusses its application to TLS key exchange
+    \item Chapter \ref{sec:implementing-pqtls-and-kemtls} describes how we implemented PQ-TLS/KEMTLS on an embedded client
+    \item Chapter \ref{sec:performance-of-pqtls-and-kemtls} presents performance evaluation of PQ-TLS/KEMTLS on embedded clients
+    \item Chapter \ref{sec:conclusions-and-future-works} summarizes the thesis and discusses open problems and future directions
 \end{itemize}
-
-Appendix \ref{sec:cryptography-definitions} reviewed rudimentary cryptography definitions used in this paper.
-Appendix \ref{sec:review-ml-kem} provided a summary of ML-KEM. 
 
 \chapter{An overview of TLS}\label{sec:surveying-post-quantum-TLS}
 Transport Layer Security (TLS) is a communication protocol with which two parties can exchange data in the presence of passive or active adversaries while preserving \textbf{confidentiality, integrity, and authenticity}.
@@ -660,24 +662,16 @@ It was first developed at Netscape in 1994 and went through many iterations.
 The latest revision is TLS 1.3, formally standardized by IETF in RFC 8446 \cite{DBLP:journals/rfc/rfc8446} in 2018.
 TLS 1.3 made significant improvements over TLS 1.2 \cite{DBLP:journals/rfc/rfc5246} and prior versions, including deprecating weak symmetric cipher suites, requiring forward secrecy at all times, and restructuring the handshake state machine in order to simplify the handshake workflow.
 According to Cloudflare \cite{Westerbaan_2024}, TLS 1.3 reached more than 93\% adoption on the Internet.
-Given TLS 1.3's superior design and nearly universal adoption over other versions of TLS, this work will focus on this version unless otherwise specified.
+Given TLS 1.3's superior design and nearly universal adoption over older versions of TLS, this work will focus on this version unless otherwise specified.
 
-Section \ref{sec:overview-tls13-handshake} reviews the TLS 1.3 handshake protocol and its security properties. Section \ref{sec:kemtls} introduces KEMTLS \cite{DBLP:conf/ccs/SchwabeSW20}, a proposal to use KEM-based authentication in TLS 1.3.
+Section \ref{sec:overview-tls13-handshake} reviews TLS 1.3 with an emphasis on the handshake protocol and its security properties. Section \ref{sec:kemtls} introduces KEMTLS \cite{DBLP:conf/ccs/SchwabeSW20}, a proposal to use KEM-based authentication in TLS 1.3.
 
 \section{TLS 1.3 handshake}\label{sec:overview-tls13-handshake}
-Figure \ref{fig:tls13-handshake} illustrates a simple TLS 1.3 handshake over TCP. A new TLS 1.3 connection begins with a handshake in which the two parties exchange a specific sequence of messages to negotiate cryptographic parameters, establish shared secrets, and authenticate each other.
-If the handshake is successful, then the connection transitions to exchanging application data using the encryption scheme and secret keys obtained from the handshake phase.
-In TLS 1.3, the handshake can be further divided into two phases: \begin{enumerate}
-    \item \textbf{Key exchange} \begin{enumerate}
-        \item \texttt{ClientHello}: client publishes its supported symmetric cipher suites (AEAD, hash functions), signature algorithms, a random nonce, and key exchange public keys.
-        \item \texttt{ServerHello}: server chooses its preferred symmetric cipher suite, as well as publishes its own random nonce and key exchange public keys.
-    \end{enumerate}
-    \item \textbf{Authentication} \begin{enumerate}
-        \item \texttt{Certificates}: server sends a chain of X.509 certificates that bind its identity to a digital signature public key; optionally, server can request client authentication (\texttt{CertificateRequest}), in which case the client must also send a chain of certificates.
-        \item \texttt{CertificatesVerify}: server proves ownership fo the corresponding digital signature secret key by producing a signature over the handshake transcript; client will do the same upon server's request
-        \item \texttt{Finished}: both parties prove to each other the integrity of the handshake by producing an HMAC over the handshake transcript
-    \end{enumerate}
-\end{enumerate}
+TLS 1.3 consists mainly of two sub-protocols.
+First, client and server establish cryptographic parameters and perform unilateral/mutual authentication in the {\bf handshake} protocol.
+If the handshake protocol succeeds, then the two parties proceed to exchange {\bf application-layer data} using the secret keys and the authenticated encryption with associated data (AEAD) scheme negotiated in the handshake protocol, otherwise the underlying connection is terminated upon handshake failure.
+In this thesis, we primarily focus on the handshake sub-protocol.
+Figure \ref{fig:tls13-handshake} illustrates a unilaterally TLS 1.3 handshake over TCP. 
 
 \begin{figure}[htbp]
     \centering
@@ -686,47 +680,47 @@ In TLS 1.3, the handshake can be further divided into two phases: \begin{enumera
             mynode/.style = {draw, rectangle}
         }
     
-        \node[draw,rectangle] (client) at (0,0) {Client[$\pk^\text{SIG}_\text{root}$]};
+        \node[draw,rectangle] (client) at (0,0) {Client[$\pk^\sig_\text{root}$]};
         \node[draw,rectangle] (server) at (10,0) {
             Server[Certs,$\sk_s$]
         };
 
         \node[below of=client] (tcpc) {}; % invisible nodes help draw TCP connection
         \node[below of=server] (tcps) {};
-        \draw[<->] (tcpc) -- (tcps) node[midway,above]{TCP SYN} node[midway,below]{TCP SYN-ACK};
+        \draw[<->, very thick] (tcpc) -- (tcps) node[midway,above]{TCP SYN} node[midway,below]{TCP SYN-ACK};
 
         % construct ClientHello
         \node[below of=tcpc,align=left] (ch) {
             $(G, g) \leftarrow \texttt{supported\_groups}$ \\
-            $x \leftsample \mathbb{Z}_q,\pk^\text{DHE}_c\leftarrow g^x,r_c \leftsample \{0,1\}^{256}$ \\
+            $x \leftsample \mathbb{Z}_q,\pk^\dhe_c\leftarrow g^x,r_c \leftsample \{0,1\}^{256}$ \\
         };
         \node[below of=tcps] (ch_wait) {}; % server is waiting for client hello
 
         % send ClientHello
         \node[below of=ch] (ch_sent) {};
         \node[below of=ch_wait] (ch_recved) {};
-        \draw[->] (ch_sent) -- (ch_recved) node[midway,above] {\texttt{ClientHello}[$\pk^\text{DHE}_c,r_c$]};
+        \draw[->, very thick] (ch_sent) -- (ch_recved) node[midway,above] {\texttt{ClientHello}[$\pk^\dhe_c,r_c$]};
 
         % process client hello, construct server hello
         \node[below of=ch_sent] (sh_wait) {};
         \node[align=left,below of=ch_recved] (sh) {
-            $y\leftsample \mathbb{Z}_q,\pk^\text{DHE}_s\leftarrow g^y$ \\
+            $y\leftsample \mathbb{Z}_q,\pk^\dhe_s\leftarrow g^y$ \\
             $r_s\leftsample\{0,1\}^{256}$
         };
 
         % send server hello
         \node[below of=sh_wait] (sh_recved) {};
         \node[below of=sh] (sh_sent) {};
-        \draw[->] (sh_sent) -- (sh_recved) node[midway,above] {
-            \texttt{ServerHello}[$\pk^\text{DHE}_s, r_s$]
+        \draw[->, very thick] (sh_sent) -- (sh_recved) node[midway,above] {
+            \texttt{ServerHello}[$\pk^\dhe_s, r_s$]
         };
 
         % derive stage 1/2 keys: handshake traffic keys
-        \node[align=left,below=0em of sh_recved] (dhe_ss_c) {$g^{xy}\leftarrow (\pk^\text{DHE}_s)^x$};
-        \node[below=0em of sh_sent] (dhe_ss_s) {$g^{xy}\leftarrow (\pk^\text{DHE}_c)^y$};
+        \node[align=left,below=0em of sh_recved] (dhe_ss_c) {$g^{xy}\leftarrow (\pk^\dhe_s)^x$};
+        \node[below=0em of sh_sent] (dhe_ss_s) {$g^{xy}\leftarrow (\pk^\dhe_c)^y$};
         \node[below=2em of dhe_ss_c] (stage12_c) {};
         \node[below=2em of dhe_ss_s] (stage12_s) {};
-        \draw[dashed] (stage12_c) -- (stage12_s) node[midway,above,align=center] {
+        \draw[dashed, very thick] (stage12_c) -- (stage12_s) node[midway,above,align=center] {
             $\texttt{HS}\leftarrow\texttt{HKDF.Extract}(\text{dES}, g^{xy})$ \\
             $\texttt{\color{blue} CHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS,"c hs traffic",CH..SH})$ \\
             $\texttt{\color{blue} SHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS,"s hs traffic",CH..SH})$
@@ -735,24 +729,24 @@ In TLS 1.3, the handshake can be further divided into two phases: \begin{enumera
         % encrypted extensions, aka server parameters
         \node[below=1em of stage12_c] (serverparams_c) {};
         \node[below=1em of stage12_s] (serverparams_s) {};
-        \draw[->] (serverparams_s) -- (serverparams_c) node[midway,above] {\color{blue}
+        \draw[->, very thick] (serverparams_s) -- (serverparams_c) node[midway,above] {\color{blue}
             $\{\texttt{EncryptedExtensions}\}_\texttt{SHTS}$
         };
 
         % certificates
         \node[below=1em of serverparams_c] (certs_recv) {};
         \node[below=1em of serverparams_s] (certs_send) {};
-        \draw[->] (certs_send) -- (certs_recv) node[midway,above,align=center] {\color{blue}
+        \draw[->, very thick] (certs_send) -- (certs_recv) node[midway,above,align=center] {\color{blue}
             $\{\texttt{Certificate}\}_\texttt{SHTS}$
         };
 
         % construct CertificateVerify
         \node[below=0em of certs_recv] (cv_wait) {
-            Verify $\pk^\text{SIG}_s$ using 
-            $\pk^\text{SIG}_\text{root}$
+            Verify $\pk^\sig_s$ using 
+            $\pk^\sig_\text{root}$
         };
         \node[below=0em of certs_send] (cv) {
-            $\sigma \leftsample \sign(\sk^\text{SIG}_s, \texttt{CH..CERT})$
+            $\sigma \leftsample \sign(\sk^\sig_s, \texttt{CH..CERT})$
         };
 
         % send CertificateVerify
@@ -760,42 +754,42 @@ In TLS 1.3, the handshake can be further divided into two phases: \begin{enumera
         };
         \node[below=1em of cv] (cv_send) {
         };
-        \draw[->] (cv_send) -- (cv_recv) node[midway,above] {\color{blue}
+        \draw[->, very thick] (cv_send) -- (cv_recv) node[midway,above] {\color{blue}
             $\{\texttt{CertificateVerify}[\sigma]\}_\texttt{SHTS}$
         };
 
         % derive finished keys
         \node[below=2em of cv_recv] (finkey_c) {};
         \node[below=2em of cv_send] (finkey_s) {};
-        \draw[dashed] (finkey_c) -- (finkey_s) node[midway,above,align=center] {
-            $\texttt{FKey}_s \leftarrow \texttt{HKDF.Expand(SHTS, "finished", "")}$ \\
-            $\texttt{FKey}_c \leftarrow \texttt{HKDF.Expand(CHTS, "finished", "")}$
+        \draw[dashed, very thick] (finkey_c) -- (finkey_s) node[midway,above,align=center] {
+            $\operatorname{fk}_s \leftarrow \texttt{HKDF.Expand(SHTS, "finished", "")}$ \\
+            $\operatorname{fk}_c \leftarrow \texttt{HKDF.Expand(CHTS, "finished", "")}$
         };
 
         % construct server finished
         \node[below=0em of finkey_c] (sfin_wait) {
-            $\verify(\pk^\text{SIG}_s, \texttt{CH..CERT}, \sigma) \stackrel{?}{=} 1$
+            accept iff $\verify(\pk^\sig_s, \texttt{CH..CERT}, \sigma) = 1$
         };
         \node[below=0em of finkey_s] (sfin) {
-            $t_s \leftarrow \texttt{HMAC}(\texttt{FKey}_s, \texttt{CH..CV})$
+            $t_s \leftarrow \texttt{HMAC}(\operatorname{fk}_s, \texttt{CH..CV})$
         };
 
         % send server finished
         \node[below=1em of sfin_wait] (sfin_recv) {};
         \node[below=1em of sfin] (sfin_send) {};
-        \draw[->] (sfin_send) -- (sfin_recv) node[midway,above] {\color{blue}
+        \draw[->, very thick] (sfin_send) -- (sfin_recv) node[midway,above] {\color{blue}
             $\{\texttt{Finished}[t_s]\}_\texttt{SHTS}$
         };
 
         % client verified ServerFinished
         \node[below=0em of sfin_recv] (sfin_verify) {
-            $\texttt{HMAC}(\texttt{FKey}_s, \texttt{CH..CV}) \stackrel{?}{=} t_s$
+            accept iff $\texttt{HMAC}(\operatorname{fk}_s, \texttt{CH..CV}) = t_s$
         };
 
         % derive MS, app traffic keys
         \node[below=6em of sfin_recv] (stage34_c) {};
         \node[below=6em of sfin_send] (stage34_s) {};
-        \draw[dashed] (stage34_s) -- (stage34_c) node[midway,above,align=center] {
+        \draw[dashed, very thick] (stage34_s) -- (stage34_c) node[midway,above,align=center] {
             $\texttt{dHS} \leftarrow \texttt{HKDF.Expand(HS, "derived", "")}$ \\
             $\texttt{MS} \leftarrow \texttt{HKDF.Extract(0,dHS)}$ \\
             $\texttt{\color{red} SATS} \leftarrow \texttt{HKDF.Expand(MS, "s ap traffic", CH..SF)}$ \\
@@ -805,38 +799,38 @@ In TLS 1.3, the handshake can be further divided into two phases: \begin{enumera
         % early app traffic from server
         \node[below=1em of stage34_c] (early_app_c) {};
         \node[below=1em of stage34_s] (early_app_s) {};
-        \draw[->] (early_app_s) -- (early_app_c) node[midway,above]{\color{red}
+        \draw[->, very thick] (early_app_s) -- (early_app_c) node[midway,above]{\color{red}
             $\{\texttt{application data}\}_\texttt{SATS}$
         };
 
         % client constructs finished
         \node[below=0em of early_app_c] (cfin) {
-            $t_c \leftarrow \texttt{HMAC}(\texttt{FKey}_c, \texttt{CH..CV})$
+            $t_c \leftarrow \texttt{HMAC}(\operatorname{fk}_c, \texttt{CH..CV})$
         };
         \node[align=left,below=0em of early_app_s] (cfin_wait) {\\};
 
         % client sends finished
         \node[below=0em of cfin] (cfin_send) {};
         \node[below=0em of cfin_wait] (cfin_recv) {};
-        \draw[->] (cfin_send) -- (cfin_recv) node[midway,above] {\color{blue}
+        \draw[->, very thick] (cfin_send) -- (cfin_recv) node[midway,above] {\color{blue}
             $\{\texttt{Finished}[t_c]\}_\texttt{CHTS}$
         };
 
         % server verifies client's Finished
         \node[align=left,below=0em of cfin_send] (cfin_verify_wait) {\\};
         \node[below=0em of cfin_recv] (cfin_verify) {
-            $\texttt{HMAC}(\texttt{FKey}_c, \texttt{CH..CV}) \stackrel{?}{=} t_c$
+            accept if $\texttt{HMAC}(\operatorname{fk}_c, \texttt{CH..CV}) = t_c$
         };
 
         % TODO: actual application data
         \node[below=0em of cfin_verify_wait] (app_c_send) {};
         \node[below=0em of cfin_verify] (app_c_recv) {};
-        \draw[->] (app_c_send) -- (app_c_recv) node[midway,above] {\color{red}
+        \draw[->, very thick] (app_c_send) -- (app_c_recv) node[midway,above] {\color{red}
             $\{\texttt{application data}\}_\texttt{CATS}$
         };
         \node[below=1em of app_c_send] (app_s_recv) {};
         \node[below=1em of app_c_recv] (app_s_send) {};
-        \draw[->] (app_s_send) -- (app_s_recv) node[midway,above] {\color{red}
+        \draw[->, very thick] (app_s_send) -- (app_s_recv) node[midway,above] {\color{red}
             $\{\texttt{application data}\}_\texttt{SATS}$
         };
     \end{tikzpicture}
@@ -844,20 +838,53 @@ In TLS 1.3, the handshake can be further divided into two phases: \begin{enumera
     \label{fig:tls13-handshake}
 \end{figure}
 
-\subsection{Certificate-based authentication}
-Authentication in TLS 1.3 relies on digital signatures and X.509 certificates. Figure \ref{fig:certificate-chain-and-pki} illustrates a certificate chain.
+\paragraph{Ephemeral key exchange} To achieve forward secrecy, TLS 1.3 requires using (elliptic-curve) ephemeral Diffie-Hellman key exchange (ECDHE)\footnote{Finite-field Diffie-Hellman is supported but very rarely used} to establish shared secret between client and server.
+The ephemeral key exchange is performed with the \texttt{ClientHello} and subsequent \texttt{ServerHello} messages.
+First, client chooses one of the pre-defined Diffie-Hellman parameter sets, which typically consists of a group $(G, \cdot)$ and a basepoint $g\in G$ that generates a subgroup of prime order $q$.
+The client then samples a random number $x \leftsample \mathbb{Z}_q$ as its ephemeral secret key and computes the corresponding public key $\pk^\dhe_c$.
+Client also samples a 256-bit random number $r_c \leftsample \{0,1\}^{256}$, which is included in \texttt{ClientHello} to mitigate replay attacks.
+Client sends $\pk^\dhe_c$ and $r_c$ in \texttt{ClientHello} to the server.
+
+If server supports client's choice of $(G, g)$, then it samples another $y \leftsample \mathbb{Z}_q$ as server's secret key, computes $\pk^\dhe_s\leftarrow g^y$, and generates its random bits $r_s \leftsample \{0,1\}^{256}$. $\pk^\dhe_s$ and $r_s$ are included in \texttt{ServerHello} and sent to the client. 
+At this point, server and client can each compute the Diffie-Hellman shared secret: client computes $g^{xy}\leftarrow (\pk^\dhe_s)^x$ and server computes $g^{xy}\leftarrow (\pk^\dhe_c)^y$.
+The shared secret $g^{xy}$ and the nonces $r_c, r_s$ are fed into a key derivation function (KDF) to first derive the \emph{Handshake Secret (HS)}: $\texttt{HS} \leftarrow \texttt{HKDF.Extract}(g^{xy}, \texttt{CH..SH}, \ldots)$.
+A pair of secret keys called \emph{client handshake traffic secret (CHTS)} and \emph{server handshake traffic secret (SHTS)} are subsequently derived from HS.
+All remaining handshake messages are encrypted under these two keys: message sent by server is encrypted under SHTS, while message sent by client is encrypted under CHTS.
+Figure \ref{fig:tls13-handshake} color-coded these two secret keys and messages encrypted under them.
+
+\paragraph{Authentication} In a unilaterally authenticated TLS handshake, the server needs to prove its identity to the client, which is accomplished with three messages \texttt{Certificate}, \texttt{CertificateVerify}, and \texttt{Finished}.
+These three messages are sent together, and after sending \texttt{Finished}, server can start sending application data.
+On the other hand, after finishing processing these messages, client will send its own \texttt{Finished} and can start sending application data.
+Hence we say client finishes handshake with one round trip (1-RTT) while server finishes handshake with zero round trip.
+
+The \texttt{Certificate} message contains a sequence of X.509 public-key certificates, where each certificate contains some identity, a cryptographic public key, and a digital signature (see Appendix \ref{sec:x509-certificate} for an example).
+The certificate chain binds a cryptographic public key $\pk^\sig_s$ to the server's identity (details are discussed in Section \ref{sec:public-key-infrastructure}), and the server authenticates itself by proving ownership of the corresponding secret key $\pk^\sig_s$.
+TLS 1.3 requires signature-based authentication, so server proves ownership by signing the handshake transcript: $\sigma \leftsample \texttt{SIG.Sign}(\sk^\sig_s, \texttt{CH..CERT})$.
+$\sigma$ is included in \texttt{CertificateVerify} and sent to the client.
+Server's final handshake message is \texttt{Finished}, which contains an HMAC tag $t_s \leftarrow \texttt{HMAC}(\operatorname{fk}_s, \texttt{CH..CV})$ computed over the handshake transcript.
+The HMAC secret key $\operatorname{fk}_s$ are derived from SHTS.
+The \texttt{Finished} message ensures the integrity of the handshake and of the computed keys.
+If the client accepts server's \texttt{Certificate}, \texttt{CertificateVerify}, and \texttt{Finished}, then it sends its own \texttt{Finished} containing an HMAC tag $t_c\leftarrow\texttt{HMAC}(\operatorname{fk}_c, \texttt{CH..SF})$ computer under a secret key $\operatorname{fk}_c$ derived from CHTS.
+
+At the end of the handshake, client and server each updates its internal secrets and derive another pair of secret keys called \emph{client application traffic keys (CATS)} and \emph{server application traffic keys (SATS)}.
+This process is discussed in details in Section \ref{sec:tls13-key-schedule}.
+Application data sent by client and server is respectively encrypted using CATS and SATS.
+
+\subsection{Public-key Infrastructure (PKI)}\label{sec:public-key-infrastructure}
+A server's cryptographic public key is bound to its identity using X.509 public-key certificates. Figure \ref{fig:certificate-chain-and-pki} illustrates a certificate chain.
 
 \begin{figure}[htbp]
+    % TODO: add Certificate and Certificate Verify, separate online/offline signatures
     \centering
     \begin{tikzpicture}[node distance=2em and 2.5cm, font=\footnotesize]
         \node[draw,rectangle,align=left] (leaf_key) {
             {\bf Server}[$\sk_s$]
         };
         \node[draw,rectangle,align=left,right=5em of leaf_key] (int_key) {
-            {\bf Intermediate CA}[$\sk^\text{SIG}_\text{IntCA}$]
+            {\bf Intermediate CA}[$\sk^\sig_\text{IntCA}$]
         };
         \node[draw,rectangle,align=left,right=5em of int_key] (root_key) {
-            {\bf Root CA}[$\sk^\text{SIG}_\text{RootCA}$]
+            {\bf Root CA}[$\sk^\sig_\text{RootCA}$]
         };
         \node[draw,rectangle,align=left,below=5em of leaf_key] (leaf_cert) {
             \textbf{Leaf Certificate} \\
@@ -868,21 +895,21 @@ Authentication in TLS 1.3 relies on digital signatures and X.509 certificates. F
         \node[draw,rectangle,align=left,below=5em of int_key] (int_cert) {
             \textbf{Int CA Certificate} \\
             $\texttt{Id}_\text{IntCA}$[Subj,Issuer,...] \\
-            $\pk_\text{IntCA}^\text{SIG}$ \\
+            $\pk_\text{IntCA}^\sig$ \\
             $\sigma_\text{IntCA}$
         };
         \node[draw,rectangle,align=left,below=5em of root_key] (root_cert) {
             \textbf{Root CA Certificate} \\
             $\texttt{Id}_\text{RootCA}$[Subj,Issuer,...] \\
-            $\pk_\text{RootCA}^\text{SIG}$ \\
+            $\pk_\text{RootCA}^\sig$ \\
             $\sigma_\text{RootCA}$
         };
-        \draw[->] (int_key) -- (leaf_cert) node[midway,above] {Signs};
-        \draw[->] (int_cert) -- (leaf_cert) node[midway,above] {Verifies};
-        \draw[->] (root_key) -- (int_cert) node[midway,above] {Signs};
-        \draw[->] (root_cert) -- (int_cert) node[midway,above] {Verifies};
-        \draw[->] (root_key) -- (root_cert) node[midway,left] {Signs};
-        \path[<->] (root_cert)
+        \draw[->, very thick] (int_key) -- (leaf_cert) node[midway,above] {Signs};
+        \draw[->, very thick] (int_cert) -- (leaf_cert) node[midway,above] {Verifies};
+        \draw[->, very thick] (root_key) -- (int_cert) node[midway,above] {Signs};
+        \draw[->, very thick] (root_cert) -- (int_cert) node[midway,above] {Verifies};
+        \draw[->, very thick] (root_key) -- (root_cert) node[midway,left] {Signs};
+        \path[<->, very thick] (root_cert)
             % edge (below)
             edge [loop below] node {Verifies} ()
         ;
@@ -894,7 +921,7 @@ Authentication in TLS 1.3 relies on digital signatures and X.509 certificates. F
 
 Each X.509 certificate encodes three pieces of information: identities of the issuer and the subject, a cryptographic public key, and a cryptographic signature over the identity and the public key. 
 Through this signature, the issuer testifies the subject's ownership of the public key and binds the public key to the identity.
-The signature of the issuer is verified using the issuer's public key, which is usually presented via another certificate of identical format.
+The signature of the issuer is verified using the issuer's public key, which is usually presented on another public-key certificate.
 This creates a chain of trust in which each certificate is verified by the public key in another certificate, up to the root of trust, which is usually a self-signed certificate whose signature is verified by the public key on the same certificate.
 
 The \textit{Public Key Infrastructure (PKI)} consists of entities that play different roles in this chain of trust.
@@ -902,7 +929,7 @@ The server (and optionally client) is the leaf node of the chain, and the entiti
 The root of this chain is thus referred to as \textit{root CA}, while other issuers between the leaf and the root are referred to as intermediate CAs.
 A selection of trusted root CA certificates are typically pre-installed in client devices by the vendors (e.g. Google, Mozilla, Apple, Microsoft, etc.).
 
-\subsection{Key schedule and HKDF}
+\subsection{Key schedule and HKDF}\label{sec:tls13-key-schedule}
 \begin{figure}[htbp]
     \centering
      \begin{tikzpicture}[node distance=2em and 2.5cm, font=\footnotesize]
@@ -912,9 +939,9 @@ A selection of trusted root CA certificates are typically pre-installed in clien
          };
          \node[draw,rectangle,right=3.5em of hs,align=left] (chts) {
             $\texttt{\color{blue}CHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS, "c hs traffic", ...})$ \\
-            $\texttt{FKey}_c \leftarrow \texttt{HKDF.Expand(CHTS, "finished", "")}$ \\
+            $\operatorname{fk}_c \leftarrow \texttt{HKDF.Expand(CHTS, "finished", "")}$ \\
             $\texttt{\color{blue}SHTS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS, "s hs traffic", ...})$ \\
-            $\texttt{FKey}_s \leftarrow \texttt{HKDF.Expand(SHTS, "finished", "")}$
+            $\operatorname{fk}_s \leftarrow \texttt{HKDF.Expand(SHTS, "finished", "")}$
          };
          \node[draw,rectangle,align=left,below=4em of hs] (dhs) {
             $\texttt{dHS} \leftarrow \texttt{HKDF.Expand}(\texttt{HS, "derived",...})$ \\
@@ -924,10 +951,10 @@ A selection of trusted root CA certificates are typically pre-installed in clien
             $\texttt{\color{red} SATS} \leftarrow \texttt{HKDF.Expand(MS, "s ap traffic", CH..SF)}$ \\
             $\texttt{\color{red} CATS} \leftarrow \texttt{HKDF.Expand(MS, "c ap traffic", CH..SF)}$
          };
-         \draw[->] (gxy) -- (hs);
-         \draw[->] (hs) -- (chts);
-         \draw[->] (hs) -- (dhs);
-         \draw[->] (dhs) -- (ats);
+         \draw[->, very thick] (gxy) -- (hs);
+         \draw[->, very thick] (hs) -- (chts);
+         \draw[->, very thick] (hs) -- (dhs);
+         \draw[->, very thick] (dhs) -- (ats);
     \end{tikzpicture}
     \caption{HKDF in TLS 1.3 key schedule}
     \label{fig:tls13-key-schedule}
@@ -935,53 +962,44 @@ A selection of trusted root CA certificates are typically pre-installed in clien
 
 TLS 1.3 uses the HMAC-based Key Derivation Function (HKDF) \cite{DBLP:journals/rfc/rfc5869} to derive cryptographic keys from input keying material (Figure \ref{fig:tls13-key-schedule}).
 Using an extract-and-expand KDF is necessary because the $n$-bit shared secret obtained from public-key cryptography (e.g. $g^{xy}$ in a Diffie-Hellman key exchange) is not a uniformly random $n$-bit string \cite{DBLP:conf/crypto/Krawczyk10}. 
-Instead, it typically contains fewer bits of computational entropy.
-\footnote{\scriptsize As stated in \cite{DBLP:conf/crypto/Krawczyk10}, an adversary with knowledge of $g^x$ and $g^y$ can deterministically compute $g^{xy}$, implying that the statistical entropy of $g^{xy}$ given $g^x$ and $g^y$ is zero.}
+Instead, it typically contains fewer bits of {\it computational} entropy\footnote{\scriptsize As stated in \cite{DBLP:conf/crypto/Krawczyk10}, an adversary with knowledge of $g^x$ and $g^y$ can deterministically compute $g^{xy}$, implying that the statistical entropy of $g^{xy}$ given $g^x$ and $g^y$ is zero.}.
 
 In TLS 1.3, the function \texttt{HKDF.Extract} serves as an entropy extractor that concentrates the available randomness in the input keying material. 
-Another critical function of HKDF in TLS 1.3 is to derive computationally independent keys via \texttt{HKDF.Expand}.
-As illustrated in Figure~\ref{fig:tls13-handshake}, all handshake messages following \texttt{ServerHello}, as well as all application data, are encrypted using different symmetric keys.
+Another critical function of HKDFis to derive computationally independent keys via \texttt{HKDF.Expand}.
+As illustrated in Figure \ref{fig:tls13-handshake}, all handshake messages following \texttt{ServerHello}, as well as all application data, are encrypted using different symmetric keys.
 Specifically, handshake messages are protected using a pair of handshake traffic keys—client handshake traffic secret (CHTS) and server handshake traffic secret (SHTS)—while application data is encrypted under a separate pair of application traffic keys—client application traffic secret (CATS) and server application traffic secret (SATS).
 Additionally, there is a unique symmetric key for each party to produce the HMAC tag used in their respective \texttt{Finished} messages.
 According to the HKDF model described in \cite{DBLP:conf/eurosp/KrawczykW16,DBLP:conf/crypto/Krawczyk10}, each of these keys—CATS, SATS, CHTS, SHTS, the client finished key, and the server finished key—is computationally independent from all others.
 
 \subsection{Security analysis}\label{sec:tls13-security-analysis}
-Formal security analysis of TLS 1.3 follows from a long line of work \cite{DBLP:conf/crypto/BellareR93,DBLP:conf/ccs/FischlinG14,DBLP:conf/ccs/DowlingFGS15,DBLP:journals/iacr/DowlingFGS16,DBLP:conf/eurosp/FischlinG17} modeling the security of multi-stage authenticated key exchange protocols.
-Here we provide a high-level description of the model used in \cite{DBLP:journals/joc/DowlingFGS21}, although we are glossing over an enormous amount of nuance, and we refer readers to the original paper for rigorous definitions and details.
+In the same way the TLS protocol consists of the handshake sub-protocol and the application layer, TLS protocol's security is broken down into two components.
+Assuming that the client and the server have already established a shared secret, the security of the application layer follows the model of authenticated encryption, which is outside this thesis' scope.
+Here we focus on the security of the handshake sub-protocol.
 
-The primary security goal of TLS 1.3 is \textit{key indistinguishability}, which means that an adversary cannot distinguish secret keys in ``fresh'' sessions from random keys after interacting with many honest parties across many sessions.
-By extending the security game across multiple connections with multiple parties, {\sf MultiStage} security captures auxiliary security goals like forward secrecy and replay attack/downgrade attack resilience.
-The adversary is a probabilistic polynomial-time Turing machine and can perform a number of malicious actions through various oracles across multiple sessions, including: \begin{itemize}
-    \item Fooling any honest party into starting a new session with any other honest party ({\sf NewSession} oracle)
-    \item Sending any message to any party ({\sf Send} oracle)
-    \item Reveal a chosen session key ({\sf Reveal} oracle), although a session is no longer considered ``fresh'' if a session key has been revealed
-    \item Compromise the long-term secret of any chosen party ({\sf Corrupt} oracle)
-\end{itemize}
-There are a few constraints on the adversary to prevent trivial wins.
-For example, the adversary cannot trivially compromise the shared secret from a Diffie-Hellman key exchange.
-TLS is simply not designed to be secure under these attacks.
+The handshake protocol is primarily modeled as an authenticated key exchange \cite{DBLP:conf/crypto/BellareR93}, but there are additional nuances to consider.
+First, a TLS handshake produces multiple symmetric keys (CHTS, SHTS, $\operatorname{fk}_c$, $\operatorname{fk}_s$, CATS, SATS), and the protocol would be considered insecure if any of these keys can be compromised.
+Second, an adversary can execute attacks across multiple connections involving any number of parties, and we need to account for the possibility that the adversary may compromise any long-term secret keys.
+Resisting replays attacks and forward secrecy both fall under the second consideration.
 
-At the beginning of the security game, a challenger decides with a coin toss $b\leftsample\{0,1\}$ whether the adversary is in a ``NULL'' experiment ($b = 0$) or not ($b = 1$).
-During the game, the adversary is given one more {\sf Test} oracle that can be queried with any session key identifier.
-If the session key identifier is invalid (or some other conditions preventing trivial wins are not fulfilled), then the oracle will reject the query.
-Otherwise, the oracle will return random key or the actual session key depending on the type of experiment.
-The game ends when the adversary outputs a guess $\hat{b}\in\{0,1\}$ at the type of experiment and wins if the guess is correct.
+The security model that is based on authenticated key exchange but also includes all considerations mentioned above is called multi-stage security \cite{DBLP:conf/ccs/FischlinG14,DBLP:phd/dnb/Gunther18}, whose primary objective is \emph{key indistinguishability} \cite{DBLP:conf/ccs/BrzuskaFWW11} for all keys derived while under active attacks.
+Under this model, a series of works \cite{DBLP:conf/ccs/DowlingFGS15,DBLP:journals/iacr/DowlingFGS16,DBLP:journals/joc/DowlingFGS21} proved that TLS 1.3 is multi-stage secure if the nonces are sufficiently long, the underlying hash function is collision resistant, the signature and HMAC are existentially unforgeable (EUF-CMA), the Diffie-Hellman key exchange is secure (PRF-ODH \cite{DBLP:conf/crypto/BrendelF0J17}), and the KDF is a secure PRF.
 
-Under this model, \cite{DBLP:journals/joc/DowlingFGS21} proved that TLS 1.3 is {\sf MultiStage} secure if the underlying hash function is collision resistant, the signature is existentially unforgeable (EUF-CMA), the Diffie-Hellman key exchange is secure (PRF-ODH), and the KDF is a secure PRF.
-
-\begin{theorem}[Multi-Stage security of \texttt{TLS1.3-full-1RTT}]\label{thm:tls13-multi-stage-security}
+\begin{theorem}[Multi-Stage security of \texttt{TLS1.3-full-1RTT} \cite{DBLP:journals/joc/DowlingFGS21}]\label{thm:tls13-multi-stage-security}
 For any efficient adversary $\mathcal{A}$ against the Multi-Stage security there exist efficient algorithms $\mathcal{B}_1, \ldots, \mathcal{B}_7$ \emph{such that}
 
 \begin{equation*}
-    \adv^{\texttt{Multi-stage}}_\texttt{TLS1.3-full-1RTT}(\mathcal{A}) \leq 2n_s\left(
+    \adv^{\texttt{multi-stage}}_\texttt{TLS1.3}(\mathcal{A}) \leq 
+        \frac{n_s^2}{2^{\vert \text{nonce} \vert}}
+        + \adv^\text{COLL}_{H}(\mathcal{B}_1)
+        + 2n_s\left(
         \begin{aligned}
             & \adv^\text{COLL}_{H}(\mathcal{B}_1)
-                + n_u \cdot \adv^\text{EUF-CMA}_\text{SIG}(\mathcal{B}_2) \\
+                + n_u \cdot \adv^\text{EUF-CMA}_\sig(\mathcal{B}_2) \\
             & + n_s \left(\begin{aligned}
-                & \adv^\text{dual-snPRF-ODH}_{\texttt{HKDS.Extract},\text{ECDHE}}(\mathcal{B}_3)
-                    + \adv^\text{PRF}_\texttt{HKDF.Expand}(\mathcal{B}_4) \\
-                & + 2\cdot\adv^{\text{PRF}}_\texttt{HKDF.Expand}(\mathcal{B}_5)
-                    + \adv^\text{PRF}_\texttt{HKDF.Extract}(\mathcal{B}_6) \\
+                & \adv^\text{dual-snPRF-ODH}_{\texttt{HKDS.Extract},\text{ECDHE}}(\mathcal{B}_3) \\
+                & + \adv^\text{PRF}_\texttt{HKDF.Expand}(\mathcal{B}_4) \\
+                & + 2\cdot\adv^{\text{PRF}}_\texttt{HKDF.Expand}(\mathcal{B}_5) \\
+                & + \adv^\text{PRF}_\texttt{HKDF.Extract}(\mathcal{B}_6) \\
                 & + \adv^\text{PRF}_\texttt{HKDF.Expand}(\mathcal{B}_7)
             \end{aligned}\right)
         \end{aligned}
@@ -991,10 +1009,12 @@ For any efficient adversary $\mathcal{A}$ against the Multi-Stage security there
 where $n_s$ is the maximum number of sessions and $n_u$ is the maximum number of users.
 \end{theorem}
 
-There is unfortunately no formal analysis for TLS 1.3 using KEM instead of Diffie-Hellman for key exchange, although we speculate that the security results from Section \ref{sec:kemtls-security} can be retrofitted to replace the PRF-ODH assumption with IND-1CCA assumtion.
+With the transition to PQ-TLS, we need to replace ephemeral Diffie-Hellman key exchange with post-quantum KEMs.
+There is unfortunately no formal analysis for TLS 1.3 using KEM instead of Diffie-Hellman for key exchange, although we speculate that the security results from Section \ref{sec:kemtls-security} can be retrofitted to replace the PRF-ODH assumption with IND-1CCA assumption.
+We will discuss the possibility of using passively secure KEM for ephemeral key exchange in Section \ref{sec:ind-1cca-discussion}.
 
 \section{KEMTLS}\label{sec:kemtls}
-KEMTLS \cite{DBLP:conf/ccs/SchwabeSW20}, first proposed by Schwabe, Stebila, and Wiggers in 2020, is a variation on TLS 1.3 that uses key encapsulation mechanism (KEM) instead of digital signature for peer authentication.
+KEMTLS \cite{DBLP:conf/ccs/SchwabeSW20,DBLP:conf/acns/GuntherRTW22,DBLP:conf/esorics/SchwabeSW21}, first proposed by Schwabe, Stebila, and Wiggers in 2020, is a variation on TLS 1.3 that uses key encapsulation mechanism (KEM) instead of digital signature for peer authentication.
 KEMTLS is motivatd by the observation that post-quantum signature candidates generally have larger public key and signature than post-quantum KEM candidates' public key and ciphertext, so by using KEMs instead of signatures, one can obtain significant savings in communication sizes.
 
 Section \ref{sec:kemtls-handshake} will introduce the KEMTLS handshake workflow. Section \ref{sec:kemtls-security} will review the security properties of KEMTLS and compare them with TLS 1.3.
@@ -1008,7 +1028,7 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         \node[draw,rectangle] (client) {Client};
         \node[draw,rectangle] (server) at (10,0) {Server};
 
-        \draw[<->] (client) -- (server) node[midway,above] {TCP-SYN} node[midway,below] {TCP SYN-ACK};
+        \draw[<->, very thick] (client) -- (server) node[midway,above] {TCP-SYN} node[midway,below] {TCP SYN-ACK};
 
         % Making ClientHello, waiting for ClientHello
         \node[align=left,below=0em of client] (ch) {
@@ -1020,7 +1040,7 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % Sending ClientHello, receiving ClientHello
         \node[below=-0.5em of ch] (ch_send) {};
         \node[below=-0.5em of ch_wait] (ch_recv) {};
-        \draw[->] (ch_send) -- (ch_recv) node[midway,above] {
+        \draw[->, very thick] (ch_send) -- (ch_recv) node[midway,above] {
             $\texttt{ClientHello}[\pk_e, r_c]$
         };
 
@@ -1034,13 +1054,13 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % Send ServerHello, receive ServerHello
         \node[below=0em of sh_wait] (sh_recv) {};
         \node[below=0em of sh] (sh_send) {};
-        \draw[->] (sh_send) -- (sh_recv) node[midway,above] {$\texttt{ServerHello}[\texttt{ct}_e, r_s]$};
+        \draw[->, very thick] (sh_send) -- (sh_recv) node[midway,above] {$\texttt{ServerHello}[\texttt{ct}_e, r_s]$};
 
         % Derive handshake traffic keys
         \node[below=0em of sh_recv] (sh_process) {$\texttt{ss}_e\leftarrow\kem_e\texttt{.Decap}(\sk_e, \texttt{ct}_e)$};
         \node[below=5.5em of sh_recv] (stage12_c) {};
         \node[below=5.5em of sh_send] (stage12_s) {};
-        \draw[dashed] (stage12_c) -- (stage12_s) node[midway,above,align=center] {
+        \draw[dashed, very thick] (stage12_c) -- (stage12_s) node[midway,above,align=center] {
             $\text{HS} \leftarrow \texttt{HKDF.Extract}(\text{...}, \texttt{ss}_e)$ \\
             $\text{\color{blue} CHTS} \leftarrow \texttt{HKDF.Expand}(\text{HS}, \texttt{"c hs traffic"}, \texttt{CH..SH})$ \\
             $\text{\color{blue} SHTS} \leftarrow \texttt{HKDF.Expand}(\text{HS}, \texttt{"s hs traffic"}, \texttt{CH..SH})$ \\
@@ -1050,14 +1070,14 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % Send/receive EncryptedExtensions
         % \node[below=1em of stage12_c] (encrypted_extensions_recv) {};
         % \node[below=1em of stage12_s] (encrypted_extensions_send) {};
-        % \draw[->] (encrypted_extensions_send) -- (encrypted_extensions_recv) node[midway,above] {\color{blue}
+        % \draw[->, very thick] (encrypted_extensions_send) -- (encrypted_extensions_recv) node[midway,above] {\color{blue}
             
         % };
 
         % send/receive Certificate
         \node[below=1em of stage12_c] (cert_recv) {};
         \node[below=1em of stage12_s] (cert_send) {};
-        \draw[->] (cert_send) -- (cert_recv) node[midway,above] {\color{blue}
+        \draw[->, very thick] (cert_send) -- (cert_recv) node[midway,above] {\color{blue}
             $\{\texttt{EncryptedExtensions}\}_\text{SHTS}$, $\{\texttt{Certificate}[\pk_s]\}_\text{SHTS}$
         };
 
@@ -1070,7 +1090,7 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % send/recv KemCiphertext
         \node[below=0em of kemct] (kemct_send) {};
         \node[below=0em of kemct_wait] (kemct_recv) {};
-        \draw[->] (kemct_send) -- (kemct_recv) node[midway,above] {\color{blue}
+        \draw[->, very thick] (kemct_send) -- (kemct_recv) node[midway,above] {\color{blue}
         $\{\texttt{KemCiphertext}[\texttt{ct}_s]\}_\text{CHTS}$}
         ;
 
@@ -1082,7 +1102,7 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % derive authenticated handshake traffic secrets
         \node[below=8.5em of kemct_send] (stage34_c) {};
         \node[below=8.5em of kemct_recv] (stage34_s) {};
-        \draw[dashed] (stage34_c) -- (stage34_s) node[midway,above,align=center] {
+        \draw[dashed, very thick] (stage34_c) -- (stage34_s) node[midway,above,align=center] {
             $\text{AHS}\leftarrow\texttt{HKDF.Extract}(\text{dHS},\texttt{ss}_s)$ \\
             $\text{\color{orange} CAHTS} \leftarrow \texttt{HKDF.Expand}(\text{AHS}, \texttt{"c ahs traffic"}, \texttt{CH..CKC})$ \\
             $\text{\color{orange} SAHTS} \leftarrow \texttt{HKDF.Expand}(\text{AHS}, \texttt{"s ahs traffic"}, \texttt{CH..CKC})$ \\
@@ -1101,7 +1121,7 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % send/recv client's Finished
         \node[below=0em of cfin] (cfin_send) {};
         \node[below=0em of cfin_wait] (cfin_recv) {};
-        \draw[->] (cfin_send) -- (cfin_recv) node[above,midway] {\color{orange}
+        \draw[->, very thick] (cfin_send) -- (cfin_recv) node[above,midway] {\color{orange}
             $\{\texttt{Finished}[t_c]\}_\text{CAHTS}$
         };
 
@@ -1113,12 +1133,12 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % client can start sending application traffic data
         \node[below=2.5em of cfin_send] (stage5_c) {};
         \node[below=2.5em of cfin_recv] (stage5_s) {};
-        \draw[dashed] (stage5_c) -- (stage5_s) node[midway,above] {
+        \draw[dashed, very thick] (stage5_c) -- (stage5_s) node[midway,above] {
             $\text{\color{red}CATS}\leftarrow\texttt{HKDF.Expand}(\text{MS}, \texttt{"c ap traffic"},\texttt{CH..CF})$
         };
         \node[below=1em of stage5_c] (c_app_send) {};
         \node[below=1em of stage5_s] (c_app_recv) {};
-        \draw[->] (c_app_send) -- (c_app_recv) node[midway,above]{\color{red}
+        \draw[->, very thick] (c_app_send) -- (c_app_recv) node[midway,above]{\color{red}
             $\{\text{application data}\}_\text{CATS}$
         };
 
@@ -1131,7 +1151,7 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % send/recv server finished
         \node[below=0em of sfin_wait] (sfin_recv) {};
         \node[below=0em of sfin] (sfin_send) {};
-        \draw[->] (sfin_send) -- (sfin_recv) node[midway,above] {\color{orange}
+        \draw[->, very thick] (sfin_send) -- (sfin_recv) node[midway,above] {\color{orange}
             $\{\texttt{Finished}[t_s]\}_\text{SAHTS}$
         };
         \node[below=0em of sfin_recv] (sfin_proc) {
@@ -1141,12 +1161,12 @@ Figure \ref{fig:kemtls-handshake} illustrates a KEMTLS handshake with unilateral
         % server can start sending application traffic data
         \node[below=2.5em of sfin_send] (stage6_c) {};
         \node[below=2.5em of sfin_recv] (stage6_s) {};
-        \draw[dashed] (stage6_c) -- (stage6_s) node[midway,above] {
+        \draw[dashed, very thick] (stage6_c) -- (stage6_s) node[midway,above] {
             $\text{\color{red}SATS}\leftarrow\texttt{HKDF.Expand}(\text{MS}, \texttt{"s ap traffic"},\texttt{CH..SF})$
         };
         \node[below=1em of stage6_c] (s_app_recv) {};
         \node[below=1em of stage6_s] (s_app_send) {};
-        \draw[->] (s_app_recv) -- (s_app_send) node[midway,above]{\color{red}
+        \draw[->, very thick] (s_app_recv) -- (s_app_send) node[midway,above]{\color{red}
             $\{\text{application data}\}_\text{SATS}$
         };
         
@@ -1182,11 +1202,10 @@ Last but not least, the \texttt{Finished} keys $\text{fk}_c, \text{fk}_s$ are de
 Like TLS 1.3, the \texttt{Finished} message contains an HMAC tag over the handshake transcript up to the point when the message is sent.
 Also like TLS 1.3, each party can derive the appropriate application traffic keys ({\color{red}CATS, SATS}) and start sending application data right after sending its own \texttt{Finished}.
 On the other hand, unlike TLS 1.3, the order of ``who first sends \texttt{Finished} and application'' is flipped: where in TLS 1.3, server sends \texttt{Finished} before client, in KEMTLS, client sends \texttt{Finished} before server.
-This means that from client's perspective, TLS 1.3 and KEMTLS require the same one round trip (1-RTT) of handshake messages before client can start sending application data.
+This means that from client's perspective, TLS 1.3 and KEMTLS handshake both require 1-RTT.
 From server's perspective, the number of round trips required before sending application data increased, but as \cite{DBLP:conf/ccs/SchwabeSW20} pointed out, in most TLS applications, client sends the first round of application data, so the increase of round trips for server is likely irrelevant to the latency of the application.
 The flipped order of \texttt{Finished} also has security implications, since client will be sending its first round of application data before having received server's \texttt{Finished}.
 We will discuss them in details in Section \ref{sec:kemtls-security}.
-
 
 \subsection{KEMTLS security}\label{sec:kemtls-security}
 KEMTLS has identical security goals to TLS 1.3.
@@ -1219,16 +1238,16 @@ These properties are formally stated by Theorem \ref{thm:multi-stage-sec-kemtls}
 \emph{A note on implicit authentication.} In TLS 1.3, client will not receive server's application data nor send its own application data until after it has received and validated server's \texttt{Finished}, which means that all application data exchanged are explicitly authenticated.
 In KEMTLS, however, client can start sending application data after sending its \texttt{Finished} but before receiving server's \texttt{Finished}.
 The application data sent before receiving server's \texttt{Finished} are encrypted under client's application traffic key, which contains entropy from the authentication secret $\texttt{ss}_s$.
-This means that, if $\kem_s$ is IND-CCA secure, then no party without the long-term seret key $\sk_s$ can correctly obtain the AEAD secret key.
+This means that, if $\kem_s$ is IND-CCA secure, then no party without the long-term seret key $\sk_s$ can learn anything about the application traffic keys.
 In other words, the early application data is \textbf{implicitly authenticated}.
 While this provides less security than explicitly authenticated application data, to this day there is no known attack exploiting the implicit authentication.
 In addition, explicit authentication can be achieved with just one more round trip, at which time KEMTLS becomes as secure as TLS 1.3 using comparable cryptographic primitives.
 
-\chapter{Faster ephemeral key exchange with IND-1CCA KEM}\label{sec:faster-tls-kex-w-ind-1cca-kem}
+\chapter{Faster ephemeral key exchange using the encrypt-then-MAC KEM transformation}\label{sec:faster-tls-kex-w-ind-1cca-kem}
 {\bf\underline{IND}}istinguishability under (adaptive) {\bf\underline C}hosen {\bf\underline C}iphertext {\bf\underline A}ttacks (IND-CCA) is the desired level of security for a key encapsulation mechanism. 
 Intuitively, IND-CCA security requires that the shared secret from a random encapsulation cannot be distinguished from random bit string of equal length with non-negligible probability, even when the adversary has access to a decapsulation oracle.
 Theoretically speaking, the number of decapsulation queries is bounded by the requirement that the adversary is ``efficient'': that is, the adversary, classical or quantum, can only have polynomial time complexity.
-In practice, NIST's PQC standardization project evaluates a candidate KEM's CCA security under the upper bound of $2^{64}$ decapsulation queries\cite{nist-pqc-security-criteria}.
+In practice, NIST's PQC standardization project evaluates a candidate KEM's CCA security under the upper bound of $2^{64}$ decapsulation queries \cite{nist-pqc-security-criteria}.
 
 However, within the context of an TLS 1.3 (and KEMTLS) key exchange, IND-CCA security is overkill.
 This is because TLS 1.3 is designed with forward secrecy, which requires that the keypair $(\pk_e, \sk_e)\leftsample\kem_e\texttt{.KeyGen}()$ exchanged in \texttt{ClientHello} and \texttt{ServerHello} be freshly generated at every session.
@@ -1239,7 +1258,7 @@ A similar notion of ``security under one query'' for Diffie-Hellman-style key ex
 On the other hand, using IND-1CCA security brings meaningful performance improvements.
 A popular strategy for building an IND-CCA secure KEM is to start with an IND-CPA secure public key encryption scheme (PKE), then apply some variation of the Fujisaki-Okamoto transformation \cite{DBLP:conf/crypto/FujisakiO99,DBLP:journals/joc/FujisakiO13,DBLP:conf/tcc/HofheinzHK17}.
 The key techniques for achieving chosen-ciphertext security in are \textit{de-randomization} and \textit{re-encryption}.
-While there is some contention on whether \textit{de-randomiation} hurts security \cite{cryptoeprint:2021/912} (which indirectly hurts performance because the same security level may require larger set of parameters), there is no doubt that \textit{re-encryption} hurts performance.
+While there is some contention on whether \textit{de-randomiation} hurts security \cite{cryptoeprint:2021/912} (which indirectly hurts performance because the same security level may require larger parameters), there is no doubt that \textit{re-encryption} hurts performance.
 The performance penalty of re-encryption is especially pronounced with many lattice-based cryptosystems whose CPA-secure encryption sub-routine is much slower than the CPA-secure decryption sub-routine.
 As we will show in the following section, IND-1CCA constructions can preserve randomization of the underlying PKE while not requiring re-encryption.
 
@@ -1249,8 +1268,8 @@ Section \ref{sec:performance-evaluation-of-otmlkem} presents the performance of 
 Finally, Section \ref{sec:ind-1cca-discussion} surveys and discusses related works.
 
 \section{The encrypt-then-MAC transformation}\label{sec:encrypt-then-mac-transformation}
-% TODO: Dumittan's T_CH transform derives SS from H(m) alone; I should do the same
 Let $\mathcal{B}^\ast$ denote the set of finite bit strings. Let $\mathcal{K}_\kem$ denote the set of all possible shared secrets. Let $(\keygen_\pke, \encrypt_\pke, \decrypt_\pke)$ be a PKE defined over message space $\mathcal{M}_\pke$ and ciphertext space $\mathcal{C}_\pke$. Let $\mac: \mathcal{K}_\mac \times \mathcal{B}^\ast \rightarrow \mathcal{T}$ be a MAC over key space $\mathcal{K}_\mac$ and tag space $\mathcal{T}$. Let $G: \mathcal{B}^\ast \rightarrow \mathcal{K}_\mac, H: \mathcal{B}^\ast \rightarrow \mathcal{K}_\kem$ be hash functions. The encrypt-then-MAC transformation $\etm[\pke,\mac,G,H]$ constructs a KEM $(\keygen_\etm, \encap_\etm, \decap_\etm)$ (Figure \ref{fig:etm-routines}).
+Definitions of these cryptographic primitives can be found in Appendix \ref{sec:cryptography-definitions}.
 
 \begin{figure}[htbp]
     \centering
@@ -1315,15 +1334,15 @@ From here, we can reduce OW-PCA security to OW-CPA security using a guessing arg
 Thus, the probability that all guesses are correct and PCA adversary retains its advantage is at most $2^{-q}$. In other words:
 
 \begin{lemma}\label{lem:pca-to-cpa-reduction}
-    For every efficient q-query OW-PCA adversary $A$ against some PKE, there exists some OW-CPA adversary $B$ such that
+    For every efficient q-query OW-PCA adversary $A$ against some PKE, there exists an OW-CPA adversary $B$ such that
 
     \begin{equation*}
-        \adv_\pke^{\text{OW-PCA}}(A) \leq 2^q\cdot \adv_\pke^{\text{OW-CPA}}(B)
+        \adv_\pke^{\texttt{OW-PCA}}(A) \leq 2^q\cdot \adv_\pke^{\texttt{OW-CPA}}(B)
     \end{equation*}
 \end{lemma}
 
 \subsection{Proof of Theorem \ref{thm:etm-is-ind-qcca-secure}}\label{sec:proof-of-etm-theorem}
-We will prove Theorem \ref{thm:etm-is-ind-qcca-secure} using a sequence of game. A summary of the the sequence of games can be found in Figure \ref{fig:etm-ind-cc2-sequence-of-games} and \ref{fig:ow-pca-simulates-game-3}. From a high level we made three incremental modifications to the IND-CCA game for $\kem_\etm$: \begin{enumerate}
+We will prove Theorem \ref{thm:etm-is-ind-qcca-secure} using a sequence of game. A summary of the sequence of games can be found in Figure \ref{fig:etm-ind-cc2-sequence-of-games} and \ref{fig:ow-pca-simulates-game-3}. From a high level we made three incremental modifications to the IND-CCA game for $\kem_\etm$: \begin{enumerate}
     \item Replace the true decapsulation oracle with a simulated decapsulation oracle. The simulated decapsulation oracle does not directly decrypt the queried ciphertext. Instead it searches through the hash oracle and looks for matching queries using the plaintext-checking oracle. The true decapsulation oracle and the simulated decapsulation oracle disagree if and only if the adversary queries with a ciphertext that contains a forged MAC tag, so the adversary cannot distinguish the two games more than it can perform existential forgery against the underlying MAC.
     \item Replace the pseudorandom MAC key $k^\ast \leftarrow G(m^\ast)$ with a uniformly random MAC key $k^\ast \leftsample \mathcal{K}_\mac$. Under ROM, the adversary cannot distinguish this game from the previous one unless it queries the hash oracle with $m^\ast$, in which case a second adversary with access to a plaintext-checking oracle can win the OW-PCA game against the underlying PKE.
     \item Replace the pseudorandom shared secret $K_0 \leftarrow H(m^\ast, c)$ with a truly random shared secret $K_0 \leftsample \mathcal{K}_\kem$. Similar to the point above, the adversary cannot distinguish the change more than it can break the one-wayness of the underlying PKE. Furthermore, since both $K_0$ and $K_1$ are uniformly random, no adversary can have any advantage.
@@ -1489,13 +1508,17 @@ A OW-PCA adversary can then simulate the modified IND-CCA game for the KEM adver
 
 
 \begin{proof}
-    \emph{Game 0} is the standard KEM IND-CCA game. The decapsulation oracle $\mathcal{O}^\decap$ executes the decapsulation routine using the challenge keypair and return the results faithfully. The queries made to the hash oracles $\mathcal{O}^G, \mathcal{O}^H$ are recorded to their respective tapes $\mathcal{L}^G, \mathcal{L}^H$.
+    \emph{Game 0} is the standard KEM IND-CCA game. 
+    The decapsulation oracle $\mathcal{O}^\decap$ executes the decapsulation routine using the challenge keypair and return the results faithfully. 
+    The queries made to the hash oracles $\mathcal{O}^G, \mathcal{O}^H$ are recorded to their respective tapes $\mathcal{L}^G, \mathcal{L}^H$.
 
     \emph{Game 1} is identical to game 0 except that the true decapsulation oracle $\mathcal{O}^\decap$ is replaced with a simulated oracle $\mathcal{O}^\decap_1$. Instead of directly decrypting $c^\prime$ as in the decapsulation routine, the simulated oracle searches through the tape $\mathcal{L}^G$ to find a matching query $(\tilde{m}, \tilde{k})$ such that $\tilde{m}$ is the decryption of $c^\prime$. The simulated oracle then uses $\tilde{k}$ to validate the tag $t$ against $c^\prime$.
 
     If the simulated oracle accepts the queried ciphertext as valid, then there is a matching query that also validates the tag, which means that the queried ciphertext is honestly generated. Therefore, the true oracle must also accept the queried ciphertext. On the other hand, if the true oracle rejects the queried ciphertext, then the tag is simply invalid under the MAC key $k = G(\decrypt(\sk^\prime, c^\prime))$. Therefore, there could not have been a matching query that also validates the tag, and the simulated oracle must also rejects the queried ciphertext.
 
-    This means that from the adversary $A$'s perspective, game 1 and game 0 differ only when the true oracle accepts while the simulated oracle rejects, which means that $t$ is a valid tag for $c^\prime$ under $k = G(\decrypt(\sk^\prime, c^\prime))$, but $k$ has never been queried. Under the random oracle model, such $k$ is a uniformly random sample of $\mathcal{K}_\mac$ that the adversary does not know, so for $A$ to produce a valid tag is to produce a forgery against the $\mac$ under an unknown and uniformly random key. Therefore, we can bound the probability that the true decapsulation oracle disagrees with the simulated oracle by the probability that some MAC adversary produces a forgery:
+    This means that from the adversary $A$'s perspective, game 1 and game 0 differ only when the true oracle accepts while the simulated oracle rejects, which means that $t$ is a valid tag for $c^\prime$ under $k = G(\decrypt(\sk^\prime, c^\prime))$, but $k$ has never been queried. 
+    Under the random oracle model, such $k$ is a uniformly random sample of $\mathcal{K}_\mac$ that the adversary does not know, so for $A$ to produce a valid tag is to produce a forgery against the MAC under an unknown and uniformly random key. 
+    Therefore, we can bound the probability that the true decapsulation oracle disagrees with the simulated oracle by the probability that some MAC adversary produces a forgery:
 
     \begin{equation*}
         P\left[\mathcal{O}^\decap(c) \neq \mathcal{O}^\decap_1(c)\right]
@@ -1581,17 +1604,18 @@ A OW-PCA adversary can then simulate the modified IND-CCA game for the KEM adver
         \end{algorithm}
     \end{minipage}
 
-    \caption{The $\kem^{\not\bot}_m$ variant of FO transformation\cite{DBLP:conf/tcc/HofheinzHK17} is used in ML-KEM}\label{fig:u-notbot-m-routines}
+    \caption{The $\kem^{\not\bot}_m$ variant of FO transformation \cite{DBLP:conf/tcc/HofheinzHK17} is used in ML-KEM}\label{fig:u-notbot-m-routines}
 \end{figure}
 
 ML-KEM is an IND-CCA secure KEM standardized by NIST in FIPS 203 \cite{FIPS203}.
 The CCA security of ML-KEM is achieved in two steps.
 The first step constructs a PKE (Figure \ref{fig:k-pke-routines}) whose IND-CPA security reduces to the conjectured intractability of the Decisional Module Learning with Error (MLWE) problem.
 Then the $\kem^{\not\bot}_m$ variant of the FO transformation (Figure \ref{fig:u-notbot-m-routines}) is applied to convert the IND-CPA secure PKE into an IND-CCA secure KEM.
+An algorithmic description of ML-KEM can be found in Appendix \ref{sec:review-ml-kem}.
 
 \subsection{One-time ML-KEM (OT-ML-KEM)}\label{sec:ot-ml-kem}
 We apply the encrypt-then-MAC transformation to the K-PKE routines of ML-KEM and call the transformed KEM \emph{one-time ML-KEM (OT-ML-KEM)} (Figure \ref{fig:ot-ml-kem-routines}).
-The key generation routines are identical between OT-ML-KEM and ML-KEM. The OT-ML-KEM encapsulation and decapsulation routines make additional use a {\sf MAC} and a {\sf KDF}.
+The key generation routines are identical between OT-ML-KEM and ML-KEM. The OT-ML-KEM encapsulation and decapsulation routines make additional use a MAC and a KDF.
 
 \begin{figure}[htbp]
     \centering
@@ -1645,27 +1669,27 @@ The key generation routines are identical between OT-ML-KEM and ML-KEM. The OT-M
 \end{figure}
 
 For performance and practical security, OT-ML-KEM makes two modifications to the encrypt-then-MAC transformation: \begin{itemize}
-    \item \emph{Hashing public key into {\sf MAC} key and shared secret.} The public key goes into deriving both the {\sf MAC} key and the shared secret for the same two reasons why Kyber \cite{DBLP:conf/eurosp/BosDKLLSSSS18} hashes its public key into the pseudorandom coin and the shared secret. 
+    \item \emph{Hashing public key into MAC key and shared secret.} The public key goes into deriving both the MAC key and the shared secret for the same two reasons why Kyber \cite{DBLP:conf/eurosp/BosDKLLSSSS18} hashes its public key into the pseudorandom coin and the shared secret. 
     First, we want the KEM to be \textit{contributory}, meaning both parties in a two-party key exchange have inputs into the shared secret.
-    Second, we want to enhance the KEM's multi-user security: if the {\sf MAC} key is derived from the PKE plaintext alone, then an adversary can pre-compute a large dictionary mapping {\sf MAC} keys to the pre-image PKE plaintext.
+    Second, we want to enhance the KEM's multi-user security: if the MAC key is derived from the PKE plaintext alone, then an adversary can pre-compute a large dictionary mapping MAC keys to the pre-image PKE plaintext.
     Upon receiving some ciphertext, this adversary can search through this key-plaintext dictionary and recover the decryption.
-    Hashing the public key into the {\sf MAC} key prevents an adversary from using a single lookup table against multiple keypairs.
-    \item \emph{Hashing the {\sf MAC} tag instead of the entire ciphertext.} Because we allowed the PKE to be randomized, the shared secret must have inputs from both the plaintext and the ciphertext. However, we find it unnecessary to hash the entire ciphertext.
-    Instead, if the {\sf MAC} is modeled as a secure pseudorandom function (PRF), then the {\sf MAC} tag functions as a (keyed) hash of the ciphertext, so we use the much shorter {\sf MAC} tag as a substitute.
+    Hashing the public key into the MAC key prevents an adversary from using a single lookup table against multiple keypairs.
+    \item \emph{Hashing the MAC tag instead of the entire ciphertext.} Because we allowed the PKE to be randomized, the shared secret must have inputs from both the plaintext and the ciphertext. However, we find it unnecessary to hash the entire ciphertext.
+    Instead, if the MAC is modeled as a secure pseudorandom function (PRF), then the MAC tag functions as a (keyed) hash of the ciphertext, so we use the much shorter MAC tag as a substitute.
 \end{itemize}
 
 Compared to ML-KEM, OT-ML-KEM makes the following trade-offs: \begin{itemize}
-    \item OT-ML-KEM's encapsulation is slightly slower because of the additional steps of computing the {\sf MAC} tag
-    \item OT-ML-KEM ciphertext size increases by the size of the {\sf MAC} tag.
-    \item OT-ML-KEM replaces \textit{re-encryption} with computing the {\sf MAC} tag.
+    \item OT-ML-KEM's encapsulation is slightly slower because of the additional steps of computing the MAC tag
+    \item OT-ML-KEM ciphertext size increases by the size of the MAC tag.
+    \item OT-ML-KEM replaces \textit{re-encryption} with computing the MAC tag.
     \item As the name suggests, each OT-ML-KEM keypair can only be used once.
 \end{itemize}
 
 \subsection{Choosing a message authentication code}\label{sec:choosing-a-mac}
-We instantiated OT-ML-KEM with a wide range of {\sf MAC} designs, including Poly1305 \cite{DBLP:conf/fse/Bernstein05}, GMAC \cite{mcgrew2004galois}, CMAC \cite{black2000cbc,iwata2003omac}, and KMAC \cite{SP80053r4}.
-All four schemes are parameterized with 256-bit key and 128-bit tag (except for KMAC, see paragraph below) to ensure that {\sf MAC} keys are at least as hard to guess has the underlying PKE plaintext.
+We instantiated OT-ML-KEM with a diverse set of MAC designs, including Poly1305 \cite{DBLP:conf/fse/Bernstein05}, GMAC \cite{mcgrew2004galois}, CMAC \cite{black2000cbc,iwata2003omac}, and KMAC \cite{SP80053r4}.
+All four schemes are parameterized with 256-bit key and 128-bit tag (except for KMAC, see paragraph below) to ensure that MAC keys are at least as hard to guess has the underlying PKE plaintext.
 
-\emph{Poly1305 and GMAC} are both Carter-Wegman style {\sf MAC} \cite{wegman1981new} that compute the tag using finite field arithmetics.
+\emph{Poly1305 and GMAC} are both Carter-Wegman style MAC \cite{wegman1981new} that compute the tag using finite field arithmetics.
 Each scheme operates by breaking the message into blocks that can then be parsed into finite field elements.
 The tag is computed by evaluating a polynomial whose coefficients are the message blocks and whose indeterminate is the secret key.
 Poly1305 operates in the prime field $\operatorname{GF}(2^{130} - 5)$ whereas GMAC operates in the binary field $\operatorname{GF}(2^{128})$.
@@ -1681,16 +1705,16 @@ All binaries are executed on an AWS c7a.medium instance\footnote{\scriptsize We 
 Source code is available on GitHub\footnote{\scriptsize \scriptsize\url{https://github.com/xuganyu96/faster-generic-ind-cca-kem-using-encrypt-then-mac/tree/tches2025-volume2}}.
 
 \subsection{MAC performance}
-We isolated the performance of OpenSSL's {\sf MAC} implementations by measuring the CPU cycles consumed to compute a tag on random inputs whose sizes correspond to the ciphertext sizes of ML-KEM at NIST levels 1, 3, and 5.
+We isolated the performance of OpenSSL's MAC implementations by measuring the CPU cycles consumed to compute a tag on random inputs whose sizes correspond to the ciphertext sizes of ML-KEM at NIST levels 1, 3, and 5.
 The median CPU cycle counts in 10,000 rounds of testing are summarized in Table \ref{tab:mac-performance}.
 
-\emph{Remark.} In OpenSSL's implementation, Poly1305 is an one-time secure {\sf MAC}. OpenSSL does not have a standalone GMAC; instead we used the AEAD \texttt{AES-256-GCM} but with all data treated as ``associated data''. CMAC and KMAC-256 are always many-time secure.
+\emph{Remark.} In OpenSSL's implementation, Poly1305 is an one-time secure MAC. OpenSSL does not have a standalone GMAC; instead we used the AEAD \texttt{AES-256-GCM} but with all data treated as ``associated data''. CMAC and KMAC-256 are always many-time secure.
 
 \begin{table}[htbp]
     \centering\footnotesize
     \begin{tabular}{llrlrlr}
     \toprule
-         {\bf\sf MAC}
+         {\bf MAC}
          & \multicolumn{2}{c}{\bf NIST level 1}
          & \multicolumn{2}{c}{\bf NIST level 3}
          & \multicolumn{2}{c}{\bf NIST level 5}
@@ -1698,7 +1722,7 @@ The median CPU cycle counts in 10,000 rounds of testing are summarized in Table 
          \cmidrule(lr){2-3}
          \cmidrule(lr){4-5}
          \cmidrule(lr){6-7}
-         & input size & 768 & input size & 1088 & input size & 1568 \\
+         & input size & {\sf 768 B} & input size & {\sf 1088 B} & input size & {\sf 1568 B} \\
          \midrule
          Poly1305 & & 909 & & 961 & & 1065 \\
          GMAC & & 3899 & & 4827 & & 4055 \\
@@ -1706,7 +1730,7 @@ The median CPU cycle counts in 10,000 rounds of testing are summarized in Table 
          KMAC-256 & & 6373 & & 9697 & & 11647 \\
     \bottomrule
     \end{tabular}
-    \caption{{\sf MAC} performance (cycles/tick)}
+    \caption{MAC performance (cycles/tick)}
     \label{tab:mac-performance}
 \end{table}
 
@@ -1717,32 +1741,32 @@ Compared to the $\kem^{\not\bot}_m$ variant of Fujisaki-Okamoto transformed used
 Since \texttt{K-PKE.\encrypt} carries significantly more computational complexity than \texttt{K-PKE.\decrypt} or any MAC we chose, the performance advantage of the encrypt-then-MAC transformation over the $\kem^{\not\bot}_m$ transformation is dominated by the runtime saving gained from replacing \emph{re-encryption} with MAC.
 
 \begin{table}[htbp]
-    \centering\footnotesize
-    \begin{tabular}{lr|lrr}
-    \toprule
-         & & {\bf KEM} & {\bf Encap} & {\bf Decap} \\
-    \midrule
-         \multicolumn{2}{c|}{\bf NIST level 1} & ML-KEM-512 & 91467 & 121185 \\
-         $\pk$ size & 800 & OT-ML-KEM-512 + Poly1305 & 93157 & 33733 \\
-         $\sk$ size & 1632 & OT-ML-KEM-512 + GMAC & 97369 & 37725 \\
-         $\texttt{ct}$ size & 768 & OT-ML-KEM-512 + CMAC & 99739 & 40117 \\
-         $\keygen$ performance (cyc/tick) & 75945 & OT-ML-KEM-512 + KMAC-256 & 101009 & 40741 \\
-    \midrule
-         \multicolumn{2}{c|}{\bf NIST level 3} & ML-KEM-768 & 136405 & 186445 \\
-         $\pk$ size & 1184 & OT-ML-KEM-768 + Poly1305 & 146405 & 43315 \\
-         $\sk$ size & 2400 & OT-ML-KEM-768 + GMAC & 149525 & 46513 \\
-         $\texttt{ct}$ size & 1088 & OT-ML-KEM-768 + CMAC & 153139 & 49841 \\
-         $\keygen$ performance (cyc/tick) & 129895 & OT-ML-KEM-768 + KMAC-256 & 155219 & 52415 \\
-    \midrule
-         \multicolumn{2}{c|}{\bf NIST level 5} & ML-KEM-1024 & 199185 & 246245 \\
-         $\pk$ size & 1568 & OT-ML-KEM-1024 + Poly1305 & 205763 & 51375 \\
-         $\sk$ size & 3168 & OT-ML-KEM-1024 + GMAC & 208805 & 54573 \\
-         $\texttt{ct}$ size & 1568 & OT-ML-KEM-1024 + CMAC & 213667 & 59175 \\
-         $\keygen$ performance (cyc/tick) & 194921 & OT-ML-KEM-1024 + KMAC-256 & 216761 & 62269 \\
-    \bottomrule
-    \end{tabular}
-    \caption{KEM routine performance}
-    \label{tab:ot-ml-kem-performance}
+\centering\footnotesize
+\begin{tabular}{lr|lrr}
+\toprule
+     & & {\bf KEM} & {\bf Encap} & {\bf Decap} \\
+\midrule
+     \multicolumn{2}{c|}{\bf NIST level 1} & ML-KEM-512 & {\sf 91.46} & {\sf 121.18} \\
+     $\pk$ size & 800 & OT-ML-KEM-512 + Poly1305 & {\sf 93.15} & {\sf 33.73} \\
+     $\sk$ size & 1632 & OT-ML-KEM-512 + GMAC & {\sf 97.36} & {\sf 37.72} \\
+     $\texttt{ct}$ size & 768 & OT-ML-KEM-512 + CMAC & {\sf 99.73} & {\sf 40.11} \\
+     $\keygen$ performance & {\sf 75.94} & OT-ML-KEM-512 + KMAC-256 & {\sf 101.00} & {\sf 40.74} \\
+\midrule
+     \multicolumn{2}{c|}{\bf NIST level 3} & ML-KEM-768 & {\sf 136.40} & {\sf 186.44} \\
+     $\pk$ size & 1184 & OT-ML-KEM-768 + Poly1305 & {\sf 146.40} & {\sf 43.31} \\
+     $\sk$ size & 2400 & OT-ML-KEM-768 + GMAC & {\sf 149.52} & {\sf 46.51} \\
+     $\texttt{ct}$ size & 1088 & OT-ML-KEM-768 + CMAC & {\sf 153.13} & {\sf 49.84} \\
+     $\keygen$ performance & {\sf 129.89} & OT-ML-KEM-768 + KMAC-256 & {\sf 155.21} & {\sf 52.41} \\
+\midrule
+     \multicolumn{2}{c|}{\bf NIST level 5} & ML-KEM-1024 & {\sf 199.18} & {\sf 246.24} \\
+     $\pk$ size & 1568 & OT-ML-KEM-1024 + Poly1305 & {\sf 205.76} & {\sf 51.37} \\
+     $\sk$ size & 3168 & OT-ML-KEM-1024 + GMAC & {\sf 208.80} & {\sf 54.57} \\
+     $\texttt{ct}$ size & 1568 & OT-ML-KEM-1024 + CMAC & {\sf 213.66} & {\sf 59.17} \\
+     $\keygen$ performance & {\sf 194.92} & OT-ML-KEM-1024 + KMAC-256 & {\sf 216.76} & {\sf 62.26} \\
+\bottomrule
+\end{tabular}
+\caption{OT-ML-KEM performance (kilocycles/tick)}
+\label{tab:ot-ml-kem-performance}
 \end{table}
 
 \section{Related works}\label{sec:ind-1cca-discussion}
@@ -1805,7 +1829,7 @@ Huguenin-Dumittan and Vaudenay \cite{DBLP:conf/eurocrypt/Huguenin-Dumittan22} ex
 $T_\text{CH}$ achieves qCCA security using a ``confirmation hash'': the KEM ciphertext includes the PKE ciphertext and a hash of the PKE plaintext, and the KEM shared secret is derived from hashing the PKE plaintext.
 The security reduction is loose by a factor of $2^q$ where $q$ is the number of decapsulation queries.
 $T_H$ achieves qCCA security by deriving the shared secret from hashing both the PKE plaintext and ciphertext (Figure \ref{fig:dumittan-th-transform}), so decapsulation queries with modified ciphertext will be answered with independent random values under the rancom oracle model.
-$T_H$'s construction is simpler than $T_\text{CH}$ and retains the original ciphertext length, but on the other hand, the security reduction is looser, with a factor of $q_H^{2q}$, where $q_H$ is the number of hash oracle queries, and $q$ is the number of decapsulation queries.
+$T_H$'s construction is simpler than $T_\text{CH}$ and retains the original ciphertext length, butthe security reduction is looser, with a factor of $q_H^{2q}$, where $q_H$ is the number of hash oracle queries, and $q$ is the number of decapsulation queries.
 The authors also proved qCCA security of both transformations under quantum random oracle model (QROM).
 
 In the same paper, the two authors also observed that in TLS 1.3, the handshake secret (and thus all subsequent secrets and keys) is derived with input from the handshake transcript, which means that the KEM public key and ciphertext, embedded in \texttt{ClientHello} and \texttt{ServerHello} respectively, are already hashed into the handshake secret.
@@ -1813,7 +1837,7 @@ This is similar to the $T_H$ construction where the shared secret is hashed from
 The initial proof presented by the authors had a looseness factor of $O(q^6)$, which was later improved by Zhou et al.\cite{DBLP:conf/asiacrypt/ZhouJZ24} to $O(q)$ for randomized PKEs, and $O(1)$ for rigid PKEs.
 
 \chapter{Implementing PQ-TLS and KEMTLS on embedded client}\label{sec:implementing-pqtls-and-kemtls}
-To evaluate post-quantum TLS 1.3 and KEMTLS on embedded clients, we implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL\footnote{\scriptsize \url{https://www.wolfssl.com/}} and using cryptographic primitives from PQClean\footnote{\scriptsize \url{https://github.com/PQClean/PQClean/}}\cite{DBLP:conf/eurosp/KannwischerSSW22}. Source code for this project is available on GithHub\footnote{\scriptsize \url{https://github.com/xuganyu96/embedded-pqtls}}. This chapter describes how we implemented post-quantum TLS 1.3 and KEMTLS.
+To evaluate post-quantum TLS 1.3 and KEMTLS on embedded clients, we implemented post-quantum TLS 1.3 and KEMTLS on top of WolfSSL\footnote{\scriptsize \url{https://www.wolfssl.com/}} and using cryptographic primitives from PQClean\footnote{\scriptsize \url{https://github.com/PQClean/PQClean/}}\cite{DBLP:conf/eurosp/KannwischerSSW22}. Source code for this project is available on GitHub\footnote{\scriptsize \url{https://github.com/xuganyu96/embedded-pqtls}}. This chapter describes how we implemented post-quantum TLS 1.3 and KEMTLS.
 
 \section{WolfSSL}\label{sec:wolfssl}
 WolfSSL is a modern open-source TLS library written in the C programming language. 
@@ -1831,12 +1855,12 @@ The project also improved developer ergonomics by applying consistent namespacin
 PQClean comes with ``batteries-included'': it contains reusable symmetric primitives (AES, SHA-2, and SHA-3) shared across downstream implementations.
 The inclusion of shared symmetric primitives made integrating PQClean into WolfCrypt easier, but unfortunately it duplicates existing functionalities from WolfCrypt, which inflates the size of the firmware.
 In addition, PQClean's symmetric primitives exhibit different performance characteristics from WolfCrypt: for example, WolfCrypt contains an in-house implementation of ML-KEM and ML-DSA, which uses an in-house implementation of Keccak/SHA-3.
-WolfCrypt's own benchmark showed that on the embedded client, WolfCrypt's SHA-3 to have approx. 10\% more throughput than PQClean's \texttt{fips202.c}, while WolfCrypt's ML-KEM is roughly twice as fast as the ``clean'' ML-KEM.
+WolfCrypt's own benchmark showed that on the embedded client, WolfCrypt's SHA-3 to have approximately 10\% more throughput than PQClean's \texttt{fips202.c}, while WolfCrypt's ML-KEM is roughly twice as fast as the ``clean'' ML-KEM.
 In the end, we chose to disable WolfCrypt's ML-KEM/ML-DSA and use the ``clean'' implementations (using PQClean's symmetric primitives) across the entire project to ensure fair comparison across different schemes. 
 We leave it for future works to incorporate machine-optimized implementations such as from \texttt{pqm4}\footnote{\scriptsize \url{https://github.com/mupq/pqm4}} and \texttt{ml-kem-native}\footnote{\scriptsize \url{https://github.com/pq-code-package/mlkem-native}}.
 
 While we kept PQClean's symmetric primitives, we had to modify its \texttt{randombytes} API for generating random number.
-PQClean's existing \texttt{randombytes} implementation is stateless and asssumes the existence of a filesystem on Linux, BSD, or Win32.
+PQClean's existing \texttt{randombytes} implementation is stateless and asssumes the existence of a filesystem on some operating systems.
 While this works on a desktop environment, it does not work with baremetal embedded clients.
 In addition, most PQC implementations do not expose internal randomness through some \texttt{seed} parameter in the public API, so a wholesale replacement of \texttt{randombytes} by another RNG implementation will require extensive refactor of the entire project.
 Fortunately, WolfCrypt provides an abstraction \texttt{WC\_RNG} with ready-to-go backends on both Linux and baremetal via Pico-SDK.
@@ -1868,10 +1892,6 @@ int randombytes(uint8_t *output, size_t n) {
     #endif
 }
 \end{lstlisting}
-
-\texttt{liboqs}\footnote{\scriptsize \url{https://github.com/open-quantum-safe/liboqs}} is another repository of high-quality PQC implementations that contain a wider selection of schemes, some of which are automatically integrated from PQClean.
-We considered using \texttt{liboqs}, but found the lack of documentation on baremetal systems (\texttt{arm-none-eabi-gcc} toolchain) and the complexity of the project difficult to navigate.
-PQClean's simple structure allowed us to easily use a single codebase and build for both server (\texttt{x86\_64} on Linux) and embedded client with no RTOS.
 
 \subsection{Implementing post-quantum key exchange}\label{sec:implementing-pq-kex}
 \subsubsection{Adding new KEM} Incorporating post-quantum KEMs into the key exchange flow of TLS 1.3 is relatively straightforward despite the API difference between a KEM and a Diffie-Hellman key exchange.
@@ -1943,59 +1963,56 @@ pub struct CryptoProvider {
 \subsubsection{Memory management} Programming in C brings substantial challenge in memory management, especially on the embedded client, where memory leaks can quickly exhaust the meager amount of available RAM.
 Following best practices, we allocate memory for cryptographic operations on the stack wherever possible, and on the heap only when necessary, such as when data need to persist across multiple TLS messages.
 With the ephemeral key exchange, KEM public key and private key must be dynamically allocated because they need to live after the local frame exits.
-On the other hand, ciphertexts and shared secrets are short-lived and are thus allocated on the stack.
-Listing \ref{lst:TLSX_KeyShare_GenPQCleanMlKemKeyClient} provides an example of managing memories for KEM keys.
+% On the other hand, ciphertexts and shared secrets are short-lived and are thus allocated on the stack.
+% Listing \ref{lst:TLSX_KeyShare_GenPQCleanMlKemKeyClient} provides an example of managing memories for KEM keys.
 
-\begin{lstlisting}[
-    frame=single, 
-    style=boxed, 
-    float=htbp,
-    label={lst:TLSX_KeyShare_GenPQCleanMlKemKeyClient}, 
-    caption={
-    Managing memory for KEM key
-}]
-static int TLSX_KeyShare_GenPQCleanMlKemKeyClient(WOLFSSL *ssl,
-                                                  KeyShareEntry *kse) {
-    int ret = 0;
-    PQCleanMlKemKey kem;
-    byte *privKey = NULL;
-    word32 privKeyLen = 0;
-    /* ... fill in privKeyLen, kse->pubKeyLen ... */
-    if (ret == 0) {
-        privKey = XMALLOC(privKeyLen, ssl->heap, 
-                          DYNAMIC_TYPE_PRIVATE_KEY);
-        if (privKey == NULL) 
-            ret = MEMORY_ERROR;
-    }
-    if (ret == 0) {
-        kse->pubKey = XMALLOC(kse->pubKeyLen, ssl->heap, 
-                              DYNAMIC_TYPE_PUBLIC_KEY);
-        if (kse->pubKey == NULL)
-            ret = MEMORY_ERROR;
-    }
-    /* ... generate key pair ... */
-    if (ret != 0) {
-        if (privKey)
-            XFREE(privKey, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
-        if (kse->pubKey) {
-            XFREE(kse->pubKey, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
-            kse->pubKey = NULL;
-        }
-    } else {
-        kse->privKey = privKey;
-        kse->privKeyLen = privKeyLen;
-    }
-    return ret;
-}
-\end{lstlisting}
+% \begin{lstlisting}[
+%     frame=single, 
+%     style=boxed, 
+%     float=htbp,
+%     label={lst:TLSX_KeyShare_GenPQCleanMlKemKeyClient}, 
+%     caption={
+%     Managing memory for KEM key
+% }]
+% static int TLSX_KeyShare_GenPQCleanMlKemKeyClient(WOLFSSL *ssl,
+%                                                   KeyShareEntry *kse) {
+%     int ret = 0;
+%     PQCleanMlKemKey kem;
+%     byte *privKey = NULL;
+%     word32 privKeyLen = 0;
+%     /* ... fill in privKeyLen, kse->pubKeyLen ... */
+%     if (ret == 0) {
+%         privKey = XMALLOC(privKeyLen, ssl->heap, 
+%                           DYNAMIC_TYPE_PRIVATE_KEY);
+%         if (privKey == NULL) 
+%             ret = MEMORY_ERROR;
+%     }
+%     if (ret == 0) {
+%         kse->pubKey = XMALLOC(kse->pubKeyLen, ssl->heap, 
+%                               DYNAMIC_TYPE_PUBLIC_KEY);
+%         if (kse->pubKey == NULL)
+%             ret = MEMORY_ERROR;
+%     }
+%     /* ... generate key pair ... */
+%     if (ret != 0) {
+%         if (privKey)
+%             XFREE(privKey, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
+%         if (kse->pubKey) {
+%             XFREE(kse->pubKey, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
+%             kse->pubKey = NULL;
+%         }
+%     } else {
+%         kse->privKey = privKey;
+%         kse->privKeyLen = privKeyLen;
+%     }
+%     return ret;
+% }
+% \end{lstlisting}
 
 \subsubsection{Miscellaneous} One interesting design is a \texttt{static const word16 preferredGroup[]}.
 User can specify the key exchange groups using the \texttt{wolfSSL\_CTX\_set\_groups} API, but this user-specified list of groups is copmared with the internal static \texttt{preferredGroups} when constructing \texttt{ClientHello}.
 If the two lists do not match, then WolfSSL will send a \texttt{ClientHello} with an empty \texttt{key\_share} extension; per RFC 8446, this indicates that client is requesting group selection from the server, and will increase handshake latency by one round trip.
-We were unaware of this feature and had spent a lot of effort trying to find out why the client is sending \texttt{ClientHello} twice even though client and server both support the newly added KEM.
-
-Last but not least, WolfSSL included ECC+KEM hybrids for key exchange, but the integration with WolfCrypt's ML-KEM is too complex for us to modify in time.
-We included benchmark results from these hybrid key exchange groups in Section \ref{sec:handshake-performance} but they are not directly comparable with other ML-KEM-only key exchange.
+We were initially unaware of this feature and had spent a lot of effort trying to find out why the client is sending \texttt{ClientHello} twice even though client and server both support the newly added KEM.
 
 \subsection{Authenticate with post-quantum signatures}\label{sec:authenticate-with-pq-sig}
 Because we need to distribute related components of a public-key certificate chain to the server and the client separately, we need to generate the certificate and the private key files.
@@ -2360,7 +2377,7 @@ err_t tcp_stream_read(tcp_stream_t *stream, uint8_t *buf, size_t bufcap,
 \end{lstlisting}
 
 \chapter{Performance of post-quantum TLS 1.3 and KEMTLS}\label{sec:performance-of-pqtls-and-kemtls}
-This section will present and analyze performance benchmarking data. 
+This section present and analyze performance benchmarking data. 
 Section \ref{sec:experiment-setup} describes the hardware setup and the software toolchain. 
 Section \ref{sec:communication-costs} analyzes the communication costs, including the sizes of the various certificate chains. 
 Section \ref{sec:crypto-primitive-performance} summarizes the performance of relevant cryptographic primitives on the test hardware. 
@@ -2476,7 +2493,7 @@ Table \ref{tab:cert-chain-sizes} compares the size of root CA and server's certi
     \centering\scriptsize
     \begin{tabular}{lrllr}
     \toprule
-        \multicolumn{2}{c}{\bf Root CA}
+        \multicolumn{2}{c}{\bf Root}
         & \textbf{Intermediate} 
         & \textbf{Leaf} 
         & \textbf{Chain} 
@@ -2541,8 +2558,9 @@ Table \ref{tab:cert-chain-sizes} compares the size of root CA and server's certi
 We benchmarked the speed of relevant cryptographic operations on the Pico 2 W and the server.
 On the Pico 2 W, CPU cycle count is read from the \texttt{CYCCNT} register, located at \texttt{PPB\_BASE + M33\_DWT\_CYCCNT\_OFFSET}.
 On the x86 server, CPU cycle count is read from the \texttt{RDTSC} register.
+Results are summarized in Table \ref{tab:crypto-primitives-rp2350} and \ref{tab:crypto-x86-64}.
 
-\begin{table}[htbp]
+\begin{table}[ht]
     \centering\scriptsize
     \begin{tabular}[t]{lr}
     \toprule
@@ -2607,7 +2625,7 @@ On the x86 server, CPU cycle count is read from the \texttt{RDTSC} register.
     \label{tab:crypto-primitives-rp2350}
 \end{table}
 
-\begin{table}[htbp]
+\begin{table}[ht]
     \centering\scriptsize
     \begin{tabular}[t]{lrrr}
     \toprule
@@ -2681,7 +2699,7 @@ The timestamps include: \begin{itemize}
     \item \texttt{keygen\_done}: when client finishes generating the ephemeral keypair
     \item \texttt{ch\_sent}: when client finishes sending \texttt{ClientHello}
     \item \texttt{sh\_start}: when client start processing \texttt{ServerHello}
-    \item \texttt{decap\_start}: when client start processing server's key share in \texttt{ServerHello}. With ECDHE, this means running the \texttt{agree} sub-routine; with KEMs, this means running the \texttt{decaosulation} sub-routine
+    \item \texttt{decap\_start}: when client start processing server's key share in \texttt{ServerHello}. With ECDHE, this means running the \texttt{agree} sub-routine; with KEMs, this means running the \texttt{decapsulation} sub-routine
     \item \texttt{decap\_done}: when client finishes processing server's key share, but before updating key schedule
     \item \texttt{sh\_done}: when client finishes processing \texttt{ServerHello}, which includes updating key schedule and deriving handshake secret
     \item \texttt{cert\_start}: when client starts processing \texttt{Certificate}
@@ -2689,13 +2707,6 @@ The timestamps include: \begin{itemize}
     \item \texttt{auth\_done}: when client finishes the asymmetric cryptographic operation for server authentication
     \item \texttt{hs\_done}: when client finishes processing server's \texttt{Finished}. Note that in signature-based workflow, this is the earliest moment when client can start sending application data, but in KEM-based workflow, client can start at an earlier moment in the handshake. Due to time constraint we did not get to implement this ``early application data'', but we speculate that the performance impact will be minimal.
 \end{itemize}
-
-Although communication cost contrinutes significantly to the latency of a handshake in both the key exchange phase and the authentication phase, measuring standalone ``certificate transmission time'' is not straightforward as it requires high precision time synchronization between the client and the server. Unfortunately, the NTP client can have up to hundreds of milliseconds of bias and is thus rather not helpful.
-It is also questionable whether standalone transmission time is all that meaningful, because data transmission often happens concurrently with data processing. 
-For example, server transmitting \texttt{Certificate} can happen concurrently with client processing \texttt{ServerHello}.
-Therefore, longer transmission time by itself does not necessarily translate to longer handshake latency.
-Instead, we will only measure the combined duration of data processing and data transmission.
-Finally, each configuration is repeated for at least 1,000 times.
 
 Within the key exchange phase we mainly care about three metrics: \begin{itemize}
     \item \emph{Total time}: the duration of the entire key exchange from the client's perspective, which is the interval from \texttt{ch\_start} to \texttt{sh\_done}.
@@ -2825,7 +2836,7 @@ Table \ref{tab:all-performance-data} reports the median for all statistics discu
 
 \subsection{Post-quantum TLS performance}\label{sec:discussion-pq-tls-performance}
 From Table \ref{tab:crypto-primitives-rp2350} we can see that on the RP2350, ML-KEM-512's key generation and decapsulation is as fast if not faster than X25519's key generation and agree operation.
-ML-DSA-44's signature verification is slower than Ed25519 (+32\%), while Falcon-512's signature verification is faster (-67\%).
+ML-DSA-44's signature verification is slower than Ed25519 (+32\% CPU cycles), while Falcon-512's signature verification is faster (-67\% CPU cycles).
 Overall, a post-quantum TLS handshake utilizing lattice-based KEM and signature has competitive latency with handshakes using elliptic-curve key exchange and signatures.
 In production deployment with fast servers and broadband networks, lattice-based primitives' slower signing routine and larger message sizes do not incur noticeable performance penalty; instead, a TLS handshake is bottlenecked by the embedded client's cryptographic operations.
 Table \ref{tab:lattice-vs-ecc-handshake} and Figure \ref{fig:ecc-vs-lattice} the performance of lattice-based handshake and elliptic-curve handshake.
@@ -2841,31 +2852,31 @@ Table \ref{tab:lattice-vs-ecc-handshake} and Figure \ref{fig:ecc-vs-lattice} the
         & {\bf Handshake}
         \\
         \cmidrule(lr){1-3}
-        KEX & CA & Leaf \\
+        KEX & \multicolumn{2}{l}{Auth} \\
     \midrule
-        X25519     & \multicolumn{2}{c}{Ed25519}
+        X25519     & \multicolumn{2}{l}{Ed25519}
         & {\sf 31.38 ms}  & {\sf 19.65 ms}    & {\sf 76.92 ms}  & {\sf 128.40 ms} \\
-        ECDHE (P-256)     & \multicolumn{2}{c}{RSA-2048}
+        ECDHE (P-256)     & \multicolumn{2}{l}{RSA-2048}
         & {\sf 388.00 ms} & {\sf 15.35 ms}    & {\sf 80.59 ms}  & {\sf 484.22 ms} \\
-        ECDHE (P-256)     & \multicolumn{2}{c}{ECDSA (P-256)}
+        ECDHE (P-256)     & \multicolumn{2}{l}{ECDSA (P-256)}
         & {\sf 374.75 ms} & {\sf 13.92 ms}    & {\sf 396.85 ms}  & {\sf 785.78 ms} \\
-        ML-KEM-512 & \multicolumn{2}{c}{ML-DSA-44}
+        ML-KEM-512 & \multicolumn{2}{l}{ML-DSA-44}
         & {\sf 22.24 ms}  & {\sf 25.91 ms}    & {\sf 123.03 ms} & {\sf 171.16 ms} \\
-        ML-KEM-512 & \multicolumn{2}{c}{Falcon-512}
+        ML-KEM-512 & \multicolumn{2}{l}{Falcon-512}
         & {\sf 23.68 ms}  & {\sf 20.12 ms}    & {\sf 58.83 ms}  & {\sf 102.44 ms} \\
     \midrule
-        X448       & \multicolumn{2}{c}{Ed448}
+        X448       & \multicolumn{2}{l}{Ed448}
         & {\sf 123.23 ms} & {\sf 13.83 ms} & {\sf 260.90 ms} & {\sf 398.13 ms} \\
-        ECDHE (P-384)   & \multicolumn{2}{c}{ECDSA (P521)}
+        ECDHE (P-384)   & \multicolumn{2}{l}{ECDSA (P521)}
         & {\sf 1080.33 ms} & {\sf 16.55 ms} & {\sf 1027.25 ms} & {\sf 2125.43 ms} \\
-        ML-KEM-768 & \multicolumn{2}{c}{ML-DSA-65}  
+        ML-KEM-768 & \multicolumn{2}{l}{ML-DSA-65}  
         & {\sf 33.01 ms}  & {\sf 32.43 ms}    & {\sf 176.57 ms} & {\sf 242.66 ms} \\
     \midrule
-        ECDHE (P-521)   & \multicolumn{2}{c}{ECDSA (P521)}
+        ECDHE (P-521)   & \multicolumn{2}{l}{ECDSA (P521)}
         & {\sf 2231.10 ms} & {\sf 12.91 ms} & {\sf 2082.33 ms} & {\sf 4327.12 ms} \\
-        ML-KEM-1024 & \multicolumn{2}{c}{ML-DSA-87}
+        ML-KEM-1024 & \multicolumn{2}{l}{ML-DSA-87}
         & {\sf 51.04 ms} & {\sf 38.96 ms} & {\sf 274.23 ms} & {364.68 ms} \\
-        ML-KEM-1024 & \multicolumn{2}{c}{Falcon-1024}
+        ML-KEM-1024 & \multicolumn{2}{l}{Falcon-1024}
         & {\sf 51.32 ms} & {\sf 22.69 ms} & {\sf 82.91 ms} & {157.01 ms} \\
     \bottomrule
     \end{tabular}
@@ -2875,13 +2886,17 @@ Table \ref{tab:lattice-vs-ecc-handshake} and Figure \ref{fig:ecc-vs-lattice} the
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\linewidth]{benchmarks/graphs/ecc-vs-lattice.png}
+    \ifdefstring{\buildtype}{release}{
+        \includegraphics[width=\linewidth]{benchmarks/graphs/ecc-vs-lattice.png}
+    }{
+        \textit{[Image omitted in dev build]}
+    }
     \caption{elliptic-curve vs lattice in TLS handshake}
     \label{fig:ecc-vs-lattice}
 \end{figure}
 
 Falcon has generally the best overall performance amongst all post-quantum signature schemes due to its compact public key and signatures, and its fast verification on the client.
-However, Falcon's signing routine needs to sample from a discrete Gaussian distribution, which requires {\it constant-time floating-point arithmetic with at least 53-bit precision}.
+However, Falcon's signing routine needs to sample from a discrete Gaussian distribution \cite{DBLP:conf/ispec/GaoLDLSL17}, which requires {\it constant-time floating-point arithmetic with at least 53-bit precision} \cite{falcon2020spec}.
 This requirement can be hard to fulfill, especially on legacy hardware, so it might not be feasible to use Falcon for online signatures.
 Fortunately, we can still use Falcon for offline signatures and still see meaningful performance improvements.
 Table \ref{tab:falcon-online-offline} and Figure \ref{fig:falcon-online-offline} compare using Falcon as online signatures and using Falcon as offline signatures.
@@ -2916,16 +2931,20 @@ Table \ref{tab:falcon-online-offline} and Figure \ref{fig:falcon-online-offline}
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level1.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level3.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level5.png}
+    \ifdefstring{\buildtype}{release}{
+        \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level1.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level3.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/falcon-online-offline-level5.png}
+    }{
+        \textit{[Image omitted in dev build]}
+    }
     \caption{Comparing Falcon online, Falcon offline, and ML-DSA}
     \label{fig:falcon-online-offline}
 \end{figure}
 
 In real-world deployments, Certificate Authorities' public keys usually have much longer lifetime than leaf public keys.
-For example, in the certificate chain for \url{www.github.com}, the leaf certificate is valid for one year, and intermediate CA is valid for 12 years, and the root CA is valid for 28 years.
-Therefore, CA' may require using signature schemes at a higher security level or with a more conservative security assumption.
+For example, in the certificate chain for \url{www.github.com}, the leaf certificate is valid for 1 year, and intermediate CA is valid for 12 years, and the root CA is valid for 28 years.
+Therefore, CA's may require using signature schemes at a higher security level or with a more conservative security assumption.
 Table \ref{tab:ca-mixed-security-level} and Figure \ref{fig:ca-mixed-security-level} summarize the performance of using a mixture of security level for CA certificates.
 
 \begin{table}[htbp]
@@ -2959,9 +2978,13 @@ Table \ref{tab:ca-mixed-security-level} and Figure \ref{fig:ca-mixed-security-le
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level1.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level3.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level5.png}
+    \ifdefstring{\buildtype}{release}{
+        \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level1.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level3.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/secure-ca-level5.png}
+    }{
+        \textit{[Image omitted in dev build]}
+    }
     \caption{Certificate Authority with upgraded security levels}
     \label{fig:ca-mixed-security-level}
 \end{figure}
@@ -3001,9 +3024,13 @@ Table \ref{tab:comparing-cca-1cca-kem} and Figure \ref{fig:comparing-cca-1cca-ke
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\linewidth]{benchmarks/graphs/ind1cca-kex-dur.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/ind1cca-hs-dur.png}
-    \caption{Comparing ML-KEM and OT-ML-KEM-512}
+    \ifdefstring{\buildtype}{release}{
+        \includegraphics[width=\linewidth]{benchmarks/graphs/ind1cca-kex-dur.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/ind1cca-hs-dur.png}
+    }{
+        \textit{[Image omitted in dev build]}
+    }
+    \caption{Comparing ML-KEM and OT-ML-KEM}
     \label{fig:comparing-cca-1cca-kem}
 \end{figure}
 
@@ -3053,12 +3080,16 @@ A comparison can be found in Table \ref{tab:comparing-kemtls-pqtls} and Figure \
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-falcon512.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa44.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa65-kex-mlkem512.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa65-kex-mlkem768.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-falcon1024.png}
-    \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa87.png}
+    \ifdefstring{\buildtype}{release}{
+        \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-falcon512.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa44.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa65-kex-mlkem512.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa65-kex-mlkem768.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-falcon1024.png}
+        \includegraphics[width=\linewidth]{benchmarks/graphs/kemtls-ca-mldsa87.png}
+    }{
+        \textit{[Image omitted in dev build]}
+    }
     \caption{KEM-based vs. signature-based authentication}
     \label{fig:comparing-kemtls-pqtls}
 \end{figure}
@@ -3091,17 +3122,46 @@ The main concern with authenticating an embedded device is the safety of the sec
 Embedded devices often operate in hostile environments where the risks of physical instrusion and sophisticated fault attacks are non-trival.
 While many platforms include some ``secure boot'' features that can increase the cost of dumping firmware and extracting secrets, they are not impossible to defeat.
 
-On the other hand, if there is a way to safely store secrets (e.g. with a TPM), then the embedded device can use TLS in PSK mode, which is far more efficient because authentication is done with symmetric primitives instead of public-key cryptography.
+On the other hand, if there is a way to safely store secrets (e.g. with a TPM \cite{DBLP:conf/IEEEares/PaulSS21}), then the embedded device can use TLS in PSK mode, which is far more efficient because authentication is done with symmetric primitives instead of public-key cryptography.
 In summary, the scenario in which authenticating an embedded device with public-key primitives remains to be found.
 
-\subsection{Using Classic McEliece}\label{sec:using-classic-mceliece}
-HQC is the only code-based KEM we tested and shows abysmal performance.
-We suspect that Classic McEliece may be a better fit, such as in KEMTLS-PDK.
-This is because an embedded client will likely only talk to a few servers, so the long-term public keys can be pre-loaded into the firmware, thus mitigating the cost of transporting Classic McEliece's large public keys.
+\subsection{Caching peer's public key}\label{sec:using-classic-mceliece}
+In this thesis, we adopted the most commonly deployed public-key infrastructure architecture, where a Certificate Authority serves as a root of trust from which a chain of signatures and public key estalishes the identity of intermediate certificate authorities and ultimately the end entity.
+This ``chain-of-trust'' architecture works well when web clients need to authenticate a large number of previously unknown web servers, but it is inefficient for an IoT device that might only talk to one or two servers throughout its lifetime.
+Instead, for clients that talk to a fixed and known list of peers, it is more efficient to directly embed peers' public keys instead of going through intermediate and root CAs.
+In fact, RFC 7924 \cite{DBLP:journals/rfc/rfc7924} already proposed a \texttt{cache\_information} extension to \texttt{ClientHello} in TLS 1.2, which would allow the client to send a hash of server's public key and indicate possession, and the server can then skip sending \texttt{Certificate} and save a substantial amount of bandwidth.
 
-Another concern is the feasibility of loading the public key into memory: the smallest of McEliece public key uses more than 250KB, which is bigger than many microcontrollers have RAM.
-However, because McEliece encryption is a single matrix-multiplication, the public key can be partially loaded into RAM.
-Streaming McEliece public key has been shown to be feasible by Bernstein et al. \cite{DBLP:conf/uss/Bernstein020}.
+Interestingly, caching server's public key would also enable the use of KEM and digital signature schemes that are previously impractical.
+A prominent example is Classic McEliece: even with the smallest parameter set, Classic McEliece's public key size is 250kB, which is impossible to fit into \texttt{ClientHello} even with record fragmentation (there was an IETF proposal\footnote{\url{https://www.ietf.org/archive/id/draft-wagner-tls-keysharepqc-00.html}} to modify \texttt{key\_share} extension so Classic McEliece public keys can fit, but it required extensive work and could break backwards compatibility with TLS middle boxes, so progress was stalled).
+On the other hand, Classic McEliece boasts impressively small ciphertext and fast encryption, which makes it a great choice for static key exchange.
+We speculate that the combination of IND-1CCA KEM for ephemeral key exchange and Classic McEliece for KEM-based authentication can greatly reduce the handshake latency and computational load of a TLS handshake on an embedded client.
+The same argument applies to digital signatures that have large public keys and small signatures, such as Unbalanced Oil and Vinegar (UOV), a multivariate signature scheme.
+With the smallest parameter set, UOV's public key size is 43576 bytes and its signature size is 128 bytes.
+Table \ref{tab:mceliece-uov-params} summarizes the other parameter sizes.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{llrr}
+    \toprule
+        {\bf Name} & {\bf NIST Sec. Lvl} & {\bf PubKey} & {\bf Ciphertext/Sig} \\
+    \midrule
+        {\sf mceliece348864} & {1} & {\sf 261.12 kB} & {\sf 96 B} \\
+        {\sf mceliece460896} & {3} & {\sf 524.16 kB} & {\sf 156 B} \\
+        {\sf mceliece6688128} & {5} & {\sf 1044.99 kB} & {\sf 208 B} \\
+        {\sf mceliece6960119} & {5} & {\sf 1047.32 kB} & {\sf 194 B} \\
+        {\sf mceliece8192128} & {5} & {\sf 1357.82 kB} & {\sf 208 B} \\
+    \midrule
+        {\sf UOV-Ip} & {1} & {\sf 43.58 kB} & {\sf 128 B} \\
+        {\sf UOV-Is} & {1} & {\sf 66.58 kB} & {\sf 96 B} \\
+        {\sf UOV-III} & {3} & {\sf 189.23 kB} & {\sf 200 B} \\
+        {\sf UOV-V} & {5} & {\sf 446.99 kB} & {\sf 260 B} \\
+    \bottomrule
+    \end{tabular}
+    \caption{
+        Post-quantum KEM/Sig schemes with large keys but small ciphertext/signatures are great candidates for public key caching
+    }
+    \label{tab:mceliece-uov-params}
+\end{table}
 
 %----------------------------------------------------------------------
 % END MATERIAL
@@ -3131,7 +3191,7 @@ Streaming McEliece public key has been shown to be feasible by Bernstein et al. 
 
 % The following statement causes the specified references to be added to the bibliography even if they were not cited in the text. 
 % The asterisk is a wildcard that causes all entries in the bibliographic database to be included (optional).
-\nocite{*}
+% \nocite{*}
 %----------------------------------------------------------------------
 
 % Appendices
@@ -3139,9 +3199,43 @@ Streaming McEliece public key has been shown to be feasible by Bernstein et al. 
 % The \appendix statement indicates the beginning of the appendices.
 \appendix
 % Add an un-numbered title page before the appendices and a line in the Table of Contents
-% \chapter*{APPENDICES}
-% \addcontentsline{toc}{chapter}{APPENDICES}
+\chapter*{APPENDICES}
+\addcontentsline{toc}{chapter}{APPENDICES}
 
+\chapter{Example X.509 public-key certificate}\label{sec:x509-certificate}
+\begin{lstlisting}[
+    frame=single, 
+    style=boxed,
+    float=htb,
+    label={lst:x509-certificate-openssl}, 
+    caption={
+    The content of an X.509 certificate can be inspected using the command \texttt{openssl x509 -text -noout -in certificate.pem}.
+}]
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            42:24:4e:c0:18:9f:49:e0:29:0c:3c:af:7d:5e:5d:4e
+        Signature Algorithm: ED25519
+        Issuer: C=CA, ST=ON, L=Waterloo, CN=*.eng.uwaterloo.ca
+        Validity
+            Not Before: Jan  1 00:00:00 2025 GMT
+            Not After : Jan  1 00:00:00 2035 GMT
+        Subject: C=CA, ST=ON, L=Waterloo, CN=*.eng.uwaterloo.ca
+        Subject Public Key Info:
+            Public Key Algorithm: ED25519
+                ED25519 Public-Key:
+                pub:
+                    b5:c0:a4:e4:5e:85:a0:c7:b4:99:a3:13:b5:91:f0:
+                    fd:59:a2:49:3a:3d:a6:8f:d4:3b:37:1d:a5:d6:e5:
+                    10:fe
+    Signature Algorithm: ED25519
+    Signature Value:
+        98:89:27:ae:37:ab:6e:22:ab:b1:b3:29:98:f3:31:bf:48:ed:
+        c1:45:7b:1a:d8:7d:44:eb:67:ab:17:f7:c6:98:32:6d:5b:83:
+        44:66:8f:49:bb:15:22:5d:3a:4e:97:b8:e6:b1:79:9b:4d:a7:
+        83:77:95:bc:0f:8b:eb:d1:1d:0d
+\end{lstlisting}
 
 \chapter{Cryptography definitions}\label{sec:cryptography-definitions}
 \section{Public-key encryption scheme}
@@ -3229,7 +3323,7 @@ In public-key cryptography, all adversaries are assumed to have access to the pu
     \end{cases}
 \end{equation*}
 
-\section{Key encapsulation mechanism (KEM)}\label{sec:key-encapsulation-mechanism}
+\section{Key encapsulation mechanism}\label{sec:key-encapsulation-mechanism}
 \paragraph{Syntax} A key encapsulation mechanism (KEM) is a collection of three routines \\$(\keygen, \encap, \decap)$ defined over some ciphertext space $\mathcal{C}$ and some key space $\mathcal{K}$. Key generation $\keygen: 1^\lambda \mapsto (\pk, \sk)$ is a randomized routine that returns a keypair. Encapsulation $\encap: \pk \mapsto (c, K)$ is a randomized routine that takes a public encapsulation key and returns a pair of ciphertext $c$ and shared secret $K$ (also commonly referred to as session key). Decapsulation $\decap: (\sk, c) \mapsto K$ is a deterministic routine that uses the secret key $\sk$ to recover the shared secret $K$ from the input ciphertext $c$. Where the KEM chooses to reject invalid ciphertext explicitly, the decapsulation routine can also output the rejection symbol $\bot$. We assume a KEM to be perfectly correct:
 
 $$
@@ -3274,7 +3368,7 @@ $$
 
 By default, all adversaries are assumed to have the public key, with which they can mount chosen plaintext attacks (ATK = CPA). If the adversary as access to a decapsulation oracle $\mathcal{O}^\decap: c \mapsto \decap(\sk, c)$, it is said to mount a chosen-ciphertext attack (ATK = CCA).
 
-\section{Message authentication code (MAC)}\label{sec:message-authentication-code}
+\section{Message authentication code}\label{sec:message-authentication-code}
 \paragraph{Syntax} A message authentication code (MAC) is a collection of two routines $\sign$ and $\verify$ defined over some key space $\mathcal{K}$, some message space $\mathcal{M}$, and some tag space $\mathcal{T}$. The signing routine $\sign: (k, m) \mapsto t$ authenticates the message $m$ under the symmetric key $k$ by producing a tag $t$. The verification routine $\verify(k,m,t)$ outputs $1$ if the message-tag pair $(m, t)$ is authentic under the symmetric key $k$ and $0$ otherwise. Many MAC constructions are deterministic: for these constructions it is simpler to denote the signing routine by $t \leftarrow \mac(k, m)$, and verification done using a simple comparison. Some MAC constructions require a distinct or randomized nonce $r \leftsample \mathcal{R}$, and the signing routine will take this additional argument $t \leftarrow \mac(k, m; r)$.
 
 \paragraph{Security} The standard security notion for a MAC is \textit{existential unforgeability under chosen message attack (EUF-CMA)}. We define it using an adversarial game in which an adversary has access to a signing oracle $\mathcal{O}^\sign: m \mapsto \sign(k, m)$ and tries to produce a valid message-tag pair that has not been queried from the signing oracle (Figure \ref{fig:euf-cma-game}).
