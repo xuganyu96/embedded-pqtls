@@ -5,6 +5,7 @@
 - [Project setup](#project-setup-and-development-environment)
     - [Neovim](#neovimlsp-setup)
     - [VSCode](#vscode-setup)
+- [Hello TLS](#hello-tls)
 
 # Introduction
 For my Master's thesis, I wanted to implement post-quantum TLS 1.3 and apply two performance optimizations aimed at reducing the handshake latency (we will discuss what "reducing handshake latency" in details at later section).
@@ -100,3 +101,8 @@ Last but not least, one can optionally put a `.clang-format` file at project roo
 ## VSCode setup
 200ms key input lag, seriously?
 
+# Hello, TLS!
+In this section we will write the first a few programs that will be used a lot in later sections:
+- `tls13client`: a TLS 1.3 client that can take command line arguments for CA file, certificate chain, private keys, remote hostname, and port
+- `tls13server`: a TLS 1.3 server that can take command line arguments like the client
+- `certgen`: generate certificates and public keys
