@@ -15,6 +15,24 @@ include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/config
 )
 
+# WolfSSL
+set(WOLFSSL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../wolfssl" CACHE PATH "Path to WolfSSL")
+get_filename_component(WOLFSSL_ROOT "${WOLFSSL_ROOT}" ABSOLUTE)
+if(NOT IS_DIRECTORY "${WOLFSSL_ROOT}")
+    message(FATAL_ERROR "'${WOLFSSL_ROOT}' is not a valid directory.")
+endif()
+message(STATUS "Using wolfSSL from ${WOLFSSL_ROOT}")
+include_directories(${WOLFSSL_ROOT})
+file(GLOB WOLFSSL_SRC 
+    "${WOLFSSL_ROOT}/src/*.c" 
+    "${WOLFSSL_ROOT}/wolfcrypt/src/*.c"
+)
+add_library(wolfssl STATIC ${WOLFSSL_SRC})
+target_compile_definitions(wolfssl PUBLIC WOLFSSL_USER_SETTINGS)
+target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations)
+
+
 add_compile_options(-Wall -Wextra)
 
 add_executable(tlsclient src/tlsclient.c)
+target_link_libraries(tlsclient wolfssl)
