@@ -60,6 +60,7 @@ cmake .. && make
 ```
 
 ## Simple TLS client
+### Build WolfSSL from source
 Next we will write a simple TLS client in `tlsclient.c`.
 First we need to pull in [WolfSSL](https://github.com/wolfssl/wolfssl).
 We will clone a fork of it as a submodule so we can modify it and compile the library from source.
@@ -111,3 +112,114 @@ target_link_libraries(tlsclient wolfssl)
 
 Before we introduce any WolfSSL library components into `tlsclient.c`, build the project once just to make sure that WolfSSL can compile correctly.
 This test build will also export compile commands under `build/compile_commands.json`, which the LSP needs to function correctly.
+
+### Establish TCP connection
+After a successful build, we will move on to establishing a TCP connection.
+On a desktop environment, TCP functionalities will almost entirely be handled by the operating system.
+We simply make the write API calls to the methods provided in standard library.
+
+```c
+#include <netdb.h>
+#include <unistd.h>
+
+/**
+ * Establishes a TCP connection to a specified hostname and port.
+ *
+ * Creates a socket, resolves the hostname to an IP address,
+ * and attempts to connect to the specified port on the resolved address.
+ *
+ * @param hostname The hostname to connect to (e.g., "example.com").
+ * @param port The port number to connect to (e.g., 80 for HTTP).
+ * @return int Returns the socket file descriptor on success, or -1 on failure.
+ */
+static int tcp_connect(const char *hostname, int port) {
+    struct sockaddr_in server_addr; /* netinet/in.h */
+    struct hostent *server;         /* netdb.h */
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        return -1;
+    }
+
+    server = gethostbyname(hostname);
+    if (!server) {
+        return -1;
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) <
+        0) {
+        close(sockfd); /* unistd.h */
+        return -1;
+    }
+    return sockfd;
+}
+```
+
+Test that we can connect to some TCP server:
+
+```c
+int conn = tcp_connect("www.github.com", 443);
+if (conn <= 0) {
+    printf("failed to connect\n");
+    close(conn);
+} else {
+    printf("你好，GitHub!\n");
+    close(conn);
+}
+```
+
+### Make a TLS connection
+When using WolfSSL to make a TLS connection, we first need to set up a runtime configuration using the struct `WOLFSSL_CTX`, which will specify how the connection will behave:
+what protocol version (TLS 1.3 or 1.2?), what peer authentication policy (no auth or server auth), where to find certificate authority, and where to find private keys, etc.
+
+From the context struct, we make a `ssl` struct, then bind the TCP socket to the struct.
+From here, WolfSSL's code will take care of I/O operations with the socket, and we just need to call the "connect" method and handle the cleanup.
+Here is a minimal example.
+
+```c
+int main(void) {
+    wolfSSL_Init();
+
+    int ssl_ret, sockfd;
+    WOLFSSL *ssl;
+    WOLFSSL_CTX *ctx;
+
+    if ((ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method())) == NULL) {
+        fprintf(stderr, "Failed to create WolfSSL context\n");
+        exit(EXIT_FAILURE);
+    }
+    wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
+    if ((ssl = wolfSSL_new(ctx)) == NULL) {
+        fprintf(stderr, "Failed to create SSL struct\n");
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_FAILURE);
+    }
+    if ((sockfd = tcp_connect("api.github.com", 443)) < 0) {
+        fprintf(stderr, "Failed to establish TCP connection\n");
+        wolfSSL_free(ssl);
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_FAILURE);
+    }
+    wolfSSL_set_fd(ssl, sockfd);
+    if ((ssl_ret = wolfSSL_connect(ssl)) != SSL_SUCCESS) {
+        close(sockfd);
+        wolfSSL_free(ssl);
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_FAILURE);
+    }
+    printf("Connected to github.com:443\n");
+    wolfSSL_shutdown(ssl);
+    close(sockfd);
+    wolfSSL_free(ssl);
+    ssl = NULL;
+    wolfSSL_CTX_free(ctx);
+    ctx = NULL;
+    wolfSSL_Cleanup();
+
+    return 0;
+}
+```
