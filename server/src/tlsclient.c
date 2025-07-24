@@ -5,6 +5,14 @@
 
 #include <wolfssl/ssl.h>
 
+#define HTTP_REQUEST                                                           \
+    "GET /octocat HTTP/1.1\r\n"                                                \
+    "Host: api.github.com\r\n"                                                 \
+    "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:136.0) "     \
+    "Gecko/20100101 Firefox/136.0\r\n"                                         \
+    "Accept: application/json\r\n"                                             \
+    "Connection: close\r\n\r\n"
+
 /**
  * Establishes a TCP connection to a specified hostname and port.
  *
@@ -44,6 +52,9 @@ static int tcp_connect(const char *hostname, int port) {
 int main(void) {
     wolfSSL_Init();
 
+    unsigned char http_rx_buf[2048];
+    int rx_buf_len = 0, readlen;
+
     int ssl_ret, sockfd;
     WOLFSSL *ssl;
     WOLFSSL_CTX *ctx;
@@ -72,6 +83,15 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
     printf("Connected to github.com:443\n");
+
+    wolfSSL_write(ssl, HTTP_REQUEST, strlen(HTTP_REQUEST));
+    while ((readlen = wolfSSL_read(ssl, http_rx_buf + rx_buf_len,
+                                   sizeof(http_rx_buf) - rx_buf_len)) > 0) {
+        rx_buf_len += readlen;
+    }
+    http_rx_buf[rx_buf_len] = '\0';
+    printf("%s\n", http_rx_buf);
+
     wolfSSL_shutdown(ssl);
     close(sockfd);
     wolfSSL_free(ssl);

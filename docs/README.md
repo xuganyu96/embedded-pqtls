@@ -223,3 +223,28 @@ int main(void) {
     return 0;
 }
 ```
+
+We can further verify that the TLS connection really works by sending an HTTPS request and reading its response:
+
+```c
+#define HTTP_REQUEST                                                           \
+    "GET /octocat HTTP/1.1\r\n"                                                \
+    "Host: api.github.com\r\n"                                                 \
+    "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:136.0) "     \
+    "Gecko/20100101 Firefox/136.0\r\n"                                         \
+    "Accept: application/json\r\n"                                             \
+    "Connection: close\r\n\r\n"
+
+/* after connecting to wolfSSL */
+int main(void) {
+    /* connect to github.com:443 */
+    wolfSSL_write(ssl, HTTP_REQUEST, strlen(HTTP_REQUEST));
+    while ((readlen = wolfSSL_read(ssl, http_rx_buf + rx_buf_len,
+                                   sizeof(http_rx_buf) - rx_buf_len)) > 0) {
+        rx_buf_len += readlen;
+    }
+    http_rx_buf[rx_buf_len] = '\0';
+    printf("%s\n", http_rx_buf);
+    /* clean-up */
+}
+```
