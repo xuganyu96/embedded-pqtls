@@ -280,3 +280,32 @@ if ((err = wc_ecc_check_key(&root_key)) < 0) {
     return -1;
 }
 ```
+
+WolfCrypt includes an ASN.1 module (`asn_public.h`) with which one can build a certificate.
+The core data structure is the `Cert` struct, and the workflow goes:
+1. Fill in the identity section of the certificate
+1. Call `wc_MakeCert` with the keypair, which will DER serialize the unsigned certificate, including identity and public key, to a buffer
+1. Call `wc_SignCert` with the DER buffer to produce the signed DER buffer
+
+Note that `WOLFSSL_CERT_GEN` must be defined in `user_settings.h`, or functions like `wc_MakeCert` will not be compiled.
+
+```c
+Cert root_cert;
+uint8_t der[512];
+
+wc_InitCert(&root_cert);
+root_cert.sigType = root_key_sigtype;
+root_cert.isCA = 1;
+// TODO: fill in subject, issuer, dates
+if ((der_sz = wc_MakeCert_ex(&root_cert, der, sizeof(der), root_key_type,
+                                &root_key, &rng)) <= 0) {
+    fprintf(stderr, "Failed to make cert (%d)\n", der_sz);
+    exit(-1);
+}
+if ((der_sz = wc_SignCert_ex(root_cert.bodySz, root_cert.sigType, der,
+                                sizeof(der), root_key_type, &root_key, &rng)) <
+    0) {
+    fprintf(stderr, "Failed to sign cert (%d)\n", der_sz);
+    exit(-1);
+}
+```

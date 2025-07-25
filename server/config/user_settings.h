@@ -484,6 +484,7 @@ extern "C" {
 #define HAVE_TLS_EXTENSIONS
 #define HAVE_SUPPORTED_CURVES
 #define WOLFSSL_BASE64_ENCODE
+#define WOLFSSL_CERT_GEN
 
 //#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
 //#define KEEP_PEER_CERT
