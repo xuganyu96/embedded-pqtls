@@ -1,4 +1,4 @@
-# July 24, 2025
+# Basic usage
 ## Compile the first program
 Set up the server project, containing programs that run on MacOS and/or Ubuntu Linux:
 
@@ -235,7 +235,6 @@ We can further verify that the TLS connection really works by sending an HTTPS r
     "Accept: application/json\r\n"                                             \
     "Connection: close\r\n\r\n"
 
-/* after connecting to wolfSSL */
 int main(void) {
     /* connect to github.com:443 */
     wolfSSL_write(ssl, HTTP_REQUEST, strlen(HTTP_REQUEST));
@@ -246,5 +245,38 @@ int main(void) {
     http_rx_buf[rx_buf_len] = '\0';
     printf("%s\n", http_rx_buf);
     /* clean-up */
+}
+```
+
+## Generate certificates and private keys
+At a minimum, TLS 1.3 requires server authentication in all handshakes,
+so before writing a TLS server, we first need to write a program for generating public-key certificates and private keys, which we will call `certgen`.
+
+For a first example, we will create a self-signed certificate (a chain of length 1) with some minimal information.
+We begin with generating an ECDSA keypair using the NIST curve P-256.
+WolfCrypt also supports RSA, Ed25519, and Ed448.
+
+```c
+#include "wolfssl/wolfcrypt/ecc.h"
+#include "wolfssl/wolfcrypt/random.h"
+
+int err;
+ecc_key root_key;
+enum ecc_curve_ids curve_id = ECC_SECP256R1;
+WC_RNG rng;
+wc_InitRng(&rng);
+
+if ((err = wc_ecc_init(&root_key)) < 0) {
+    fprintf(stderr, "Failed to init ECC key (%d)\n", err);
+    return -1;
+}
+if ((err = wc_ecc_make_key(&rng, wc_ecc_get_curve_size_from_id(curve_id),
+                            &root_key)) < 0) {
+    fprintf(stderr, "Failed to make ECC key (%d)\n", err);
+    return -1;
+}
+if ((err = wc_ecc_check_key(&root_key)) < 0) {
+    fprintf(stderr, "ECC key check failed (%d)\n", err);
+    return -1;
 }
 ```

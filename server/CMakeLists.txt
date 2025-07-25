@@ -36,3 +36,6 @@ add_compile_options(-Wall -Wextra)
 
 add_executable(tlsclient src/tlsclient.c)
 target_link_libraries(tlsclient wolfssl)
+
+add_executable(certgen src/certgen.c)
+target_link_libraries(certgen wolfssl)
