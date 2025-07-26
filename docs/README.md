@@ -252,112 +252,38 @@ int main(void) {
 At a minimum, TLS 1.3 requires server authentication in all handshakes,
 so before writing a TLS server, we first need to write a program for generating public-key certificates and private keys, which we will call `certgen`.
 
+### Private key
 For a first example, we will create a self-signed certificate (a chain of length 1) with some minimal information.
-We begin with generating an ECDSA keypair using the NIST curve P-256.
-WolfCrypt also supports RSA, Ed25519, and Ed448.
+The program will output a `ecdsa256.key` file that contains an ECDSA (P-256) private key encoded under DER, 
+and a `root.crt` file encoding an X.509 certificate UNDER PEM.
+The certificate will contain the corresponding public key.
+
+First we need to generate the ECDSA key pair.
 
 ```c
-#include "wolfssl/wolfcrypt/ecc.h"
-#include "wolfssl/wolfcrypt/random.h"
+if ((err = wc_ecc_init(&key)) < 0) {
+    fprintf(stderr, "Failed to init ECC key (err=%d)\n", err);
+    exit(EXIT_FAILURE);
+}
+if ((err = wc_ecc_make_key(&rng, curve_size, &key)) < 0) {
+    fprintf(stderr, "Failed to make ECC key (err=%d)\n", err);
+    exit(EXIT_FAILURE);
+}
+if ((err = wc_ecc_check_key(&key)) < 0) {
+    fprintf(stderr, "ECC key check failed (err=%d)\n", err);
+    exit(EXIT_FAILURE);
+}
+if ((err = wc_EccKeyToDer(&key, der, sizeof(der))) <= 0) {
+    fprintf(stderr, "Failed to DER-encode ECC key (err=%d)\n", err);
+    exit(EXIT_FAILURE);
+}
+printf("ECC key DER size %d\n", err);
 
-int err;
-ecc_key root_key;
-enum ecc_curve_ids curve_id = ECC_SECP256R1;
-WC_RNG rng;
-wc_InitRng(&rng);
-
-if ((err = wc_ecc_init(&root_key)) < 0) {
-    fprintf(stderr, "Failed to init ECC key (%d)\n", err);
-    return -1;
-}
-if ((err = wc_ecc_make_key(&rng, wc_ecc_get_curve_size_from_id(curve_id),
-                            &root_key)) < 0) {
-    fprintf(stderr, "Failed to make ECC key (%d)\n", err);
-    return -1;
-}
-if ((err = wc_ecc_check_key(&root_key)) < 0) {
-    fprintf(stderr, "ECC key check failed (%d)\n", err);
-    return -1;
-}
+/* fopen a file and write it */
 ```
 
-WolfCrypt includes an ASN.1 module (`asn_public.h`) with which one can build a certificate.
-The core data structure is the `Cert` struct, and the workflow goes:
-1. Fill in the identity section of the certificate
-1. Call `wc_MakeCert` with the keypair, which will DER serialize the unsigned certificate, including identity and public key, to a buffer
-1. Call `wc_SignCert` with the DER buffer to produce the signed DER buffer
-
-Note that `WOLFSSL_CERT_GEN` must be defined in `user_settings.h`, or functions like `wc_MakeCert` will not be compiled.
-
-```c
-Cert cert;
-uint8_t der[512], pem[512];
-int der_sz, pem_sz;
-
-wc_InitCert(&cert);
-cert.sigType = key_sigtype;
-cert.isCA = 1;
-// TODO: fill in subject, issuer, dates
-if ((der_sz = wc_MakeCert_ex(&cert, der, sizeof(der), key_type, &key,
-                                &rng)) <= 0) {
-    fprintf(stderr, "Failed to make cert (%d)\n", der_sz);
-    exit(-1);
-}
-if ((der_sz = wc_SignCert_ex(cert.bodySz, cert.sigType, der, sizeof(der),
-                                key_type, &key, &rng)) < 0) {
-    fprintf(stderr, "Failed to sign cert (%d)\n", der_sz);
-    exit(-1);
-}
-
-/* Convert to PEM and write to file */
-if ((pem_sz = wc_DerToPem(der, der_sz, pem, sizeof(pem), CERT_TYPE)) <= 0) {
-    fprintf(stderr, "Failed to make PEM (%d)\n", pem_sz);
-    exit(-1);
-}
-pem[pem_sz] = '\0';
-```
-
-You can then print `pem` with `printf("%s\n", pem)`, pipe the output to a file, and inspect the content using `openssl x509`:
+The output file `root.key` can be inspected using OpenSSL:
 
 ```bash
-# from project_root/server/
-cd build && cmake .. && make
-./certgen > root.crt
-openssl x509 -text -noout -in root.crt
-```
-
-Since we used ECDSA with P-256, the public key and signature algorithm fields of OpenSSL's output should show the appropriate value:
-
-```
-Certificate:
-    Data:
-        Version: 3 (0x2)
-        Serial Number:
-            0d:6b:63:0c:9a:a1:83:cd:d2:85:ed:0e:7b:2d:5b:13
-        Signature Algorithm: ecdsa-with-SHA256
-        Issuer: 
-        Validity
-            Not Before: Jul 25 00:29:16 2025 GMT
-            Not After : Dec  8 00:29:16 2026 GMT
-        Subject: 
-        Subject Public Key Info:
-            Public Key Algorithm: id-ecPublicKey
-                Public-Key: (256 bit)
-                pub:
-                    04:5d:c4:64:42:4a:ba:81:1a:68:24:36:d7:82:fa:
-                    b4:a4:11:73:ff:ab:29:72:d1:c5:15:b8:e3:fb:9c:
-                    2e:f7:50:fb:4d:c4:71:53:f4:15:f8:41:7d:dc:0a:
-                    0c:86:6f:6c:7e:e8:f9:60:55:d6:f9:fb:13:01:fd:
-                    d1:ce:da:09:c1
-                ASN1 OID: prime256v1
-                NIST CURVE: P-256
-        X509v3 extensions:
-            X509v3 Basic Constraints: 
-                CA:TRUE
-    Signature Algorithm: ecdsa-with-SHA256
-    Signature Value:
-        30:46:02:21:00:d2:37:93:64:6c:be:8e:68:21:34:ac:35:fa:
-        b3:d5:6e:2c:3a:fe:cc:0b:9f:00:eb:0c:1f:39:7d:cd:fa:44:
-        b9:02:21:00:cb:a7:f8:8b:30:0f:9d:e1:10:69:84:83:de:63:
-        97:be:d4:2e:48:94:7b:04:d5:d5:b9:eb:36:12:0c:36:ce:db
+openssl asn1parse -inform DER -in root.key
 ```

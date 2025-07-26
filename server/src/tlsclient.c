@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <wolfssl/ssl.h>
+#include "wolfssl/ssl.h"
 
 #define HTTP_REQUEST                                                           \
     "GET /octocat HTTP/1.1\r\n"                                                \
