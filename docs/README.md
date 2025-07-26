@@ -290,22 +290,74 @@ The core data structure is the `Cert` struct, and the workflow goes:
 Note that `WOLFSSL_CERT_GEN` must be defined in `user_settings.h`, or functions like `wc_MakeCert` will not be compiled.
 
 ```c
-Cert root_cert;
-uint8_t der[512];
+Cert cert;
+uint8_t der[512], pem[512];
+int der_sz, pem_sz;
 
-wc_InitCert(&root_cert);
-root_cert.sigType = root_key_sigtype;
-root_cert.isCA = 1;
+wc_InitCert(&cert);
+cert.sigType = key_sigtype;
+cert.isCA = 1;
 // TODO: fill in subject, issuer, dates
-if ((der_sz = wc_MakeCert_ex(&root_cert, der, sizeof(der), root_key_type,
-                                &root_key, &rng)) <= 0) {
+if ((der_sz = wc_MakeCert_ex(&cert, der, sizeof(der), key_type, &key,
+                                &rng)) <= 0) {
     fprintf(stderr, "Failed to make cert (%d)\n", der_sz);
     exit(-1);
 }
-if ((der_sz = wc_SignCert_ex(root_cert.bodySz, root_cert.sigType, der,
-                                sizeof(der), root_key_type, &root_key, &rng)) <
-    0) {
+if ((der_sz = wc_SignCert_ex(cert.bodySz, cert.sigType, der, sizeof(der),
+                                key_type, &key, &rng)) < 0) {
     fprintf(stderr, "Failed to sign cert (%d)\n", der_sz);
     exit(-1);
 }
+
+/* Convert to PEM and write to file */
+if ((pem_sz = wc_DerToPem(der, der_sz, pem, sizeof(pem), CERT_TYPE)) <= 0) {
+    fprintf(stderr, "Failed to make PEM (%d)\n", pem_sz);
+    exit(-1);
+}
+pem[pem_sz] = '\0';
+```
+
+You can then print `pem` with `printf("%s\n", pem)`, pipe the output to a file, and inspect the content using `openssl x509`:
+
+```bash
+# from project_root/server/
+cd build && cmake .. && make
+./certgen > root.crt
+openssl x509 -text -noout -in root.crt
+```
+
+Since we used ECDSA with P-256, the public key and signature algorithm fields of OpenSSL's output should show the appropriate value:
+
+```
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            0d:6b:63:0c:9a:a1:83:cd:d2:85:ed:0e:7b:2d:5b:13
+        Signature Algorithm: ecdsa-with-SHA256
+        Issuer: 
+        Validity
+            Not Before: Jul 25 00:29:16 2025 GMT
+            Not After : Dec  8 00:29:16 2026 GMT
+        Subject: 
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                pub:
+                    04:5d:c4:64:42:4a:ba:81:1a:68:24:36:d7:82:fa:
+                    b4:a4:11:73:ff:ab:29:72:d1:c5:15:b8:e3:fb:9c:
+                    2e:f7:50:fb:4d:c4:71:53:f4:15:f8:41:7d:dc:0a:
+                    0c:86:6f:6c:7e:e8:f9:60:55:d6:f9:fb:13:01:fd:
+                    d1:ce:da:09:c1
+                ASN1 OID: prime256v1
+                NIST CURVE: P-256
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:TRUE
+    Signature Algorithm: ecdsa-with-SHA256
+    Signature Value:
+        30:46:02:21:00:d2:37:93:64:6c:be:8e:68:21:34:ac:35:fa:
+        b3:d5:6e:2c:3a:fe:cc:0b:9f:00:eb:0c:1f:39:7d:cd:fa:44:
+        b9:02:21:00:cb:a7:f8:8b:30:0f:9d:e1:10:69:84:83:de:63:
+        97:be:d4:2e:48:94:7b:04:d5:d5:b9:eb:36:12:0c:36:ce:db
 ```
