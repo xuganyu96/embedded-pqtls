@@ -7,6 +7,33 @@
 
 #define MAX_DER_SZ 12000
 #define MAX_PEM_SZ MAX_DER_SZ
+#define COUNTRY "CA"
+#define STATE "ON"
+#define LOCALITY "Waterloo"
+#define ORG "University of Waterloo"
+
+static void set_certname(CertName *id, const char *country, const char *state,
+                         const char *locality, const char *org,
+                         const char *common_name) {
+    if (id == NULL) {
+        return;
+    }
+    if (country != NULL) {
+        strncpy(id->country, country, CTC_NAME_SIZE);
+    }
+    if (state != NULL) {
+        strncpy(id->state, state, CTC_NAME_SIZE);
+    }
+    if (locality != NULL) {
+        strncpy(id->locality, locality, CTC_NAME_SIZE);
+    }
+    if (org != NULL) {
+        strncpy(id->org, org, CTC_NAME_SIZE);
+    }
+    if (common_name != NULL) {
+        strncpy(id->commonName, common_name, CTC_NAME_SIZE);
+    }
+}
 
 int main(void) {
     int err, der_len;
@@ -20,6 +47,7 @@ int main(void) {
 
     wc_InitRng(&rng);
 
+    /* ECDSA key */
     if ((err = wc_ecc_init(&key)) < 0) {
         fprintf(stderr, "Failed to init ECC key (err=%d)\n", err);
         exit(EXIT_FAILURE);
@@ -46,6 +74,16 @@ int main(void) {
     printf("Wrote %zu to %s\n", written, keyfile);
     fclose(fd);
 
+    /* certificate */
+    Cert cert;
+    if ((err = wc_InitCert(&cert)) < 0) {
+        fprintf(stderr, "Failed to init cert (err=%d)\n", err);
+        exit(EXIT_FAILURE);
+    }
+    set_certname(&cert.subject, COUNTRY, STATE, LOCALITY, ORG,
+                 "*.eng.uwaterloo.ca");
+    set_certname(&cert.issuer, COUNTRY, STATE, LOCALITY, ORG,
+                 "certauthority.eng.uwaterloo.ca");
 
     printf("Ok.\n");
     return 0;

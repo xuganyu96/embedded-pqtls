@@ -287,3 +287,52 @@ The output file `root.key` can be inspected using OpenSSL:
 ```bash
 openssl asn1parse -inform DER -in root.key
 ```
+
+### Certificate body
+The body of the certificate contains the identity of the subject/issuer, the subject's public key, and a slew of other information.
+We begin with a `Cert` struct:
+
+```c
+#include "wolfssl/wolfcrypt/asn_public.h"
+
+Cert cert;
+wc_InitCert(&cert);
+```
+
+Identity information about the subject and the issuer is encoded using UTF-8 strings, which is filled in to the appropriate fields with `strncpy`:
+
+```c
+strncpy(cert.subject.country, "CA", CTC_NAME_SIZE);
+strncpy(cert.subject.state, "ON", CTC_NAME_SIZE);
+strncpy(cert.subject.locality, "Waterloo", CTC_NAME_SIZE);
+strncpy(cert.subject.org, "University of Waterloo", CTC_NAME_SIZE);
+strncpy(cert.subject.commonName, "*.uwaterloo.ca", CTC_NAME_SIZE);
+```
+
+Since we need to copy information for both subject and issuer, and later we will need to do this for four certificates (root CA, intermediate CA, server, client),
+it helps to have a function that hides away the repetition:
+
+```c
+static void set_certname(CertName *id, const char *country, const char *state,
+                         const char *locality, const char *org,
+                         const char *common_name) {
+    if (id == NULL) {
+        return;
+    }
+    if (country != NULL) {
+        strncpy(id->country, country, CTC_NAME_SIZE);
+    }
+    if (state != NULL) {
+        strncpy(id->state, state, CTC_NAME_SIZE);
+    }
+    if (locality != NULL) {
+        strncpy(id->locality, locality, CTC_NAME_SIZE);
+    }
+    if (org != NULL) {
+        strncpy(id->org, org, CTC_NAME_SIZE);
+    }
+    if (common_name != NULL) {
+        strncpy(id->commonName, common_name, CTC_NAME_SIZE);
+    }
+}
+```
