@@ -336,3 +336,19 @@ static void set_certname(CertName *id, const char *country, const char *state,
     }
 }
 ```
+
+Another piece of non-cryptographic information we are interested in is the date range for which the certificate is valid.
+One way to express such date range is with a pair of dates "not before" and "not after".
+In X.509 certificates, dates are formatted according to the UTC time format `YYMMDDHHMMSSZ`.
+Here is how we work with date range:
+
+```c
+static void set_utctime(byte *dst, int *dst_sz, const char *datestr) {
+    dst[0] = ASN_UTC_TIME;
+    dst[1] = ASN_UTC_TIME_SIZE - 1;
+    memcpy(dst + 2, datestr, strlen(datestr));
+    *dst_sz = 2 + strlen(datestr);
+}
+set_utctime(cert.beforeDate, &cert.beforeDateSz, NOT_BEFORE_DATE);
+set_utctime(cert.afterDate, &cert.afterDateSz, NOT_AFTER_DATE);
+```

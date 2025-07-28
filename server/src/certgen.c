@@ -4,6 +4,7 @@
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/ecc.h"
 #include "wolfssl/wolfcrypt/random.h"
+#include "wolfssl/wolfcrypt/asn.h"
 
 #define MAX_DER_SZ 12000
 #define MAX_PEM_SZ MAX_DER_SZ
@@ -11,6 +12,9 @@
 #define STATE "ON"
 #define LOCALITY "Waterloo"
 #define ORG "University of Waterloo"
+/* UTCTime format: YYMMDDHHMMSSZ */
+#define NOT_BEFORE_DATE "250101000000Z"
+#define NOT_AFTER_DATE "350101000000Z"
 
 static void set_certname(CertName *id, const char *country, const char *state,
                          const char *locality, const char *org,
@@ -33,6 +37,15 @@ static void set_certname(CertName *id, const char *country, const char *state,
     if (common_name != NULL) {
         strncpy(id->commonName, common_name, CTC_NAME_SIZE);
     }
+}
+
+/* Copy the date string from `datestr` to the destination
+ */
+static void set_utctime(byte *dst, int *dst_sz, const char *datestr) {
+    dst[0] = ASN_UTC_TIME;
+    dst[1] = ASN_UTC_TIME_SIZE - 1;
+    memcpy(dst + 2, datestr, strlen(datestr));
+    *dst_sz = 2 + strlen(datestr);
 }
 
 int main(void) {
@@ -84,6 +97,8 @@ int main(void) {
                  "*.eng.uwaterloo.ca");
     set_certname(&cert.issuer, COUNTRY, STATE, LOCALITY, ORG,
                  "certauthority.eng.uwaterloo.ca");
+    set_utctime(cert.beforeDate, &cert.beforeDateSz, NOT_BEFORE_DATE);
+    set_utctime(cert.afterDate, &cert.afterDateSz, NOT_AFTER_DATE);
 
     printf("Ok.\n");
     return 0;
