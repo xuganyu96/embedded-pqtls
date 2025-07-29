@@ -288,7 +288,7 @@ The output file `root.key` can be inspected using OpenSSL:
 openssl asn1parse -inform DER -in root.key
 ```
 
-### Certificate body
+### Certificate
 The body of the certificate contains the identity of the subject/issuer, the subject's public key, and a slew of other information.
 We begin with a `Cert` struct:
 
@@ -339,7 +339,7 @@ static void set_certname(CertName *id, const char *country, const char *state,
 
 Another piece of non-cryptographic information we are interested in is the date range for which the certificate is valid.
 One way to express such date range is with a pair of dates "not before" and "not after".
-In X.509 certificates, dates are formatted according to the UTC time format `YYMMDDHHMMSSZ`.
+In X.509 certificates, dates are formatted according to the UTC time format `YYMMDDHHMMSSZ` (see [RFC 5280](https://datatracker.ietf.org/doc/html/rfc5280)).
 Here is how we work with date range:
 
 ```c
@@ -352,3 +352,75 @@ static void set_utctime(byte *dst, int *dst_sz, const char *datestr) {
 set_utctime(cert.beforeDate, &cert.beforeDateSz, NOT_BEFORE_DATE);
 set_utctime(cert.afterDate, &cert.afterDateSz, NOT_AFTER_DATE);
 ```
+
+There are a few other relevant but optional attributes to play with, such as `cert.isCA`, which corresponds to a X.509v3 extension, but we will ignore them for now.
+
+WolfCrypt's `MakeCert` and `SignCert` API's are used to serialize the certificate, then sign the certificate body.
+We will convert the DER-encoded certificate to PEM format because `openssl s_client`'s `-CAfile` argument only accepts PEM format.
+
+```c
+int key_keytype = ECC_TYPE;
+int key_sigtype = CTC_SHA256wECDSA;
+if ((err = wc_MakeCert_ex(&cert, der, sizeof(der), key_keytype, &key,
+                            &rng)) <= 0) {
+    fprintf(stderr, "Failed to encode certificate body (err=%d)\n", err);
+    exit(EXIT_FAILURE);
+}
+der_len = err;
+if ((err = wc_SignCert_ex(cert.bodySz, key_sigtype, der, sizeof(der),
+                            key_keytype, &key, &rng)) <= 0) {
+    fprintf(stderr, "Failed to sign certificate (err=%d)\n", err);
+    exit(EXIT_FAILURE);
+}
+der_len = err;
+if ((err = wc_DerToPem(der, der_len, pem, sizeof(pem), CERT_TYPE)) <= 0) {
+    fprintf(stderr, "Failed to convert DER to PEM (err=%d)\n", err);
+    exit(EXIT_FAILURE);
+}
+pem_len = err;
+```
+
+We can output the certificate to the filesystem and inspect it with OpenSSL's `openssl x509 -noout -text -in root.crt` command, which should output something that looks like this:
+
+```
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            55:c3:06:41:c7:d2:bd:cc:88:52:fe:91:20:ed:14:4d
+        Signature Algorithm: ecdsa-with-SHA256
+        Issuer: C=CA, ST=ON, L=Waterloo, O=University of Waterloo, CN=*.eng.uwaterloo.ca
+        Validity
+            Not Before: Jan  1 00:00:00 2025 GMT
+            Not After : Jan  1 00:00:00 2035 GMT
+        Subject: C=CA, ST=ON, L=Waterloo, O=University of Waterloo, CN=*.eng.uwaterloo.ca
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                pub:
+                    04:05:ca:d0:8b:1a:ab:28:4b:43:f1:12:d2:37:00:
+                    f3:04:06:1b:0a:66:65:91:ed:92:c4:d9:ea:45:54:
+                    0a:99:41:57:e0:48:14:37:8e:bf:ac:05:b9:21:ed:
+                    1e:c6:dc:09:c0:52:c9:8c:81:52:73:42:c3:c8:e3:
+                    48:f9:60:68:3d
+                ASN1 OID: prime256v1
+                NIST CURVE: P-256
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:TRUE
+    Signature Algorithm: ecdsa-with-SHA256
+    Signature Value:
+        30:44:02:20:6c:aa:19:0a:10:fb:af:68:2f:6d:f7:b3:6e:de:
+        d3:5c:11:c8:ab:ec:66:df:11:7e:75:05:20:de:db:55:38:03:
+        02:20:34:64:ec:d5:ca:6c:03:61:2e:d4:51:87:35:e0:e7:4e:
+        92:51:03:3f:33:97:8a:94:e6:d1:ec:29:5f:2c:b0:00
+```
+
+We can further check the validity of the certificate and the key using `openssl s_server` and `openssl s_client`:
+
+```bash
+openssl s_server -cert root.crt -key root.key -port 8000
+openssl s_client -CAfile root.crt -verify_return_error -connect localhost:8000 < /dev/null
+```
+
+The client should report `Verify report code: 0 (ok)`.
