@@ -424,3 +424,20 @@ openssl s_client -CAfile root.crt -verify_return_error -connect localhost:8000 <
 ```
 
 The client should report `Verify report code: 0 (ok)`.
+
+### Certificate chain
+Today on the real Internet we usually work with a chain of multiple certificates.
+Each certificate is issued by a different person or institute, and with varying expiration date ranges, public keys, and signature types.
+Certificate Authorities are institutes that can issue other certificates, and the leaf certificates are owned by individual domains, and are what was sent to the client during the TLS handshake.
+
+The complete `certgen` program will generate the following certificate chain:
+
+```
+root   -->   intermediate   -->   server
+  |
+client
+```
+
+With `root` and `intermediate` being CAs and server/client being end entities.
+When authenticating the server, client holds the root certificate, and server sends a chain that contains server and intermediate CA in this order.
+When authenticating the client, server holds the root certificate, and client sends its own certificate.

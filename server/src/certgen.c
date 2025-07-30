@@ -40,6 +40,9 @@ static void set_certname(CertName *id, const char *country, const char *state,
 }
 
 /* Copy the date string from `datestr` to the destination
+ *
+ * @param dst: must be cert->beforeDate or cert->afterDate
+ * @param dst_sz: must be pointer to cert->beforeDateSz or cert->afterDateSz
  */
 static void set_utctime(byte *dst, int *dst_sz, const char *datestr) {
     dst[0] = ASN_UTC_TIME;
@@ -57,6 +60,7 @@ int main(void) {
     uint8_t der[MAX_DER_SZ], pem[MAX_PEM_SZ];
     WC_RNG rng;
     const char keyfile[] = "root.key";
+    const char certfile[] = "root.crt";
 
     wc_InitRng(&rng);
 
@@ -123,8 +127,6 @@ int main(void) {
     }
     pem_len = err;
 
-    /* TODO: convert to PEM */
-    const char certfile[] = "root.crt";
     if ((fd = fopen(certfile, "wb")) == NULL) {
         fprintf(stderr, "Failed to open %s\n", certfile);
         exit(EXIT_FAILURE);
