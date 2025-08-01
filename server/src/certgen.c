@@ -297,7 +297,62 @@ int CliArgs_parse(struct CliArgs *args, int argc, char *argv[]) {
     return 0;
 }
 
-int alloc_make_key(void **key, int key_type, int sig_type) { return -1; }
+static int alloc_make_ecc_key(void **key, int key_type, int sig_type,
+                              WC_RNG *rng) {
+    int err = BAD_FUNC_ARG;
+
+    int is_valid_sig_type = (sig_type == CTC_SHA256wECDSA) ||
+                            (sig_type == CTC_SHA384wECDSA) ||
+                            (sig_type == CTC_SHA512wECDSA);
+    if ((key == NULL) || (key_type != ECC_TYPE) || !is_valid_sig_type ||
+        (rng == NULL)) {
+        return BAD_FUNC_ARG;
+    }
+
+    /* TODO: alloc key, make key */
+
+    return err;
+}
+
+/* Using key_type and sig_type as hints, allocate space for the some
+ * cryptographic key type, then generate a random key for that type
+ */
+int alloc_make_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
+    int err;
+
+    switch (key_type) {
+#ifdef WOLFSSL_KEY_GEN
+    case RSA_TYPE:
+        err = alloc_make_rsa_key(key, key_type, sig_type, rng);
+        break;
+#endif
+    case ECC_TYPE:
+        err = alloc_make_ecc_key(key, key_type, sig_type, rng);
+        break;
+#ifdef HAVE_ED25519
+    case ED25519_TYPE:
+        err = alloc_make_ed25519_key(key, key_type, sig_type, rng);
+        break;
+#endif
+#ifdef HAVE_ED448
+    case ED448_TYPE:
+        err = alloc_make_ed448_key(key, key_type, sig_type, rng);
+        break;
+#endif
+#ifdef HAVE_DILITHIUM
+    case ML_DSA_LEVEL2_TYPE:
+    case ML_DSA_LEVEL3_TYPE:
+    case ML_DSA_LEVEL5_TYPE:
+        err = alloc_make_mldsa_key(key, key_type, sig_type, rng);
+        break;
+#endif
+    default:
+        err = BAD_FUNC_ARG;
+        break;
+    }
+
+    return err;
+}
 
 int free_key(void *key, int key_type, int sig_type) { return -1; }
 
@@ -308,7 +363,7 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
     return -1;
 }
 
-int generate_cert_chain(struct CliArgs *args) {
+int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
     int err = 0;
 
     void *root_key = NULL, *int_key = NULL, *server_key = NULL,
@@ -316,19 +371,19 @@ int generate_cert_chain(struct CliArgs *args) {
     Cert root_cert, int_cert, server_cert, client_cert;
 
     if ((err = alloc_make_key(&root_key, args->root_key_type,
-                              args->root_sig_type)) < 0) {
+                              args->root_sig_type, rng)) < 0) {
         goto cleanup;
     }
-    if ((err = alloc_make_key(&int_key, args->int_key_type,
-                              args->int_sig_type)) < 0) {
+    if ((err = alloc_make_key(&int_key, args->int_key_type, args->int_sig_type,
+                              rng)) < 0) {
         goto cleanup;
     }
     if ((err = alloc_make_key(&server_key, args->server_key_type,
-                              args->server_sig_type)) < 0) {
+                              args->server_sig_type, rng)) < 0) {
         goto cleanup;
     }
     if ((err = alloc_make_key(&client_key, args->client_key_type,
-                              args->client_sig_type)) < 0) {
+                              args->client_sig_type, rng)) < 0) {
         goto cleanup;
     }
 
@@ -407,7 +462,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if ((err = generate_cert_chain(&args)) < 0) {
+    WC_RNG rng;
+    wc_InitRng(&rng);
+    if ((err = generate_cert_chain(&args, &rng)) < 0) {
         fprintf(stderr, "Failed to generate cert chain (err=%d)\n", err);
         exit(EXIT_FAILURE);
     }

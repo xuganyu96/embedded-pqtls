@@ -246,6 +246,14 @@ extern "C" {
     #endif
 #endif
 
+/* Ed448 / Curve25519 */
+#undef HAVE_CURVE448
+#undef HAVE_ED448
+#if 0
+    #define HAVE_CURVE448
+    #define HAVE_ED448 /*Requires SHA512 */
+#endif
+
 
 /* ------------------------------------------------------------------------- */
 /* Hashing */
@@ -486,9 +494,11 @@ extern "C" {
 #define WOLFSSL_BASE64_ENCODE
 #define WOLFSSL_CERT_GEN
 
-//#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
-//#define KEEP_PEER_CERT
-//#define HAVE_COMP_KEY
+#if 0
+#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
+#endif
+// #define KEEP_PEER_CERT
+// #define HAVE_COMP_KEY
 
 /* TLS Session Cache */
 #if 0
@@ -497,6 +507,10 @@ extern "C" {
     #define NO_SESSION_CACHE
 #endif
 
+#if 0
+    #define HAVE_DILITHIUM
+    #define WOLFSSL_WC_DILITHIUM
+#endif
 
 /* ------------------------------------------------------------------------- */
 /* Disable Features */
