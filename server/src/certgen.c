@@ -49,6 +49,17 @@
 #define SIGTYPE_MLDSA65 "mldsa65"
 #define SIGTYPE_MLDSA87 "mldsa87"
 
+/* Write data to <dir>/<filename>
+ *
+ * It is safe to assume that `dir` will not end on a slash
+ */
+static int write_to_file(const char *dir, const char *filename, uint8_t *data,
+                         size_t len) {
+    char filepath[MAX_DIRPATH_SZ];
+    snprintf(filepath, sizeof(filepath), "%s/%s", dir, filename);
+    printf("%s\n", filepath);
+}
+
 static void set_certname(CertName *id, const char *country, const char *state,
                          const char *locality, const char *org,
                          const char *common_name) {
@@ -172,14 +183,14 @@ void example(void) {
 }
 
 struct CliArgs {
-    int root_ktype;
-    int root_stype;
-    int int_ktype;
-    int int_stype;
-    int server_ktype;
-    int server_stype;
-    int client_ktype;
-    int client_stype;
+    int root_key_type;
+    int root_sig_type;
+    int int_key_type;
+    int int_sig_type;
+    int server_key_type;
+    int server_sig_type;
+    int client_key_type;
+    int client_sig_type;
     char certdir[MAX_DIRPATH_SZ];
 };
 
@@ -269,20 +280,20 @@ int CliArgs_parse(struct CliArgs *args, int argc, char *argv[]) {
         return -1;
     }
     int err;
-    if ((err = get_keytype_sigtype(&args->root_ktype, &args->root_stype,
+    if ((err = get_keytype_sigtype(&args->root_key_type, &args->root_sig_type,
                                    argv[1])) < 0) {
         return err;
     }
-    if ((err = get_keytype_sigtype(&args->int_ktype, &args->int_stype,
+    if ((err = get_keytype_sigtype(&args->int_key_type, &args->int_sig_type,
                                    argv[2])) < 0) {
         return err;
     }
-    if ((err = get_keytype_sigtype(&args->server_ktype, &args->server_stype,
-                                   argv[3])) < 0) {
+    if ((err = get_keytype_sigtype(&args->server_key_type,
+                                   &args->server_sig_type, argv[3])) < 0) {
         return err;
     }
-    if ((err = get_keytype_sigtype(&args->client_ktype, &args->client_stype,
-                                   argv[4])) < 0) {
+    if ((err = get_keytype_sigtype(&args->client_key_type,
+                                   &args->client_sig_type, argv[4])) < 0) {
         return err;
     }
 
@@ -399,6 +410,46 @@ int alloc_make_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
     return err;
 }
 
+/* A wrapper around the various KeyToDer methods
+ */
+int key_to_der(void *key, int key_type, byte *buf, word32 bufcap) {
+    int err = 0;
+
+    if ((key == NULL) || (buf == NULL) || (bufcap <= 0)) {
+        return BAD_FUNC_ARG;
+    }
+
+    switch (key_type) {
+#ifdef WOLFSSL_KEY_GEN
+    case RSA_TYPE:
+        break;
+#endif
+#ifdef HAVE_ECC
+    case ECC_TYPE:
+        err = wc_EccKeyToDer(key, buf, bufcap);
+        break;
+#endif
+#ifdef HAVE_ED25519
+    case ED25519_TYPE:
+        break;
+#endif
+#ifdef HAVE_ED448
+    case ED448_TYPE:
+        break;
+#endif
+#ifdef HAVE_DILITHIUM
+    case ML_DSA_LEVEL2_TYPE:
+    case ML_DSA_LEVEL3_TYPE:
+    case ML_DSA_LEVEL5_TYPE:
+        break;
+#endif
+    default:
+        return NOT_COMPILED_IN;
+    }
+
+    return err;
+}
+
 int free_key(void *key, int key_type, int sig_type) {
     (void)sig_type;
     if (key == NULL) {
@@ -466,27 +517,39 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
     return err;
 }
 
+/* Generate a certificate chain: root -> int -> server and root -> client
+ *
+ * The final output should include five files:
+ * - server.crt: PEM-encoded certificate chain including server and int pubkey
+ * - server.key: DER-encoded private key for server authentication
+ * - client.crt: PEM-encoded certificate including client pubkey
+ * - client.key: DER-encoded private key for client authentication
+ * - root.crt: PEM-encoded certificate including root CA's public key
+ */
 int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
     int err = 0;
 
     void *root_key = NULL, *int_key = NULL, *server_key = NULL,
          *client_key = NULL;
     Cert root_cert, int_cert, server_cert, client_cert;
+    byte pem[MAX_PEM_SZ], der[MAX_DER_SZ];
+    int pemsz, dersz;
 
-    if ((err = alloc_make_key(&root_key, args->root_ktype, args->root_stype,
+    if ((err = alloc_make_key(&root_key, args->root_key_type,
+                              args->root_sig_type, rng)) < 0) {
+        goto cleanup;
+    }
+    if ((err = alloc_make_key(&int_key, args->int_key_type, args->int_sig_type,
                               rng)) < 0) {
         goto cleanup;
     }
-    if ((err = alloc_make_key(&int_key, args->int_ktype, args->int_stype,
-                              rng)) < 0) {
+    if ((err = alloc_make_key(&server_key, args->server_key_type,
+                              args->server_sig_type, rng)) < 0) {
         goto cleanup;
     }
-    if ((err = alloc_make_key(&server_key, args->server_ktype,
-                              args->server_stype, rng)) < 0) {
-        goto cleanup;
-    }
-    if ((err = alloc_make_key(&client_key, args->client_ktype,
-                              args->client_stype, rng)) < 0) {
+    write_to_file(args->certdir, "server.key", NULL, 0);
+    if ((err = alloc_make_key(&client_key, args->client_key_type,
+                              args->client_sig_type, rng)) < 0) {
         goto cleanup;
     }
 
@@ -514,46 +577,51 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
     set_utctime(client_cert.afterDate, &client_cert.afterDateSz,
                 LONG_AFTER_DATE);
 
-    if ((err = make_sign_cert(&root_cert, root_key, args->root_ktype,
-                              args->root_stype, IS_CA, NULL, NULL, 0, 0, rng)) <
-        0) {
+    if ((err = make_sign_cert(&root_cert, root_key, args->root_key_type,
+                              args->root_sig_type, IS_CA, NULL, NULL, 0, 0,
+                              rng)) < 0) {
         goto cleanup;
     }
     printf("Root cert DER %d bytes\n", err);
-    if ((err = make_sign_cert(&int_cert, int_key, args->int_ktype,
-                              args->int_stype, IS_CA, &root_cert, root_key,
-                              args->root_ktype, args->root_stype, rng)) < 0) {
+    if ((err = make_sign_cert(&int_cert, int_key, args->int_key_type,
+                              args->int_sig_type, IS_CA, &root_cert, root_key,
+                              args->root_key_type, args->root_sig_type, rng)) <
+        0) {
         goto cleanup;
     }
     printf("Int cert DER %d bytes\n", err);
-    if ((err = make_sign_cert(&server_cert, server_key, args->server_ktype,
-                              args->server_stype, NOT_CA, &int_cert, int_key,
-                              args->int_ktype, args->int_stype, rng)) < 0) {
+    if ((err = make_sign_cert(&server_cert, server_key, args->server_key_type,
+                              args->server_sig_type, NOT_CA, &int_cert, int_key,
+                              args->int_key_type, args->int_sig_type, rng)) <
+        0) {
         goto cleanup;
     }
     printf("Server cert DER %d bytes\n", err);
-    if ((err = make_sign_cert(&client_cert, client_key, args->client_ktype,
-                              args->client_stype, NOT_CA, &root_cert, root_key,
-                              args->root_ktype, args->root_stype, rng)) < 0) {
+    if ((err = make_sign_cert(&client_cert, client_key, args->client_key_type,
+                              args->client_sig_type, NOT_CA, &root_cert,
+                              root_key, args->root_key_type,
+                              args->root_sig_type, rng)) < 0) {
         goto cleanup;
     }
     printf("Client cert DER %d bytes\n", err);
 
+    /* TODO: Write to output */
+
 cleanup:
     if (root_key) {
-        free_key(root_key, args->root_ktype, args->root_stype);
+        free_key(root_key, args->root_key_type, args->root_sig_type);
         root_key = NULL;
     }
     if (int_key) {
-        free_key(int_key, args->int_ktype, args->int_stype);
+        free_key(int_key, args->int_key_type, args->int_sig_type);
         int_key = NULL;
     }
     if (server_key) {
-        free_key(server_key, args->server_ktype, args->server_stype);
+        free_key(server_key, args->server_key_type, args->server_sig_type);
         server_key = NULL;
     }
     if (client_key) {
-        free_key(client_key, args->client_ktype, args->client_stype);
+        free_key(client_key, args->client_key_type, args->client_sig_type);
         client_key = NULL;
     }
 

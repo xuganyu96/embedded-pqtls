@@ -495,7 +495,7 @@ extern "C" {
 #define WOLFSSL_CERT_GEN
 
 #if 0
-#define WOLFSSL_KEY_GEN /* For RSA Key gen only */
+    #define WOLFSSL_KEY_GEN /* For RSA Key gen only */
 #endif
 // #define KEEP_PEER_CERT
 // #define HAVE_COMP_KEY
