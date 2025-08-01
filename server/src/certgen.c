@@ -7,6 +7,8 @@
 #include "wolfssl/wolfcrypt/ecc.h"
 #include "wolfssl/wolfcrypt/random.h"
 
+#define IS_CA 1
+#define NOT_CA 0
 #define MAX_DIRPATH_SZ 512
 #define MAX_DER_SZ 12000
 #define MAX_PEM_SZ MAX_DER_SZ
@@ -299,8 +301,8 @@ int CliArgs_parse(struct CliArgs *args, int argc, char *argv[]) {
 
 static int alloc_make_ecc_key(void **key, int key_type, int sig_type,
                               WC_RNG *rng) {
-    int err = BAD_FUNC_ARG;
-
+    int err = 0;
+    int curve_id;
     int is_valid_sig_type = (sig_type == CTC_SHA256wECDSA) ||
                             (sig_type == CTC_SHA384wECDSA) ||
                             (sig_type == CTC_SHA512wECDSA);
@@ -308,9 +310,46 @@ static int alloc_make_ecc_key(void **key, int key_type, int sig_type,
         (rng == NULL)) {
         return BAD_FUNC_ARG;
     }
+    switch (sig_type) {
+    case CTC_SHA256wECDSA:
+        curve_id = ECC_SECP256R1;
+        break;
+    case CTC_SHA384wECDSA:
+        curve_id = ECC_SECP384R1;
+        break;
+    case CTC_SHA512wECDSA:
+        curve_id = ECC_SECP521R1;
+        break;
+    default:
+        return NOT_COMPILED_IN;
+    }
 
-    /* TODO: alloc key, make key */
+    ecc_key *_key = malloc(sizeof(ecc_key));
+    if (_key == NULL) {
+        return MEMORY_E;
+    }
+    if ((err = wc_ecc_init(_key)) < 0) {
+        fprintf(stderr, "Failed to init ECC key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_ecc_make_key(rng, wc_ecc_get_curve_size_from_id(curve_id),
+                               _key)) < 0) {
+        fprintf(stderr, "Failed to make ECC key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_ecc_check_key(_key)) < 0) {
+        fprintf(stderr, "ECC key check failed (err=%d)\n", err);
+    }
 
+cleanup:
+    if (err != 0) {
+        /* something went wrong, need to free the key */
+        wc_ecc_free(_key);
+        free(_key);
+        return err;
+    }
+    /* everything worked, swap the input pointer with the internal pointer */
+    *key = _key;
     return err;
 }
 
@@ -354,13 +393,71 @@ int alloc_make_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
     return err;
 }
 
-int free_key(void *key, int key_type, int sig_type) { return -1; }
+int free_key(void *key, int key_type, int sig_type) {
+    (void)sig_type;
+    if (key == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    switch (key_type) {
+    case ECC_TYPE:
+        wc_ecc_free(key);
+        break;
+    default:
+        return NOT_COMPILED_IN;
+    }
+    free(key);
+    return 0;
+}
 
+/* Make a signed certificate based on the identity information supplied in
+ * subj_cert, containing the public key from subj_key.
+ *
+ * If issuer_cert, issuer_key, issuer_key_type, and issuer_sig_type are all
+ * supplied, then subj_cert will be signed by the supplied issuer. If not, then
+ * subj_cert will be self-signed
+ *
+ * Return the length of the DER encoding upon success.
+ */
 int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
-                   int subj_sig_type, Cert *issuer_cert, void *issuer_key,
-                   int issuer_key_type, int issuer_sig_type) {
-    /* TODO: write to buffer, or write to file? */
-    return -1;
+                   int subj_sig_type, int subj_is_ca, Cert *issuer_cert,
+                   void *issuer_key, int issuer_key_type, int issuer_sig_type,
+                   WC_RNG *rng) {
+    int err = 0;
+    byte der[MAX_DER_SZ];
+
+    int self_signed = (issuer_cert == NULL) || (issuer_key == NULL) ||
+                      (issuer_key_type == 0) || (issuer_sig_type == 0);
+
+    /* Copy issuer information */
+    if (self_signed) {
+        set_certname(&subj_cert->issuer, subj_cert->subject.country,
+                     subj_cert->subject.state, subj_cert->subject.locality,
+                     subj_cert->subject.org, subj_cert->subject.commonName);
+    } else {
+        set_certname(&subj_cert->issuer, issuer_cert->subject.country,
+                     issuer_cert->subject.state, issuer_cert->subject.locality,
+                     issuer_cert->subject.org, issuer_cert->subject.commonName);
+    }
+    subj_cert->sigType = subj_sig_type;
+    subj_cert->isCA = subj_is_ca;
+
+    if ((err = wc_MakeCert_ex(subj_cert, der, sizeof(der), subj_key_type,
+                              subj_key, rng)) < 0) {
+        fprintf(stderr, "Failed to make cert (err=%d)\n", err);
+        return err;
+    }
+    if (self_signed) {
+        err = wc_SignCert_ex(subj_cert->bodySz, subj_sig_type, der, sizeof(der),
+                             subj_key_type, subj_key, rng);
+    } else {
+        err = wc_SignCert_ex(subj_cert->bodySz, issuer_sig_type, der,
+                             sizeof(der), issuer_key_type, issuer_key, rng);
+    }
+    if (err <= 0) {
+        fprintf(stderr, "Failed to sign cert (err=%d)\n", err);
+    }
+
+    return err;
 }
 
 int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
@@ -413,24 +510,32 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
                 LONG_AFTER_DATE);
 
     if ((err = make_sign_cert(&root_cert, root_key, args->root_key_type,
-                              args->root_sig_type, NULL, NULL, 0, 0)) < 0) {
+                              args->root_sig_type, IS_CA, NULL, NULL, 0, 0,
+                              rng)) < 0) {
         goto cleanup;
     }
+    printf("Root cert DER %d bytes\n", err);
     if ((err = make_sign_cert(&int_cert, int_key, args->int_key_type,
-                              args->int_sig_type, &root_cert, root_key,
-                              args->root_key_type, args->root_sig_type)) < 0) {
+                              args->int_sig_type, IS_CA, &root_cert, root_key,
+                              args->root_key_type, args->root_sig_type, rng)) <
+        0) {
         goto cleanup;
     }
+    printf("Int cert DER %d bytes\n", err);
     if ((err = make_sign_cert(&server_cert, server_key, args->server_key_type,
-                              args->server_sig_type, &int_cert, int_key,
-                              args->int_key_type, args->int_sig_type)) < 0) {
+                              args->server_sig_type, NOT_CA, &int_cert, int_key,
+                              args->int_key_type, args->int_sig_type, rng)) <
+        0) {
         goto cleanup;
     }
+    printf("Server cert DER %d bytes\n", err);
     if ((err = make_sign_cert(&client_cert, client_key, args->client_key_type,
-                              args->client_sig_type, &root_cert, root_key,
-                              args->root_key_type, args->root_sig_type)) < 0) {
+                              args->client_sig_type, NOT_CA, &root_cert,
+                              root_key, args->root_key_type,
+                              args->root_sig_type, rng)) < 0) {
         goto cleanup;
     }
+    printf("Client cert DER %d bytes\n", err);
 
 cleanup:
     if (root_key) {
