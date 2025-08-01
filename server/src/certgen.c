@@ -55,9 +55,21 @@
  */
 static int write_to_file(const char *dir, const char *filename, uint8_t *data,
                          size_t len) {
+    int err = 0;
     char filepath[MAX_DIRPATH_SZ];
     snprintf(filepath, sizeof(filepath), "%s/%s", dir, filename);
-    printf("%s\n", filepath);
+    FILE *dst = fopen(filepath, "wb");
+    if (dst == NULL) {
+        fprintf(stderr, "Failed to open %s\n", filepath);
+        return -1;
+    }
+    size_t written = fwrite(data, sizeof(uint8_t), len, dst);
+    if (written < len) {
+        fprintf(stderr, "Wrote %zu out of %zu bytes\n", written, len);
+    }
+    fclose(dst);
+
+    return err;
 }
 
 static void set_certname(CertName *id, const char *country, const char *state,
@@ -478,9 +490,10 @@ int free_key(void *key, int key_type, int sig_type) {
 int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
                    int subj_sig_type, int subj_is_ca, Cert *issuer_cert,
                    void *issuer_key, int issuer_key_type, int issuer_sig_type,
-                   WC_RNG *rng) {
+                   byte *out, word32 outcap, WC_RNG *rng) {
     int err = 0;
     byte der[MAX_DER_SZ];
+    int dersz;
 
     int self_signed = (issuer_cert == NULL) || (issuer_key == NULL) ||
                       (issuer_key_type == 0) || (issuer_sig_type == 0);
@@ -513,6 +526,10 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
     if (err <= 0) {
         fprintf(stderr, "Failed to sign cert (err=%d)\n", err);
     }
+    dersz = err;
+    if ((err = wc_DerToPem(der, dersz, out, outcap, CERT_TYPE)) <= 0) {
+        fprintf(stderr, "Failed to encode cert to PEM (err=%d)\n", err);
+    }
 
     return err;
 }
@@ -532,8 +549,8 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
     void *root_key = NULL, *int_key = NULL, *server_key = NULL,
          *client_key = NULL;
     Cert root_cert, int_cert, server_cert, client_cert;
-    byte pem[MAX_PEM_SZ], der[MAX_DER_SZ];
-    int pemsz, dersz;
+    byte buf1[MAX_PEM_SZ], buf2[MAX_PEM_SZ];
+    int buf1sz, buf2sz;
 
     if ((err = alloc_make_key(&root_key, args->root_key_type,
                               args->root_sig_type, rng)) < 0) {
@@ -547,9 +564,24 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
                               args->server_sig_type, rng)) < 0) {
         goto cleanup;
     }
-    write_to_file(args->certdir, "server.key", NULL, 0);
+    if ((err = key_to_der(server_key, args->server_key_type, buf1,
+                          sizeof(buf1))) <= 0) {
+        goto cleanup;
+    }
+    buf1sz = err;
+    if ((err = write_to_file(args->certdir, "server.key", buf1, buf1sz)) < 0) {
+        goto cleanup;
+    }
     if ((err = alloc_make_key(&client_key, args->client_key_type,
                               args->client_sig_type, rng)) < 0) {
+        goto cleanup;
+    }
+    if ((err = key_to_der(client_key, args->client_key_type, buf1,
+                          sizeof(buf1))) <= 0) {
+        goto cleanup;
+    }
+    buf1sz = err;
+    if ((err = write_to_file(args->certdir, "client.key", buf1, buf1sz)) < 0) {
         goto cleanup;
     }
 
@@ -579,33 +611,43 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
 
     if ((err = make_sign_cert(&root_cert, root_key, args->root_key_type,
                               args->root_sig_type, IS_CA, NULL, NULL, 0, 0,
-                              rng)) < 0) {
+                              buf1, sizeof(buf1), rng)) < 0) {
         goto cleanup;
     }
-    printf("Root cert DER %d bytes\n", err);
+    buf1sz = err;
+    if ((err = write_to_file(args->certdir, "root.crt", buf1, buf1sz)) < 0) {
+        goto cleanup;
+    }
     if ((err = make_sign_cert(&int_cert, int_key, args->int_key_type,
                               args->int_sig_type, IS_CA, &root_cert, root_key,
-                              args->root_key_type, args->root_sig_type, rng)) <
-        0) {
+                              args->root_key_type, args->root_sig_type, buf1,
+                              sizeof(buf1), rng)) < 0) {
         goto cleanup;
     }
-    printf("Int cert DER %d bytes\n", err);
+    buf1sz = err;
     if ((err = make_sign_cert(&server_cert, server_key, args->server_key_type,
                               args->server_sig_type, NOT_CA, &int_cert, int_key,
-                              args->int_key_type, args->int_sig_type, rng)) <
-        0) {
+                              args->int_key_type, args->int_sig_type, buf2,
+                              sizeof(buf2), rng)) < 0) {
         goto cleanup;
     }
-    printf("Server cert DER %d bytes\n", err);
+    buf2sz = err;
+    memcpy(buf2 + buf2sz, buf1, buf1sz);
+    if ((err = write_to_file(args->certdir, "server.crt", buf2,
+                             buf1sz + buf2sz)) < 0) {
+        goto cleanup;
+    }
     if ((err = make_sign_cert(&client_cert, client_key, args->client_key_type,
                               args->client_sig_type, NOT_CA, &root_cert,
                               root_key, args->root_key_type,
-                              args->root_sig_type, rng)) < 0) {
+                              args->root_sig_type, buf1, sizeof(buf1), rng)) <
+        0) {
         goto cleanup;
     }
-    printf("Client cert DER %d bytes\n", err);
-
-    /* TODO: Write to output */
+    buf1sz = err;
+    if ((err = write_to_file(args->certdir, "client.crt", buf1, buf1sz)) < 0) {
+        goto cleanup;
+    }
 
 cleanup:
     if (root_key) {
