@@ -5,7 +5,9 @@
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/ecc.h"
+#include "wolfssl/wolfcrypt/oid_sum.h"
 #include "wolfssl/wolfcrypt/random.h"
+#include "wolfssl/wolfcrypt/rsa.h"
 
 #define IS_CA 1
 #define NOT_CA 0
@@ -30,7 +32,9 @@
     "Usage: certgen <root> <int> <server> <client> <dir>\n"                    \
     "Generate a certificate chain and write the files to <dir>\n"              \
     "The first four arguments must be one of the supported signature type:\n"  \
-    "    - sha256rsa: 2048-bit RSA\n"                                          \
+    "    - sha256rsa: 2048-bit RSA w/ SHA-256\n"                               \
+    "    - sha384rsa: 2048-bit RSA w/ SHA-384\n"                               \
+    "    - sha512rsa: 2048-bit RSA w/ SHA-512\n"                               \
     "    - sha256ecdsa: ECDSA with P-256\n"                                    \
     "    - sha384ecdsa: ECDSA with P-384\n"                                    \
     "    - sha512ecdsa: ECDSA with P-521\n"                                    \
@@ -40,6 +44,8 @@
     "    - mldsa65: ML-DSA-65\n"                                               \
     "    - mldsa87: ML-DSA-87"
 #define SIGTYPE_SHA256RSA "sha256rsa"
+#define SIGTYPE_SHA384RSA "sha384rsa"
+#define SIGTYPE_SHA512RSA "sha512rsa"
 #define SIGTYPE_SHA256ECDSA "sha256ecdsa"
 #define SIGTYPE_SHA384ECDSA "sha384ecdsa"
 #define SIGTYPE_SHA512ECDSA "sha512ecdsa"
@@ -219,6 +225,16 @@ static int get_keytype_sigtype(int *key_type, int *sig_type, const char *name) {
         *sig_type = CTC_SHA256wRSA;
         return 0;
     }
+    if (strncmp(name, SIGTYPE_SHA384RSA, sizeof(SIGTYPE_SHA384RSA)) == 0) {
+        *key_type = RSA_TYPE;
+        *sig_type = CTC_SHA384wRSA;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_SHA512RSA, sizeof(SIGTYPE_SHA512RSA)) == 0) {
+        *key_type = RSA_TYPE;
+        *sig_type = CTC_SHA512wRSA;
+        return 0;
+    }
     if (strncmp(name, SIGTYPE_SHA256ECDSA, sizeof(SIGTYPE_SHA256ECDSA)) == 0) {
         *key_type = ECC_TYPE;
         *sig_type = CTC_SHA256wECDSA;
@@ -321,6 +337,57 @@ int CliArgs_parse(struct CliArgs *args, int argc, char *argv[]) {
 
     return 0;
 }
+
+#ifdef WOLFSSL_KEY_GEN
+/* Allocate space for an RSA key. Only 2048-bit RSA is supported for now.
+ *
+ * Return 0 on success.
+ */
+int alloc_make_rsa_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
+    int err = 0;
+    int is_valid_sig_type = (sig_type == CTC_SHA256wRSA) ||
+                            (sig_type == CTC_SHA384wRSA) ||
+                            (sig_type == CTC_SHA512wRSA);
+    if ((key == NULL) || (rng == NULL) || (key_type != RSA_TYPE) ||
+        !is_valid_sig_type) {
+        return BAD_FUNC_ARG;
+    }
+
+    RsaKey *rsakey = malloc(sizeof(RsaKey));
+    if (!rsakey) {
+        fprintf(stderr, "Failed to allocate for RsaKey\n");
+        return MEMORY_E;
+    }
+    if ((err = wc_InitRsaKey(rsakey, NULL)) < 0) {
+        fprintf(stderr, "Failed to init RSA key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_MakeRsaKey(rsakey, RSA_MIN_SIZE, WC_RSA_EXPONENT, rng)) < 0) {
+        fprintf(stderr, "Failed to make %d-bit RSA key (err=%d)\n",
+                RSA_MIN_SIZE, err);
+        goto cleanup;
+    }
+#ifdef WOLFSSL_RSA_KEY_CHECK
+    if ((err = wc_CheckRsaKey(rsakey)) < 0) {
+        fprintf(stderr, "RSA key check failed (err=%d)\n", err);
+        goto cleanup;
+    }
+#endif
+
+cleanup:
+    if (err != 0) {
+        /* Something went wrong, free the key */
+        wc_FreeRsaKey(rsakey);
+        if (rsakey) {
+            free(rsakey);
+        }
+    } else {
+        *key = rsakey;
+    }
+
+    return err;
+}
+#endif
 
 /* Allocate space for an ECC key, then generate a keypair.
  *
@@ -434,6 +501,7 @@ int key_to_der(void *key, int key_type, byte *buf, word32 bufcap) {
     switch (key_type) {
 #ifdef WOLFSSL_KEY_GEN
     case RSA_TYPE:
+        err = wc_RsaKeyToDer(key, buf, bufcap);
         break;
 #endif
 #ifdef HAVE_ECC
@@ -468,9 +536,16 @@ int free_key(void *key, int key_type, int sig_type) {
         return BAD_FUNC_ARG;
     }
     switch (key_type) {
+#ifdef WOLFSSL_KEY_GEN
+    case RSA_TYPE:
+        wc_FreeRsaKey(key);
+        break;
+#endif
+#ifdef HAVE_ECC
     case ECC_TYPE:
         wc_ecc_free(key);
         break;
+#endif
     default:
         return NOT_COMPILED_IN;
     }
@@ -495,8 +570,7 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
     byte der[MAX_DER_SZ];
     int dersz;
 
-    int self_signed = (issuer_cert == NULL) || (issuer_key == NULL) ||
-                      (issuer_key_type == 0) || (issuer_sig_type == 0);
+    int self_signed = (issuer_cert == NULL) || (issuer_key == NULL);
 
     /* Copy issuer information */
     if (self_signed) {
@@ -554,18 +628,23 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
 
     if ((err = alloc_make_key(&root_key, args->root_key_type,
                               args->root_sig_type, rng)) < 0) {
+        fprintf(stderr, "Failed to allocate or make root key (err=%d)\n", err);
         goto cleanup;
     }
     if ((err = alloc_make_key(&int_key, args->int_key_type, args->int_sig_type,
                               rng)) < 0) {
+        fprintf(stderr, "Failed to allocate or make int key (err=%d)\n", err);
         goto cleanup;
     }
     if ((err = alloc_make_key(&server_key, args->server_key_type,
                               args->server_sig_type, rng)) < 0) {
+        fprintf(stderr, "Failed to allocate or make server key (err=%d)\n",
+                err);
         goto cleanup;
     }
     if ((err = key_to_der(server_key, args->server_key_type, buf1,
                           sizeof(buf1))) <= 0) {
+        fprintf(stderr, "Failed to write server key to DER (err=%d)\n", err);
         goto cleanup;
     }
     buf1sz = err;
@@ -574,6 +653,8 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
     }
     if ((err = alloc_make_key(&client_key, args->client_key_type,
                               args->client_sig_type, rng)) < 0) {
+        fprintf(stderr, "Failed to allocate or make client key (err=%d)\n",
+                err);
         goto cleanup;
     }
     if ((err = key_to_der(client_key, args->client_key_type, buf1,
