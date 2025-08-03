@@ -4,8 +4,10 @@
 
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
+#include "wolfssl/wolfcrypt/dilithium.h"
 #include "wolfssl/wolfcrypt/ecc.h"
 #include "wolfssl/wolfcrypt/ed25519.h"
+#include "wolfssl/wolfcrypt/ed448.h"
 #include "wolfssl/wolfcrypt/oid_sum.h"
 #include "wolfssl/wolfcrypt/random.h"
 #include "wolfssl/wolfcrypt/rsa.h"
@@ -264,14 +266,17 @@ static int get_keytype_sigtype(int *key_type, int *sig_type, const char *name) {
     if (strncmp(name, SIGTYPE_MLDSA44, sizeof(SIGTYPE_MLDSA44)) == 0) {
         *key_type = ML_DSA_LEVEL2_TYPE;
         *sig_type = CTC_ML_DSA_LEVEL2;
+        return 0;
     }
     if (strncmp(name, SIGTYPE_MLDSA65, sizeof(SIGTYPE_MLDSA65)) == 0) {
         *key_type = ML_DSA_LEVEL3_TYPE;
         *sig_type = CTC_ML_DSA_LEVEL3;
+        return 0;
     }
     if (strncmp(name, SIGTYPE_MLDSA87, sizeof(SIGTYPE_MLDSA87)) == 0) {
         *key_type = ML_DSA_LEVEL5_TYPE;
         *sig_type = CTC_ML_DSA_LEVEL5;
+        return 0;
     }
     return BAD_FUNC_ARG;
 }
@@ -492,6 +497,108 @@ cleanup:
 }
 #endif
 
+#ifdef HAVE_ED448
+int alloc_make_ed448_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
+    int err = 0;
+
+    if ((key == NULL) || (rng == NULL) || (key_type != ED448_TYPE) ||
+        (sig_type != CTC_ED448)) {
+        return BAD_FUNC_ARG;
+    }
+
+    ed448_key *ed448key = malloc(sizeof(ed448_key));
+    if (ed448key == NULL) {
+        fprintf(stderr, "Failed to allocate for Ed448 key\n");
+        return MEMORY_E;
+    }
+
+    if ((err = wc_ed448_init(ed448key)) < 0) {
+        fprintf(stderr, "Failed to init Ed448 key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_ed448_make_key(rng, ED448_KEY_SIZE, ed448key)) < 0) {
+        fprintf(stderr, "Failed to make Ed448 key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_ed448_check_key(ed448key)) < 0) {
+        fprintf(stderr, "Ed448 key check failed (err=%d)\n", err);
+        goto cleanup;
+    }
+
+cleanup:
+    if (err) {
+        if (ed448key) {
+            wc_ed448_free(ed448key);
+            free(ed448key);
+        }
+    } else {
+        *key = ed448key;
+    }
+
+    return err;
+}
+#endif
+
+#ifdef HAVE_DILITHIUM
+int alloc_make_mldsa_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
+    int err = 0, level;
+    (void)sig_type;
+
+    if ((key == NULL) || (rng == NULL)) {
+        return BAD_FUNC_ARG;
+    }
+
+    switch (key_type) {
+    case ML_DSA_LEVEL2_TYPE:
+        level = 2;
+        break;
+    case ML_DSA_LEVEL3_TYPE:
+        level = 3;
+        break;
+    case ML_DSA_LEVEL5_TYPE:
+        level = 5;
+        break;
+    default:
+        return BAD_FUNC_ARG;
+    }
+
+    dilithium_key *mldsakey = malloc(sizeof(dilithium_key));
+    if (!mldsakey) {
+        fprintf(stderr, "Failed to allocate for dilithium_key\n");
+        return MEMORY_E;
+    }
+
+    if ((err = wc_dilithium_init(mldsakey)) < 0) {
+        fprintf(stderr, "Failed to init ML-DSA key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_dilithium_set_level(mldsakey, level)) < 0) {
+        fprintf(stderr, "Failed to set ML-DSA level (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_dilithium_make_key(mldsakey, rng)) < 0) {
+        fprintf(stderr, "Failed to init ML-DSA key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_dilithium_check_key(mldsakey)) < 0) {
+        fprintf(stderr, "Failed ML-DSA key check (err=%d)\n", err);
+        goto cleanup;
+    }
+
+cleanup:
+    if (err) {
+        if (mldsakey) {
+            wc_dilithium_free(mldsakey);
+            free(mldsakey);
+        }
+    } else {
+        *key = mldsakey;
+    }
+
+    return err;
+}
+#endif
+
 /* Using key_type and sig_type as hints, allocate space for the some
  * cryptographic key type, then generate a random key for that type
  */
@@ -559,12 +666,14 @@ int key_to_der(void *key, int key_type, byte *buf, word32 bufcap) {
 #endif
 #ifdef HAVE_ED448
     case ED448_TYPE:
+        err = wc_Ed448KeyToDer(key, buf, bufcap);
         break;
 #endif
 #ifdef HAVE_DILITHIUM
     case ML_DSA_LEVEL2_TYPE:
     case ML_DSA_LEVEL3_TYPE:
     case ML_DSA_LEVEL5_TYPE:
+        err = wc_MlDsaKey_PrivateKeyToDer(key, buf, bufcap);
         break;
 #endif
     default:
@@ -594,6 +703,16 @@ int free_key(void *key, int key_type, int sig_type) {
 #ifdef HAVE_ED25519
     case ED25519_TYPE:
         wc_ed25519_free(key);
+#endif
+#ifdef HAVE_ED448
+    case ED448_TYPE:
+        wc_ed448_free(key);
+#endif
+#ifdef HAVE_DILITHIUM
+    case ML_DSA_LEVEL2_TYPE:
+    case ML_DSA_LEVEL3_TYPE:
+    case ML_DSA_LEVEL5_TYPE:
+        wc_dilithium_free(key);
 #endif
     default:
         return NOT_COMPILED_IN;

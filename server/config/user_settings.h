@@ -249,7 +249,7 @@ extern "C" {
 /* Ed448 / Curve25519 */
 #undef HAVE_CURVE448
 #undef HAVE_ED448
-#if 0
+#if 1
     #define HAVE_CURVE448
     #define HAVE_ED448 /*Requires SHA512 */
 #endif
@@ -298,7 +298,7 @@ extern "C" {
 
 /* Sha3 */
 #undef WOLFSSL_SHA3
-#if 0
+#if 1
     #define WOLFSSL_SHA3
 #endif
 
@@ -508,9 +508,10 @@ extern "C" {
     #define NO_SESSION_CACHE
 #endif
 
-#if 0
+#if 1
     #define HAVE_DILITHIUM
     #define WOLFSSL_WC_DILITHIUM
+    #define WOLFSSL_SHAKE128 
 #endif
 
 /* ------------------------------------------------------------------------- */
