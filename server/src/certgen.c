@@ -570,10 +570,10 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
     byte der[MAX_DER_SZ];
     int dersz;
 
-    int self_signed = (issuer_cert == NULL) || (issuer_key == NULL);
+    subj_cert->selfSigned = (issuer_cert == NULL) || (issuer_key == NULL);
 
     /* Copy issuer information */
-    if (self_signed) {
+    if (subj_cert->selfSigned) {
         set_certname(&subj_cert->issuer, subj_cert->subject.country,
                      subj_cert->subject.state, subj_cert->subject.locality,
                      subj_cert->subject.org, subj_cert->subject.commonName);
@@ -590,7 +590,7 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
         fprintf(stderr, "Failed to make cert (err=%d)\n", err);
         return err;
     }
-    if (self_signed) {
+    if (subj_cert->selfSigned) {
         err = wc_SignCert_ex(subj_cert->bodySz, subj_sig_type, der, sizeof(der),
                              subj_key_type, subj_key, rng);
     } else {
@@ -706,6 +706,9 @@ int generate_cert_chain(struct CliArgs *args, WC_RNG *rng) {
         goto cleanup;
     }
     buf1sz = err;
+    if ((err = write_to_file(args->certdir, "int.crt", buf1, buf1sz)) < 0) {
+        goto cleanup;
+    }
     if ((err = make_sign_cert(&server_cert, server_key, args->server_key_type,
                               args->server_sig_type, NOT_CA, &int_cert, int_key,
                               args->int_key_type, args->int_sig_type, buf2,
