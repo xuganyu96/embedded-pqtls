@@ -5,6 +5,7 @@
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/ecc.h"
+#include "wolfssl/wolfcrypt/ed25519.h"
 #include "wolfssl/wolfcrypt/oid_sum.h"
 #include "wolfssl/wolfcrypt/random.h"
 #include "wolfssl/wolfcrypt/rsa.h"
@@ -449,6 +450,48 @@ cleanup:
     return err;
 }
 
+#ifdef HAVE_ED25519
+int alloc_make_ed25519_key(void **key, int key_type, int sig_type,
+                           WC_RNG *rng) {
+    int err = 0;
+
+    if ((key == NULL) || (rng == NULL) || (key_type != ED25519_TYPE) ||
+        (sig_type != CTC_ED25519)) {
+        return BAD_FUNC_ARG;
+    }
+
+    ed25519_key *ed25519key = malloc(sizeof(ed25519_key));
+    if (ed25519key == NULL) {
+        fprintf(stderr, "Failed to allocate ed25519_key\n");
+        return MEMORY_E;
+    }
+
+    if ((err = wc_ed25519_init(ed25519key)) < 0) {
+        fprintf(stderr, "Failed to init ed25519 key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_ed25519_make_key(rng, ED25519_KEY_SIZE, ed25519key)) < 0) {
+        fprintf(stderr, "Failed to make ed25519 key (err=%d)\n", err);
+        goto cleanup;
+    }
+    if ((err = wc_ed25519_check_key(ed25519key)) < 0) {
+        fprintf(stderr, "ed25519 key check failed (err=%d)\n", err);
+        goto cleanup;
+    }
+
+cleanup:
+    if (err != 0) {
+        if (ed25519key) {
+            wc_ed25519_free(ed25519key);
+            free(ed25519key);
+        }
+    } else {
+        *key = ed25519key;
+    }
+    return err;
+}
+#endif
+
 /* Using key_type and sig_type as hints, allocate space for the some
  * cryptographic key type, then generate a random key for that type
  */
@@ -511,6 +554,7 @@ int key_to_der(void *key, int key_type, byte *buf, word32 bufcap) {
 #endif
 #ifdef HAVE_ED25519
     case ED25519_TYPE:
+        err = wc_Ed25519KeyToDer(key, buf, bufcap);
         break;
 #endif
 #ifdef HAVE_ED448
@@ -535,6 +579,7 @@ int free_key(void *key, int key_type, int sig_type) {
     if (key == NULL) {
         return BAD_FUNC_ARG;
     }
+
     switch (key_type) {
 #ifdef WOLFSSL_KEY_GEN
     case RSA_TYPE:
@@ -545,6 +590,10 @@ int free_key(void *key, int key_type, int sig_type) {
     case ECC_TYPE:
         wc_ecc_free(key);
         break;
+#endif
+#ifdef HAVE_ED25519
+    case ED25519_TYPE:
+        wc_ed25519_free(key);
 #endif
     default:
         return NOT_COMPILED_IN;
