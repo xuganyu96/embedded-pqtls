@@ -43,6 +43,17 @@
     "must "                                                                    \
     "be a valid integer between 1 and 65535.\n"
 
+/* Return true if path points to a regular file */
+static int is_file(const char *path) {
+    struct stat target;
+    int err;
+    if ((err = stat(path, &target)) != 0) {
+        fprintf(stderr, "Cannot read from %s\n", path);
+        return 0;
+    }
+    return S_ISREG(target.st_mode);
+}
+
 struct CliArgs {
     char *cafile;
     char *keyfile;
@@ -52,13 +63,18 @@ struct CliArgs {
 };
 
 static int CliArgs_check(struct CliArgs *args) {
-    int err;
     if (args->certfile == NULL) {
         fprintf(stderr, "--certfile is required\n");
+        return -1;
+    } else if (!is_file(args->certfile)) {
+        fprintf(stderr, "%s is not valid file\n", args->certfile);
         return -1;
     }
     if (args->keyfile == NULL) {
         fprintf(stderr, "--keyfile is required\n");
+        return -1;
+    } else if (!is_file(args->keyfile)) {
+        fprintf(stderr, "%s is not valid file\n", args->keyfile);
         return -1;
     }
     if ((args->port < 1024) || (args->port > 65535)) {
@@ -68,33 +84,10 @@ static int CliArgs_check(struct CliArgs *args) {
         return -1;
     }
 
-    /* can safely assume args->certfile and args->keyfile are not NULL */
-    struct stat file;
-    if ((err = stat(args->certfile, &file)) != 0) {
-        fprintf(stderr, "%s is not a valid file\n", args->certfile);
-        return -1;
-    }
-    if (file.st_mode != S_IFREG) {
-        fprintf(stderr, "%s is not a valid file\n", args->certfile);
-        return -1;
-    }
-    if ((err = stat(args->keyfile, &file)) != 0) {
-        fprintf(stderr, "%s is not a valid file\n", args->keyfile);
-        return -1;
-    }
-    if (file.st_mode != S_IFREG) {
-        fprintf(stderr, "%s is not a valid file\n", args->keyfile);
-        return -1;
-    }
-
     /* If cafile is not NULL, then it must be regular file */
     if (args->cafile) {
-        if ((err = stat(args->cafile, &file)) != 0) {
-            fprintf(stderr, "%s is not a valid file\n", args->cafile);
-            return -1;
-        }
-        if (file.st_mode != S_IFREG) {
-            fprintf(stderr, "%s is not a valid file\n", args->cafile);
+        if (!is_file(args->cafile)) {
+            fprintf(stderr, "%s is not valid file\n", args->cafile);
             return -1;
         }
     }
@@ -117,13 +110,63 @@ int CliArgs_parse(struct CliArgs *args, int argc, char *argv[]) {
     (void)argv;
 
     int argi = 1; /* argv[0] is the program name */
-    while (argi < argc) {
-        // TODO: parse through argv and fill out args
+
+    int expect_kwargs = argi < argc;
+    while (expect_kwargs) {
+        if (strncmp(argv[argi], "--debug", sizeof("--debug")) == 0) {
+            args->debug = 1;
+            argi++;
+        } else if (strncmp(argv[argi], "--certs", sizeof("--certs")) == 0) {
+            if (argi + 1 < argc) {
+                args->certfile = argv[argi + 1];
+                argi += 2;
+            } else {
+                fprintf(stderr, "Missing value for --certs\n");
+                return -1;
+            }
+        } else if (strncmp(argv[argi], "--key", sizeof("--key")) == 0) {
+            if (argi + 1 < argc) {
+                args->keyfile = argv[argi + 1];
+                argi += 2;
+            } else {
+                fprintf(stderr, "Missing value for --certs\n");
+                return -1;
+            }
+        } else if (strncmp(argv[argi], "--cafile", sizeof("--cafile")) == 0) {
+            if (argi + 1 < argc) {
+                args->cafile = argv[argi + 1];
+                argi += 2;
+            } else {
+                fprintf(stderr, "Missing value for --certs\n");
+                return -1;
+            }
+        } else {
+            expect_kwargs = 0;
+        }
+    }
+
+    if (argi < argc) {
+        args->port = atoi(argv[argi]);
     }
 
     err = CliArgs_check(args);
 
     return err;
+}
+
+/* Print values of args struct for debugging purpose */
+void CliArgs_debug(struct CliArgs *args) {
+    if (args->keyfile) {
+        fprintf(stderr, "%12s: %s\n", "keyfile", args->keyfile);
+    }
+    if (args->certfile) {
+        fprintf(stderr, "%12s: %s\n", "certfile", args->certfile);
+    }
+    if (args->cafile) {
+        fprintf(stderr, "%12s: %s\n", "cafile", args->cafile);
+    }
+    fprintf(stderr, "%12s: %d\n", "debug", args->debug);
+    fprintf(stderr, "%12s: %d\n", "port", args->port);
 }
 
 int main(int argc, char *argv[]) {
@@ -134,6 +177,8 @@ int main(int argc, char *argv[]) {
         printf("%s\n", HELP);
         exit(EXIT_FAILURE);
     }
+
+    CliArgs_debug(&args);
 
     wolfSSL_Init();
 
