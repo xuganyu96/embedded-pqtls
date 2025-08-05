@@ -745,12 +745,13 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
         set_certname(&subj_cert->issuer, subj_cert->subject.country,
                      subj_cert->subject.state, subj_cert->subject.locality,
                      subj_cert->subject.org, subj_cert->subject.commonName);
+        subj_cert->sigType = subj_sig_type;
     } else {
         set_certname(&subj_cert->issuer, issuer_cert->subject.country,
                      issuer_cert->subject.state, issuer_cert->subject.locality,
                      issuer_cert->subject.org, issuer_cert->subject.commonName);
+        subj_cert->sigType = issuer_sig_type;
     }
-    subj_cert->sigType = subj_sig_type;
     subj_cert->isCA = subj_is_ca;
 
     if ((err = wc_MakeCert_ex(subj_cert, der, sizeof(der), subj_key_type,

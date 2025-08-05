@@ -170,17 +170,59 @@ void CliArgs_debug(struct CliArgs *args) {
 }
 
 int main(int argc, char *argv[]) {
-    int err = 0;
+    int err, ec = 0;
     struct CliArgs args;
     CliArgs_init(&args);
     if ((err = CliArgs_parse(&args, argc, argv)) < 0) {
         printf("%s\n", HELP);
         exit(EXIT_FAILURE);
     }
-
     CliArgs_debug(&args);
 
     wolfSSL_Init();
+    if (args.debug) {
+        wolfSSL_Debugging_ON();
+    } else {
+        wolfSSL_Debugging_OFF();
+    }
+    WOLFSSL_CTX *ctx;
 
-    return err;
+    if ((ctx = wolfSSL_CTX_new(wolfTLSv1_3_server_method())) == NULL) {
+        fprintf(stderr, "Failed to create WOLFSSL_CTX\n");
+        ec = 1;
+        goto cleanup;
+    }
+    if ((err = wolfSSL_CTX_use_PrivateKey_file(
+             ctx, args.keyfile, SSL_FILETYPE_DEFAULT)) != WOLFSSL_SUCCESS) {
+        fprintf(stderr, "Failed to load private key file %s\n", args.keyfile);
+        ec = 1;
+        goto cleanup;
+    }
+    if ((err = wolfSSL_CTX_use_certificate_chain_file_format(
+             ctx, args.certfile, SSL_FILETYPE_PEM)) != WOLFSSL_SUCCESS) {
+        fprintf(stderr, "Failed to load certificates %s\n", args.certfile);
+        ec = 1;
+        goto cleanup;
+    }
+    if (args.cafile) {
+        if ((err = wolfSSL_CTX_load_verify_locations(ctx, args.cafile, NULL)) !=
+            WOLFSSL_SUCCESS) {
+            fprintf(stderr, "Failed to load CA file %s\n", args.cafile);
+            ec = 1;
+            goto cleanup;
+        }
+        wolfSSL_CTX_set_verify(
+            ctx, WOLFSSL_VERIFY_PEER | WOLFSSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+            NULL);
+    } else {
+        wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
+    }
+
+cleanup:
+    if (ctx) {
+        wolfSSL_CTX_free(ctx);
+    }
+    wolfSSL_Cleanup();
+
+    return ec;
 }
