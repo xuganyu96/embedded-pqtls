@@ -9,6 +9,9 @@
 
 #include "wolfssl/ssl.h"
 
+#define REUSE_ADDR 1
+#define ACCEPT_QUEUE_N 5
+#define INVALID_FD -1
 #define HELP                                                                   \
     "Usage: tlsserver [--debug] --certs <certfile> --key <keyfile> [--cafile " \
     "<cafile>] <port>\n"                                                       \
@@ -169,6 +172,98 @@ void CliArgs_debug(struct CliArgs *args) {
     fprintf(stderr, "%12s: %d\n", "port", args->port);
 }
 
+/* Encapsulate the socket and address info
+ * Currently only supports IPv4 address
+ */
+struct TcpListener {
+    struct sockaddr_in addr;
+    size_t addr_sz;
+    int sock;
+    /* TODO: this means it can only handle one connection at a time, how can I
+     * make it handle multiple connections at a time */
+    int stream;
+};
+
+/* Create an IPv4 socket, binds it to the specified port, then start listening
+ */
+int TcpListener_init(struct TcpListener *listener, uint16_t port, int reuse) {
+    if (listener == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    memset(&listener->addr, 0, sizeof(struct sockaddr_in));
+    listener->stream = INVALID_FD;
+    listener->sock = INVALID_FD;
+    listener->addr.sin_family = AF_INET;
+    listener->addr.sin_addr.s_addr = INADDR_ANY;
+    listener->addr.sin_port = port;
+    listener->addr_sz = sizeof(struct sockaddr_in);
+    listener->sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener->sock < 0) {
+        perror("Failed to create a socket");
+        return -1;
+    }
+    if (reuse) {
+        if (setsockopt(listener->sock, SOL_SOCKET, SO_REUSEADDR, &(int){1},
+                       sizeof(int)) < 0) {
+            perror("Failed to set reusable address");
+            close(listener->sock);
+            return -1;
+        }
+    }
+    if (bind(listener->sock, (struct sockaddr *)&listener->addr,
+             listener->addr_sz) < 0) {
+        perror("Failed to bind listener to address");
+        close(listener->sock);
+        listener->sock = INVALID_FD;
+        return -1;
+    }
+    if (listen(listener->sock, 5) < 0) {
+        perror("Failed to listen");
+        close(listener->sock);
+        listener->sock = INVALID_FD;
+        return -1;
+    }
+    return 0;
+}
+
+/* If it fails to accept a connection, will not automatically close the socket
+ */
+int TcpListener_accept(struct TcpListener *listener) {
+    if (listener == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    if (listener->stream != INVALID_FD) {
+        fprintf(stderr, "Connection is busy\n");
+        return -1;
+    }
+    listener->stream =
+        accept(listener->sock, (struct sockaddr *)&listener->addr,
+               (socklen_t *)&listener->addr_sz);
+    if (listener->stream < 0) {
+        perror("Failed to accept connection");
+        listener->stream = INVALID_FD;
+        return -1;
+    }
+    return 0;
+}
+
+int TcpListener_close(struct TcpListener *listener) {
+    if (listener == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    if (listener->sock != INVALID_FD) {
+        if (close(listener->sock) < 0) {
+            perror("Ignoring `close` error: ");
+        }
+    }
+    if (listener->stream != INVALID_FD) {
+        if (close(listener->stream) < 0) {
+            perror("Ignoring `close` error: ");
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     int err, ec = 0;
     struct CliArgs args;
@@ -218,11 +313,30 @@ int main(int argc, char *argv[]) {
         wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
     }
 
+    struct TcpListener listener;
+    if ((err = TcpListener_init(&listener, args.port, REUSE_ADDR)) < 0) {
+        fprintf(stderr, "Failed to listen to port %d\n", args.port);
+        goto cleanup;
+    }
+    printf("Listening to port %d\n", args.port);
+
+    for (int i = 0; i < 2; i++) {
+        if (TcpListener_accept(&listener) < 0) {
+            fprintf(stderr, "Failed to accept\n");
+            goto cleanup;
+        }
+
+        printf("Accepted connection\n");
+        close(listener.stream);
+        listener.stream = INVALID_FD;
+    }
+
 cleanup:
     if (ctx) {
         wolfSSL_CTX_free(ctx);
     }
     wolfSSL_Cleanup();
+    TcpListener_close(&listener);
 
     return ec;
 }
