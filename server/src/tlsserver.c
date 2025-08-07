@@ -2,6 +2,15 @@
  *
  * Handshake only: terminates connection as soon as the connection is
  * established
+ *
+ * Test with Openssl:
+ *  openssl s_client \
+ *      -cert <cert> \
+ *      -key <key> \
+ *      -CAfile <root> \
+ *      -verify_return_error \
+ *      -connect \
+ *      localhost:8000
  */
 #include <inttypes.h>
 #include <stdio.h>
@@ -17,34 +26,17 @@
     "<cafile>] <port>\n"                                                       \
     "\n"                                                                       \
     "Arguments:\n"                                                             \
-    "  --debug                Enable debug mode by activating "                \
-    "wolfSSL_Debugging_ON. This provides detailed logging for debugging "      \
-    "purposes. "                                                               \
-    "Note that this option requires the compilation flag DEBUG_WOLFSSL to be " \
-    "set during the build process.\n"                                          \
-    "\n"                                                                       \
-    "  --certs <certfile>     Specify the path to the certificate file. This " \
-    "file should contain the server's public certificate in PEM format. It "   \
-    "is "                                                                      \
-    "required for establishing a secure TLS connection.\n"                     \
-    "\n"                                                                       \
-    "  --key <keyfile>        Specify the path to the private key file. This " \
-    "file should contain the server's private key in DER format. It is "       \
-    "required "                                                                \
-    "for decrypting incoming messages and establishing secure connections.\n"  \
-    "\n"                                                                       \
-    "  --cafile <cafile>      (Optional) Specify the path to the Certificate " \
-    "Authority (CA) file. This file should contain the CA certificates in "    \
-    "PEM "                                                                     \
-    "format that the server trusts. It is used to verify the client "          \
-    "certificates "                                                            \
-    "if client authentication is enabled.\n"                                   \
-    "\n"                                                                       \
-    "  <port>                 Specify the port number on which the server "    \
-    "will "                                                                    \
-    "listen for incoming TLS connections. This is a required argument and "    \
-    "must "                                                                    \
-    "be a valid integer between 1 and 65535.\n"
+    "  --debug              Enable wolfSSL_Debugging_ON. Requires the macro "  \
+    "DEBUG_WOLFSSL to be set at compile time\n"                                \
+    "  --certs <certfile>   Required. Loads PEM-encoded certificate chain at " \
+    "the specified location. Leaf certificate must be on top\n"                \
+    "  --key <keyfile>      Required. Loads DER-encoded private key for "      \
+    "server authentication\n"                                                  \
+    "  --cafile <cafile>    Optional. Loads PEM-encoded root certificate at "  \
+    "the specified path. If cafile is specified, then server "                 \
+    "will request client authentication\n"                                     \
+    "  <port>               Required. The server will listen for incoming "    \
+    "TCP connection on this port\n"
 
 /* Return true if path points to a regular file */
 static int is_file(const char *path) {
@@ -179,9 +171,6 @@ struct TcpListener {
     struct sockaddr_in addr;
     size_t addr_sz;
     int sock;
-    /* TODO: this means it can only handle one connection at a time, how can I
-     * make it handle multiple connections at a time */
-    int stream;
 };
 
 /* Create an IPv4 socket, binds it to the specified port, then start listening
@@ -191,11 +180,10 @@ int TcpListener_init(struct TcpListener *listener, uint16_t port, int reuse) {
         return BAD_FUNC_ARG;
     }
     memset(&listener->addr, 0, sizeof(struct sockaddr_in));
-    listener->stream = INVALID_FD;
     listener->sock = INVALID_FD;
     listener->addr.sin_family = AF_INET;
     listener->addr.sin_addr.s_addr = INADDR_ANY;
-    listener->addr.sin_port = port;
+    listener->addr.sin_port = htons(port);
     listener->addr_sz = sizeof(struct sockaddr_in);
     listener->sock = socket(AF_INET, SOCK_STREAM, 0);
     if (listener->sock < 0) {
@@ -226,25 +214,28 @@ int TcpListener_init(struct TcpListener *listener, uint16_t port, int reuse) {
     return 0;
 }
 
-/* If it fails to accept a connection, will not automatically close the socket
- */
 int TcpListener_accept(struct TcpListener *listener) {
+    int stream = INVALID_FD;
     if (listener == NULL) {
         return BAD_FUNC_ARG;
     }
-    if (listener->stream != INVALID_FD) {
-        fprintf(stderr, "Connection is busy\n");
-        return -1;
-    }
-    listener->stream =
-        accept(listener->sock, (struct sockaddr *)&listener->addr,
-               (socklen_t *)&listener->addr_sz);
-    if (listener->stream < 0) {
+    stream = accept(listener->sock, (struct sockaddr *)&listener->addr,
+                    (socklen_t *)&listener->addr_sz);
+    if (stream < 0) {
         perror("Failed to accept connection");
-        listener->stream = INVALID_FD;
         return -1;
+    } else {
+        struct sockaddr_in peer_addr;
+        size_t peer_addr_len = sizeof(peer_addr);
+        char peer_addr_str[INET_ADDRSTRLEN];
+        getpeername(stream, (struct sockaddr *)&peer_addr,
+                    (socklen_t *)&peer_addr_len);
+        inet_ntop(AF_INET, &(peer_addr.sin_addr), peer_addr_str,
+                  INET_ADDRSTRLEN);
+        int peer_port = ntohs(peer_addr.sin_port);
+        fprintf(stderr, "Connected to %s:%d\n", peer_addr_str, peer_port);
     }
-    return 0;
+    return stream;
 }
 
 int TcpListener_close(struct TcpListener *listener) {
@@ -256,16 +247,11 @@ int TcpListener_close(struct TcpListener *listener) {
             perror("Ignoring `close` error: ");
         }
     }
-    if (listener->stream != INVALID_FD) {
-        if (close(listener->stream) < 0) {
-            perror("Ignoring `close` error: ");
-        }
-    }
     return 0;
 }
 
 int main(int argc, char *argv[]) {
-    int err, ec = 0;
+    int err, ec = 0, stream = INVALID_FD;
     struct CliArgs args;
     CliArgs_init(&args);
     if ((err = CliArgs_parse(&args, argc, argv)) < 0) {
@@ -281,7 +267,9 @@ int main(int argc, char *argv[]) {
         wolfSSL_Debugging_OFF();
     }
     WOLFSSL_CTX *ctx;
+    WOLFSSL *ssl;
 
+    /* TODO: simplify this */
     if ((ctx = wolfSSL_CTX_new(wolfTLSv1_3_server_method())) == NULL) {
         fprintf(stderr, "Failed to create WOLFSSL_CTX\n");
         ec = 1;
@@ -320,15 +308,33 @@ int main(int argc, char *argv[]) {
     }
     printf("Listening to port %d\n", args.port);
 
-    for (int i = 0; i < 2; i++) {
-        if (TcpListener_accept(&listener) < 0) {
+    while (1) {
+        if ((stream = TcpListener_accept(&listener)) < 0) {
             fprintf(stderr, "Failed to accept\n");
             goto cleanup;
         }
 
-        printf("Accepted connection\n");
-        close(listener.stream);
-        listener.stream = INVALID_FD;
+        if ((ssl = wolfSSL_new(ctx)) == NULL) {
+            fprintf(stderr, "Failed to allocate WOLFSSL\n");
+            goto cleanup;
+        }
+        if ((err = wolfSSL_set_fd(ssl, stream)) != WOLFSSL_SUCCESS) {
+            fprintf(stderr, "Failed to bind WOLFSSL to TCP stream\n");
+            goto cleanup;
+        }
+        if ((err = wolfSSL_accept(ssl)) != WOLFSSL_SUCCESS) {
+            int wolfssl_e = wolfSSL_get_error(ssl, err);
+            fprintf(stderr, "wolfSSL_accept failed (err=%d)\n", wolfssl_e);
+        } else {
+            fprintf(stderr, "Successful handshake\n");
+        }
+
+        if (close(stream) == 0) {
+            fprintf(stderr, "Gracefully shutdown connection\n");
+        } else {
+            perror("Failed to gracefully shutdown connection\n");
+        }
+        stream = INVALID_FD;
     }
 
 cleanup:
