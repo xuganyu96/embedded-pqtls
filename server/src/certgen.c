@@ -753,6 +753,10 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
         subj_cert->sigType = issuer_sig_type;
     }
     subj_cert->isCA = subj_is_ca;
+    if (subj_is_ca) {
+        /* or client will err "Doesn't have key usage certificate signing" */
+        subj_cert->keyUsage |= KEYUSE_KEY_CERT_SIGN;
+    }
 
     if ((err = wc_MakeCert_ex(subj_cert, der, sizeof(der), subj_key_type,
                               subj_key, rng)) < 0) {

@@ -266,8 +266,8 @@ int main(int argc, char *argv[]) {
     } else {
         wolfSSL_Debugging_OFF();
     }
-    WOLFSSL_CTX *ctx;
-    WOLFSSL *ssl;
+    WOLFSSL_CTX *ctx = NULL;
+    WOLFSSL *ssl = NULL;
 
     /* TODO: simplify this */
     if ((ctx = wolfSSL_CTX_new(wolfTLSv1_3_server_method())) == NULL) {
@@ -327,6 +327,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "wolfSSL_accept failed (err=%d)\n", wolfssl_e);
         } else {
             fprintf(stderr, "Successful handshake\n");
+            wolfSSL_shutdown(ssl);
         }
 
         if (close(stream) == 0) {
@@ -340,6 +341,10 @@ int main(int argc, char *argv[]) {
 cleanup:
     if (ctx) {
         wolfSSL_CTX_free(ctx);
+    }
+    if (ssl) {
+        wolfSSL_shutdown(ssl);
+        wolfSSL_free(ssl);
     }
     wolfSSL_Cleanup();
     TcpListener_close(&listener);

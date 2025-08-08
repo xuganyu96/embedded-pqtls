@@ -13,11 +13,13 @@
  *  <port>          remote port to connect to
  */
 #include <inttypes.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "wolfssl/ssl.h"
 
+#define INVALID_FD -1
 #define HELP                                                                   \
     "Usage: tlsclient [--debug] [--cafile <path>] [--certs <path>] [--key "    \
     "<path>] <host> <port>"
@@ -139,8 +141,63 @@ int CliArgs_debug(struct CliArgs *args) {
     return 0;
 }
 
-int main(int argc, char *argv[]) {
+static int set_wolfssl_ctx(WOLFSSL_CTX *ctx, const char *cafile,
+                           const char *certfile, const char *keyfile) {
     int err = 0;
+
+    if (cafile) {
+        if ((err = wolfSSL_CTX_load_verify_locations(ctx, cafile, NULL)) !=
+            WOLFSSL_SUCCESS) {
+            fprintf(stderr, "Failed to load CA certificate (err=%d)\n", err);
+            return err;
+        }
+        wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, NULL);
+    } else {
+        wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
+    }
+
+    if (certfile != NULL && keyfile != NULL) {
+        if ((err = wolfSSL_CTX_use_certificate_chain_file_format(
+                 ctx, certfile, SSL_FILETYPE_PEM)) < 0) {
+            fprintf(stderr, "Failed to load certificate chain (err=%d)\n", err);
+            return err;
+        }
+        if ((err = wolfSSL_CTX_use_PrivateKey_file(ctx, keyfile,
+                                                   SSL_FILETYPE_DEFAULT)) < 0) {
+            fprintf(stderr, "Failed to load private key (err=%d)\n", err);
+            return err;
+        }
+    }
+
+    return 0;
+}
+
+static int TcpStream_connect(const char *host, uint16_t port) {
+    struct sockaddr_in server_addr;
+    struct hostent *server;
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+        return -1;
+
+    server = gethostbyname(host); // TODO: use getaddrinfo instead
+    if (!server)
+        return -1;
+
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) <
+        0) {
+        close(sockfd);
+        return -1;
+    }
+    return sockfd;
+}
+
+int main(int argc, char *argv[]) {
+    int err = 0, ret = 0, stream = INVALID_FD;
 
     struct CliArgs args;
     CliArgs_init(&args);
@@ -151,6 +208,65 @@ int main(int argc, char *argv[]) {
     CliArgs_debug(&args);
 
     wolfSSL_Init();
+    if (args.debug) {
+        wolfSSL_Debugging_ON();
+    } else {
+        wolfSSL_Debugging_OFF();
+    }
 
-    return err;
+    WOLFSSL_CTX *ctx = NULL;
+    WOLFSSL *ssl = NULL;
+
+    if ((ctx = wolfSSL_CTX_new(wolfTLSv1_3_client_method())) == NULL) {
+        fprintf(stderr, "Failed to create WOLFSSL_CTX\n");
+        ret = 1;
+        goto cleanup;
+    }
+    if ((err = set_wolfssl_ctx(ctx, args.cafile, args.certfile, args.keyfile)) <
+        0) {
+        fprintf(stderr, "Failed to configure WOLFSSL_CTX\n");
+        ret = 1;
+        goto cleanup;
+    }
+
+    if ((stream = TcpStream_connect(args.host, args.port)) < 0) {
+        fprintf(stderr, "Failed to connect to %s:%d\n", args.host, args.port);
+        ret = 1;
+        goto cleanup;
+    }
+
+    if ((ssl = wolfSSL_new(ctx)) == NULL) {
+        fprintf(stderr, "Failed to create WOLFSSL struct\n");
+        ret = 1;
+        goto cleanup;
+    }
+
+    wolfSSL_set_fd(ssl, stream);
+
+    if ((err = wolfSSL_connect(ssl)) != WOLFSSL_SUCCESS) {
+        int wolfssl_err = wolfSSL_get_error(ssl, err);
+        fprintf(stderr, "TLS connection failed (err=%d)\n", wolfssl_err);
+    } else {
+        fprintf(stderr, "Successful handshake\n");
+        wolfSSL_shutdown(ssl);
+    }
+
+cleanup:
+    if (ctx) {
+        wolfSSL_CTX_free(ctx);
+    }
+    if (ssl) {
+        wolfSSL_free(ssl);
+    }
+    if (stream >= 0) {
+        if (close(stream) == 0) {
+            fprintf(stderr, "Gracefully shutdown connection\n");
+        } else {
+            perror("Failed to gracefully shutdown connection\n");
+        }
+        stream = INVALID_FD;
+    }
+    wolfSSL_Cleanup();
+
+    return ret;
 }
