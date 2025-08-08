@@ -516,6 +516,8 @@ extern "C" {
     #define HAVE_DILITHIUM
     #define WOLFSSL_WC_DILITHIUM
     #define WOLFSSL_SHAKE128 
+    #define WOLFSSL_HAVE_MLKEM
+    #define WOLFSSL_WC_MLKEM
 #endif
 
 /* ------------------------------------------------------------------------- */
