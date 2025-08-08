@@ -34,11 +34,14 @@ target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations)
 
 add_compile_options(-Wall -Wextra)
 
-add_executable(tlsclient src/tlsclient.c)
-target_link_libraries(tlsclient wolfssl)
+add_executable(https_example src/https_example.c)
+target_link_libraries(https_example wolfssl)
 
 add_executable(tlsserver src/tlsserver.c)
 target_link_libraries(tlsserver wolfssl)
 
 add_executable(certgen src/certgen.c)
 target_link_libraries(certgen wolfssl)
+
+add_executable(tlsclient src/tlsclient.c)
+target_link_libraries(tlsclient wolfssl)
