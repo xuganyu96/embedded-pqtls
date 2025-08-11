@@ -21,6 +21,7 @@
 #define REUSE_ADDR 1
 #define ACCEPT_QUEUE_N 5
 #define INVALID_FD -1
+#define APP_BUF_SZ 256
 #define HELP                                                                   \
     "Usage: tlsserver [--debug] --certs <certfile> --key <keyfile> [--cafile " \
     "<cafile>] <port>\n"                                                       \
@@ -250,6 +251,32 @@ int TcpListener_close(struct TcpListener *listener) {
     return 0;
 }
 
+/* Echo client's application data until client hangs up */
+void echo_server(WOLFSSL *ssl) {
+    char buf[APP_BUF_SZ];
+    size_t buflen = 0;
+    int ret = 0, err = 0;
+
+    while (1) {
+        ret = wolfSSL_read(ssl, buf, sizeof(buf));
+        if (ret <= 0) {
+            err = wolfSSL_get_error(ssl, err);
+            fprintf(stderr, "SSL has nothing to read (err=%d)\n", err);
+            return;
+        }
+        buflen = ret;
+        ret = wolfSSL_write(ssl, buf, buflen);
+        if (ret <= 0) {
+            err = wolfSSL_get_error(ssl, err);
+            fprintf(stderr, "SSL failed to write %zu bytes (err=%d)\n", buflen,
+                    err);
+            return;
+        }
+        fprintf(stderr, "SSL wrote %zu bytes\n", buflen);
+        buflen = 0;
+    }
+}
+
 int main(int argc, char *argv[]) {
     int err, ec = 0, stream = INVALID_FD;
     struct CliArgs args;
@@ -327,6 +354,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "wolfSSL_accept failed (err=%d)\n", wolfssl_e);
         } else {
             fprintf(stderr, "Successful handshake\n");
+            echo_server(ssl);
+            /* TODO: shutdown might fail; need to handle shutdown's error */
             wolfSSL_shutdown(ssl);
         }
 

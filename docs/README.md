@@ -441,3 +441,12 @@ client
 With `root` and `intermediate` being CAs and server/client being end entities.
 When authenticating the server, client holds the root certificate, and server sends a chain that contains server and intermediate CA in this order.
 When authenticating the client, server holds the root certificate, and client sends its own certificate.
+
+## Implementing a server
+The test server listens to a user-specified port and accepts TLS handshakes.
+Users can specify certificate chain, private key, and certificate authority (for requesting client authentication) from the command line.
+Upon a successful handshake, the server will echo client's data until client hangs up.
+
+## Implementing a client
+The test client connects to a user-specified remote host and initiate a TLS handshake.
+After the handshake, client should send some random bytes and verify that the data are correct.
