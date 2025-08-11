@@ -47,6 +47,9 @@ static int is_file(const char *path) {
 }
 
 static int get_namedgroup_from_name(const char *name) {
+    if (name == NULL) {
+        return 0;
+    }
     if (strncmp(name, "x25519", sizeof("x25519")) == 0) {
         return WOLFSSL_ECC_X25519;
     } else if (strncmp(name, "secp256r1", sizeof("secp256r1")) == 0) {
@@ -112,6 +115,7 @@ int CliArgs_check(struct CliArgs *args) {
     return 0;
 }
 
+// BUG: ./tlsclient --cafile certs/root.crt localhost 8000 will segfault
 int CliArgs_parse(struct CliArgs *args, int argc, char **argv) {
     int argi = 1; /* argv[0] is program name */
     int expect_kwargs = argi < argc;

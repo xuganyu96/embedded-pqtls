@@ -449,4 +449,5 @@ Upon a successful handshake, the server will echo client's data until client han
 
 ## Implementing a client
 The test client connects to a user-specified remote host and initiate a TLS handshake.
+Users can specify certificate authority, client certificate chain, client key, and key exchange group from the command line.
 After the handshake, client should send some random bytes and verify that the data are correct.
