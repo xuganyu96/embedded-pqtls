@@ -15,6 +15,22 @@ include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/config
 )
 
+# PQClean
+set(PQCLEAN_ROOT "${CMAKE_CURRENT_LIST_DIR}/../PQClean" CACHE PATH "Path to PQClean")
+get_filename_component(PQCLEAN_ROOT ${PQCLEAN_ROOT} ABSOLUTE)
+if(NOT IS_DIRECTORY ${PQCLEAN_ROOT}) 
+    message(FATAL_ERROR "'${PQCLEAN_ROOT}' is not a valid directory")
+endif()
+message(STATUS "Using PQClean from ${PQCLEAN_ROOT}")
+include_directories(
+    ${PQCLEAN_ROOT}/common
+    ${PQCLEAN_ROOT}
+)
+file(GLOB PQCLEAN_SRC
+    "${PQCLEAN_ROOT}/common/*.c"
+    "${PQCLEAN_ROOT}/crypto_kem/ml-kem-512/clean/*.c"
+)
+
 # WolfSSL
 set(WOLFSSL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../wolfssl" CACHE PATH "Path to WolfSSL")
 get_filename_component(WOLFSSL_ROOT "${WOLFSSL_ROOT}" ABSOLUTE)
@@ -27,9 +43,9 @@ file(GLOB WOLFSSL_SRC
     "${WOLFSSL_ROOT}/src/*.c" 
     "${WOLFSSL_ROOT}/wolfcrypt/src/*.c"
 )
-add_library(wolfssl STATIC ${WOLFSSL_SRC})
+add_library(wolfssl STATIC ${WOLFSSL_SRC} ${PQCLEAN_SRC})
 target_compile_definitions(wolfssl PUBLIC WOLFSSL_USER_SETTINGS)
-target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations)
+target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations -DUSE_WC_RNG)
 
 
 add_compile_options(-Wall -Wextra)

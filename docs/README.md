@@ -75,6 +75,13 @@ Some helpful commands with git submodules:
 - `git submodule update --init --recursive` will initialize uninitialized sub-modules, then update them recursively
 
 At the time of this write-up, WolfSSL's head is at commit `2db1669`.
+However, it might be a good idea to also set up the original repository as a remote source so we can pull updates from the original repository, as well:
+
+```bash
+# From the wolfssl submodule
+git remote add wolfssl https://github.com/wolfssl/wolfssl.git
+git pull wolfssl master
+```
 
 We will configure WolfSSL using `config/user_settings.h`.
 A [template](https://github.com/wolfSSL/wolfssl/tree/master/examples/configs) provided by WolfSSL serves as a good starting point:
@@ -451,3 +458,141 @@ Upon a successful handshake, the server will echo client's data until client han
 The test client connects to a user-specified remote host and initiate a TLS handshake.
 Users can specify certificate authority, client certificate chain, client key, and key exchange group from the command line.
 After the handshake, client should send some random bytes and verify that the data are correct.
+
+# Implementing PQC with PQClean
+[PQClean](https://github.com/PQClean/PQClean/) is a curated collection of post-quantum cryptography implementations.
+We can use their ML-KEM and HQC impls for ephemeral key exchange and their ML-DSA/Falcon/SPHINCS+ impls for certificates.
+
+## Compiling with PQClean
+We recommend forking the original repository since we will make some modifications.
+
+```bash
+# From project root
+git submodule add git@github.com:xuganyu96/PQClean.git
+git remote add pqclean git@github.com:PQClean/PQClean.git
+git pull pqclean master
+```
+
+PQClean comes with its own implementation of AES, SHA-2, SHA-3, and random number generator.
+These implementations duplicate the functionalities of WolfCrypt and are actually slower.
+The random number generator is going to be problematic because it depends on the presence of some operating system, whereas this project will later move to a bare metal platform.
+My workaround is to substitute PQClean's implementation with WolfCrypt's `WC_RNG`.
+
+```bash
+# From PQClean/
+git checkout -b wolfcrypt-integration
+```
+
+`WC_RNG` is stateful and cannot directly plug into the `int randombytes()` function.
+Instead `PQClean/common/randombytes.c` will have a static pointer to a `WC_RNG` object,
+which can be set to a user-specified instance using a public API, 
+then the stateless `int randombytes()` can behave statelessly by hiding the `WC_RNG`.
+Of course the user is responsible for making sure that `WC_RNG` is properly initialized and cleaned up afterwards, but that should not be a problem since we can piggyback off the RNG in `WOLFSSL` struct.
+
+Need to add a `.clangd` at PQClean root so the language server can find WolfSSL.
+Also define a macro so that WolfCrypt integration is only enabled if `USE_WC_RNG` is defined.
+
+```yaml
+# PQClean/.clang
+CompileFlags:
+  Add: [
+    "-I/Users/ganyuxu/opensource/embedded-pqtls/wolfssl",
+    "-DUSE_WC_RNG",
+  ]
+```
+
+Modification to `randombytes.c`:
+
+```c
+#ifdef USE_WC_RNG
+#include "wolfssl/wolfcrypt/random.h"
+#include "wolfssl/wolfcrypt/error-crypt.h"
+
+/* GYX: maybe not the best way to approach this:
+ * if USE_WC_RNG, then turn off all other entropy sources
+ */
+#undef _WIN32
+#undef __wasi__
+#undef __linux__
+#undef BSD
+#undef __APPLE__
+#undef __MACH__
+#undef __EMSCRIPTEN__
+
+static WC_RNG *_wc_rng = NULL;
+
+/* Set the internal WC_RNG pointer to the input pointer
+ *
+ * Return 0 on success.
+ * Return BAD_FUNC_ARG if input pointer is NULL
+ */
+int set_wc_rng(WC_RNG *rng) {
+    if (rng == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    _wc_rng = rng;
+    return 0;
+}
+// TODO: maybe also do a free_wc_rng, which set _wc_rng to NULL?
+#endif
+
+int randombytes(uint8_t *output, size_t n) {
+    #if defined(USE_WC_RNG)
+    (void) buf;
+    if (_wc_rng == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    return wc_RNG_GenerateBlock(_wc_rng, output, n);
+    #endif
+}
+```
+
+Add PQClean's source code and headers to `server/CMakeLists.txt`, 
+first define PQClean's root directory.
+Need to add `PQClean/common` to `include_directories` so implementations can find `randombytes`.
+Need to add `PQClean` to `include_directories` so we can find the individual `api.h` files.
+
+```cmake
+set(PQCLEAN_ROOT "${CMAKE_CURRENT_LIST_DIR}/../PQClean" CACHE PATH "Path to PQClean")
+get_filename_component(PQCLEAN_ROOT ${PQCLEAN_ROOT} ABSOLUTE)
+if(NOT IS_DIRECTORY ${PQCLEAN_ROOT}) 
+    message(FATAL_ERROR "'${PQCLEAN_ROOT}' is not a valid directory")
+endif()
+message(STATUS "Using PQClean from ${PQCLEAN_ROOT}")
+include_directories(
+    ${PQCLEAN_ROOT}/common
+    ${PQCLEAN_ROOT}
+)
+file(GLOB PQCLEAN_SRC
+    "${PQCLEAN_ROOT}/common/*.c"
+    "${PQCLEAN_ROOT}/crypto_kem/ml-kem-512/clean/*.c"
+)
+```
+
+Add PQClean to the `libwolfssl.a` target, remember to define `USE_WC_RNG`:
+
+```cmake
+add_library(wolfssl STATIC ${WOLFSSL_SRC} ${PQCLEAN_SRC})
+target_compile_options(wolfssl PRIVATE -Wno-deprecated-declarations -DUSE_WC_RNG)
+```
+
+We can write a quick test program:
+
+```c
+#include "crypto_kem/ml-kem-512/clean/api.h"
+
+int main(void) {
+    uint8_t pk[PQCLEAN_MLKEM512_CLEAN_CRYPTO_PUBLICKEYBYTES],
+        sk[PQCLEAN_MLKEM512_CLEAN_CRYPTO_SECRETKEYBYTES],
+        ct[PQCLEAN_MLKEM512_CLEAN_CRYPTO_CIPHERTEXTBYTES],
+        ss[PQCLEAN_MLKEM512_CLEAN_CRYPTO_BYTES],
+        sscmp[PQCLEAN_MLKEM512_CLEAN_CRYPTO_BYTES];
+    PQCLEAN_MLKEM512_CLEAN_crypto_kem_keypair(pk, sk);
+    PQCLEAN_MLKEM512_CLEAN_crypto_kem_enc(ct, ss, pk);
+    PQCLEAN_MLKEM512_CLEAN_crypto_kem_dec(sscmp, ct, sk);
+    if (memcmp(ss, sscmp, sizeof(sscmp)) == 0) {
+        printf("ML-KEM-512 Ok.\n");
+    }
+    return 0;
+}
+```
