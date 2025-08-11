@@ -260,14 +260,14 @@ void echo_server(WOLFSSL *ssl) {
     while (1) {
         ret = wolfSSL_read(ssl, buf, sizeof(buf));
         if (ret <= 0) {
-            err = wolfSSL_get_error(ssl, err);
+            err = wolfSSL_get_error(ssl, ret);
             fprintf(stderr, "SSL has nothing to read (err=%d)\n", err);
             return;
         }
         buflen = ret;
         ret = wolfSSL_write(ssl, buf, buflen);
         if (ret <= 0) {
-            err = wolfSSL_get_error(ssl, err);
+            err = wolfSSL_get_error(ssl, ret);
             fprintf(stderr, "SSL failed to write %zu bytes (err=%d)\n", buflen,
                     err);
             return;

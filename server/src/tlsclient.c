@@ -18,9 +18,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "wolfssl/internal.h"
 #include "wolfssl/ssl.h"
+#include "wolfssl/wolfcrypt/random.h"
 
 #define INVALID_FD -1
+#define TEST_DATA_SZ 80
 #define HELP                                                                   \
     "Usage: tlsclient [--debug] [--cafile <path>] [--certs <path>] [--key "    \
     "<path>] [--namedgroup <x25519|secp256r1|mlkem512>] <host> <port>"
@@ -255,6 +258,45 @@ static int TcpStream_connect(const char *host, uint16_t port) {
     return sockfd;
 }
 
+static int test_ssl(WOLFSSL *ssl) {
+    int err;
+    unsigned char buf[TEST_DATA_SZ], bufcmp[TEST_DATA_SZ];
+
+    /* TODO: why is ssl->rng NULL? */
+    WC_RNG rng;
+    wc_InitRng(&rng);
+    if ((err = wc_RNG_GenerateBlock(&rng, buf, sizeof(buf))) < 0) {
+        fprintf(stderr, "Failed to generate random test data (err=%d)\n", err);
+        return err;
+    }
+
+    err = wolfSSL_write(ssl, buf, sizeof(buf));
+    if (err <= 0) {
+        err = wolfSSL_get_error(ssl, err);
+        fprintf(stderr, "Failed to transmit test data (err=%d)\n", err);
+        return err;
+    }
+    fprintf(stderr, "Transmitted %zu bytes\n", sizeof(buf));
+
+    err = wolfSSL_read(ssl, bufcmp, sizeof(bufcmp));
+    if (err <= 0) {
+        err = wolfSSL_get_error(ssl, err);
+        fprintf(stderr, "Failed to read from SSL (err=%d)\n", err);
+        return err;
+    }
+    if (err != TEST_DATA_SZ) {
+        fprintf(stderr, "Expected %d bytes, received %d bytes\n", TEST_DATA_SZ,
+                err);
+        return -1;
+    }
+    if (memcmp(buf, bufcmp, sizeof(buf)) != 0) {
+        fprintf(stderr, "Received data does not match test data\n");
+        return -1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     int err = 0, ret = 0, stream = INVALID_FD;
 
@@ -307,6 +349,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "TLS connection failed (err=%d)\n", wolfssl_err);
     } else {
         fprintf(stderr, "Successful handshake\n");
+        if ((err = test_ssl(ssl)) == 0) {
+            printf("TLS connection Ok.\n");
+        } else {
+            fprintf(stderr, "TLS connection test failed (err=%d)\n", err);
+        }
         wolfSSL_shutdown(ssl);
     }
 
