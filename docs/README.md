@@ -611,6 +611,7 @@ CompileFlags:
 ```
 
 ## Adding HQC for ephemeral key exchange
+### Adding named group variant to the enumerated type
 HQC was [selected by NIST](https://www.nist.gov/publications/status-report-fourth-round-nist-post-quantum-cryptography-standardization-process) as an alternative KEM to ML-KEM.
 
 The entrypoint would be `wolfSSL_CTX_set_groups`.
@@ -622,8 +623,15 @@ int groups[] = {WOLFSSL_HQC_128, WOLFSSL_HQC_192, WOLFSSL_HQC_256}
 wolfSSL_CTX_set_groups(ctx, groups, 3);
 ```
 
-`wolfSSL_CTX_set_groups` calls `wolfSSL_CTX_UseSupportedCurve` to check if the named group is valid,
-the group is assigned to `ctx->group[i]`.
+`wolfSSL_CTX_set_groups` calls `wolfSSL_CTX_UseSupportedCurve` to check if the named group is valid.
+`wolfSSL_CTX_UseSupportedCurve` calls `isValidCurveGroup` and `TLSX_UseSupportedCurve`.
+`TLSX_UseSupportedCurve` calls `TLSX_IsGroupSupported`.
+`isValidCurveGroup` and `TLSX_IsGroupSupported` need to be modified so the added named group variants are recognized.
+After modifying `isValidCurveGroup` and `TLSX_IsGroupSupported`, `wolfSSL_CTX_set_groups` returns success.
+Client can construct `ClientHello` and send to server, but server complains that `ClientHello` is missing the `key_share` extension and sends back an alert instead of `ServerHello`.
+Client fails upon receiving server's alert.
+
+The group is assigned to `ctx->group[i]`.
 The function `InitSSL` copies `ctx->group` to `ssl->group`.
 `InitSSL` is called by `wolfSSL_new`.
 
