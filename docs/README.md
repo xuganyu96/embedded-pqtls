@@ -702,9 +702,14 @@ then `ssl->group` is compared with `preferredGroup`.
 If the two lists do not agree, then client will not call `TLSX_KeyShare_Use` to populate the `key_share` extension.
 I guess this is so server will could send back its preferred list of named group in `HelloRetryRequest`.
 
-After adding the HQC variants to `preferredGroup`, client fails at constructing `ClientHello` because `TLSX_KeyShare_Use` does not know how to handle `WOLFSSL_HQC_128/192/256`.
+After adding the HQC variants to `preferredGroup`, 
+client fails at constructing `ClientHello` because `TLSX_KeyShare_GenKey` does not know how to handle `WOLFSSL_HQC_128/192/256`.
 
-The set of named groups is used to construct the `key_share` extension in `ClientHello`.
-`ClientHello` is constructed in the function `int SendTls13ClientHello`.
-`SendTls13ClientHello` calls `TLSX_PopulateExtensions`.
-`TLSX_PopulateExtensions` calls `TLSX_KeyShare_Use`.
+### Generate HQC keypair in ClientHello
+When using a KEM for TLS ephemeral key exchange, 
+the `key_share` extension in `ClientHello` contains the public key of a freshly generated keypair.
+Need to modify `NamedGroupIsPqc` so `WOLFSSL_HQC_XXX` is identified as PQC KEM.
+Then modify `TLSX_KeyShare_GenPqcKeyClient`.
+At [65e7f2](https://github.com/wolfSSL/wolfssl/tree/65e7f2c40f51e4cb7c9594873c0afd1e38c85912),
+`TLSX_KeyShare_GenPqcKeyClient` assumes that the only PQC KEM is ML-KEM and/or Kyber,
+so the first modification is to add a layer of abstraction and make `GenPqcKeyClient` call `GenMlKemKeyClient` if `kse->group` represents ML-KEM/Kyber and `GenHqcKeyClient` if `kse->group` represents HQC.
