@@ -518,6 +518,7 @@ extern "C" {
     #define WOLFSSL_SHAKE128 
     #define WOLFSSL_HAVE_MLKEM
     #define WOLFSSL_WC_MLKEM
+    #define HAVE_HQC
 #endif
 
 /* ------------------------------------------------------------------------- */

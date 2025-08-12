@@ -496,7 +496,7 @@ Also define a macro so that WolfCrypt integration is only enabled if `USE_WC_RNG
 # PQClean/.clang
 CompileFlags:
   Add: [
-    "-I/Users/ganyuxu/opensource/embedded-pqtls/wolfssl",
+    "-I/path/to/embedded-pqtls/wolfssl",
     "-DUSE_WC_RNG",
   ]
 ```
@@ -596,3 +596,45 @@ int main(void) {
     return 0;
 }
 ```
+
+Before we modify WolfSSL, need to add PQClean to the include directories:
+
+```c
+CompileFlags:
+    Add: [
+        "-DWOLFSSL_USER_SETTINGS",
+        "-I/path/to/embedded-pqtls/wolfssl",
+        "-I/path/to/embedded-pqtls/server/config",
+        "-I/path/to/embedded-pqtls/pqclean",
+        "-DUSE_WC_RNG",
+    ]
+```
+
+## Adding HQC for ephemeral key exchange
+HQC was [selected by NIST](https://www.nist.gov/publications/status-report-fourth-round-nist-post-quantum-cryptography-standardization-process) as an alternative KEM to ML-KEM.
+
+The entrypoint would be `wolfSSL_CTX_set_groups`.
+The enum variants are located in `internal.h`, though the type does not have a name.
+Find the type definition by looking up the definition of something like `WOLFSSL_ECC_X25519`.
+
+```c
+int groups[] = {WOLFSSL_HQC_128, WOLFSSL_HQC_192, WOLFSSL_HQC_256}
+wolfSSL_CTX_set_groups(ctx, groups, 3);
+```
+
+`wolfSSL_CTX_set_groups` calls `wolfSSL_CTX_UseSupportedCurve` to check if the named group is valid,
+the group is assigned to `ctx->group[i]`.
+The function `InitSSL` copies `ctx->group` to `ssl->group`.
+`InitSSL` is called by `wolfSSL_new`.
+
+```c
+if (ctx->numGroups > 0) {
+    XMEMCPY(ssl->group, ctx->group, sizeof(*ctx->group) * ctx->numGroups);
+    ssl->numGroups = ctx->numGroups;
+}
+```
+
+The set of named groups is used to construct the `key_share` extension in `ClientHello`.
+`ClientHello` is constructed in the function `int SendTls13ClientHello`.
+`SendTls13ClientHello` calls `TLSX_PopulateExtensions`.
+`TLSX_PopulateExtensions` calls `TLSX_KeyShare_Use`.

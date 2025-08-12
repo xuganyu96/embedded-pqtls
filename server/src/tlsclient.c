@@ -66,6 +66,12 @@ static int get_namedgroup_from_name(const char *name) {
         return WOLFSSL_ML_KEM_768;
     } else if (strncmp(name, "mlkem1024", sizeof("mlkem1024")) == 0) {
         return WOLFSSL_ML_KEM_1024;
+    } else if (strncmp(name, "hqc128", sizeof("hqc128")) == 0) {
+        return WOLFSSL_HQC_128;
+    } else if (strncmp(name, "hqc192", sizeof("hqc192")) == 0) {
+        return WOLFSSL_HQC_192;
+    } else if (strncmp(name, "hqc256", sizeof("hqc256")) == 0) {
+        return WOLFSSL_HQC_256;
     }
     return NOT_COMPILED_IN;
 }
