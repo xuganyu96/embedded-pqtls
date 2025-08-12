@@ -627,10 +627,6 @@ wolfSSL_CTX_set_groups(ctx, groups, 3);
 `wolfSSL_CTX_UseSupportedCurve` calls `isValidCurveGroup` and `TLSX_UseSupportedCurve`.
 `TLSX_UseSupportedCurve` calls `TLSX_IsGroupSupported`.
 `isValidCurveGroup` and `TLSX_IsGroupSupported` need to be modified so the added named group variants are recognized.
-After modifying `isValidCurveGroup` and `TLSX_IsGroupSupported`, `wolfSSL_CTX_set_groups` returns success.
-Client can construct `ClientHello` and send to server, but server complains that `ClientHello` is missing the `key_share` extension and sends back an alert instead of `ServerHello`.
-Client fails upon receiving server's alert.
-
 The group is assigned to `ctx->group[i]`.
 The function `InitSSL` copies `ctx->group` to `ssl->group`.
 `InitSSL` is called by `wolfSSL_new`.
@@ -641,6 +637,72 @@ if (ctx->numGroups > 0) {
     ssl->numGroups = ctx->numGroups;
 }
 ```
+
+After modifying `isValidCurveGroup` and `TLSX_IsGroupSupported`, `wolfSSL_CTX_set_groups` returns success.
+Client can construct `ClientHello` and send to server, but server complains that `ClientHello` is missing the `key_share` extension and sends back an alert instead of `ServerHello`.
+Client fails upon receiving server's alert.
+
+Client might omit the `key_share` extension because of the following snippet in `tls.c`:
+
+```c
+extension = TLSX_Find(ssl->extensions, TLSX_KEY_SHARE);
+if (extension == NULL) {
+    if (ssl->numGroups > 0) {
+        int set = 0;
+        int i, j;
+
+        /* try to find the highest element in ssl->group[]
+            * that is contained in preferredGroup[].
+            */
+        namedGroup = preferredGroup[0];
+        for (i = 0; i < ssl->numGroups && !set; i++) {
+            for (j = 0; preferredGroup[j] != WOLFSSL_NAMED_GROUP_INVALID; j++) {
+                if (preferredGroup[j] == ssl->group[i]
+                    && TLSX_IsGroupSupported(preferredGroup[j])) {
+                    namedGroup = ssl->group[i];
+                    set = 1;
+                    break;
+                }
+            }
+        }
+        if (!set)
+            namedGroup = WOLFSSL_NAMED_GROUP_INVALID;
+    }
+    else {
+        /* Choose the most preferred group. */
+        namedGroup = preferredGroup[0];
+        if (!TLSX_IsGroupSupported(namedGroup)) {
+            int i = 1;
+            for (;preferredGroup[i] != WOLFSSL_NAMED_GROUP_INVALID;
+                    i++) {
+                if (TLSX_IsGroupSupported(preferredGroup[i]))
+                    break;
+            }
+            namedGroup = preferredGroup[i];
+        }
+    }
+}
+else {
+    KeyShareEntry* kse = (KeyShareEntry*)extension->data;
+    if (kse)
+        namedGroup = kse->group;
+}
+if (namedGroup != WOLFSSL_NAMED_GROUP_INVALID) {
+    ret = TLSX_KeyShare_Use(ssl, namedGroup, 0, NULL, NULL,
+            &ssl->extensions);
+    if (ret != 0)
+        return ret;
+}
+```
+
+There is a static list of `int preferredGroup[]` at the top of `tls.c`.
+When populating the extensions in `ClientHello`, 
+if the `key_share` extension is not already populated,
+then `ssl->group` is compared with `preferredGroup`.
+If the two lists do not agree, then client will not call `TLSX_KeyShare_Use` to populate the `key_share` extension.
+I guess this is so server will could send back its preferred list of named group in `HelloRetryRequest`.
+
+After adding the HQC variants to `preferredGroup`, client fails at constructing `ClientHello` because `TLSX_KeyShare_Use` does not know how to handle `WOLFSSL_HQC_128/192/256`.
 
 The set of named groups is used to construct the `key_share` extension in `ClientHello`.
 `ClientHello` is constructed in the function `int SendTls13ClientHello`.
