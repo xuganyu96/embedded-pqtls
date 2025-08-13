@@ -713,3 +713,214 @@ Then modify `TLSX_KeyShare_GenPqcKeyClient`.
 At [65e7f2](https://github.com/wolfSSL/wolfssl/tree/65e7f2c40f51e4cb7c9594873c0afd1e38c85912),
 `TLSX_KeyShare_GenPqcKeyClient` assumes that the only PQC KEM is ML-KEM and/or Kyber,
 so the first modification is to add a layer of abstraction and make `GenPqcKeyClient` call `GenMlKemKeyClient` if `kse->group` represents ML-KEM/Kyber and `GenHqcKeyClient` if `kse->group` represents HQC.
+
+Need to implement `TLSX_KeyShare_GenHqcKeyClient`, but first look at `GenMlKemKeyClient`:
+
+```c
+static int TLSX_KeyShare_GenMlKemKeyClient(WOLFSSL *ssl, KeyShareEntry *kse) {
+    WOLFSSL_ENTER("TLSX_KeyShare_GenMlKemKeyClient");
+    int ret = 0;
+    int type = 0;
+    KyberKey kem[1];
+    if (kse->pubKey != NULL) {
+        return ret;
+    }
+
+    ret = mlkem_id2type(kse->group, &type);
+    if (ret == WC_NO_ERR_TRACE(NOT_COMPILED_IN)) {
+        WOLFSSL_MSG("Invalid Kyber algorithm specified.");
+        ret = BAD_FUNC_ARG;
+    }
+
+    if (ret == 0) {
+        ret = wc_KyberKey_Init(type, kem, ssl->heap, ssl->devId);
+        if (ret != 0) {
+            WOLFSSL_MSG("Failed to initialize Kyber Key.");
+        }
+    }
+
+    if (ret == 0) {
+        ret = wc_KyberKey_PrivateKeySize(kem, &privSz);
+    }
+    if (ret == 0) {
+        ret = wc_KyberKey_PublicKeySize(kem, &kse->pubKeyLen);
+    }
+
+    if (ret == 0) {
+        privKey = (byte*)XMALLOC(privSz, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
+        if (privKey == NULL) {
+            WOLFSSL_MSG("privkey memory allocation failure");
+            ret = MEMORY_ERROR;
+        }
+    }
+
+    if (ret == 0) {
+        kse->pubKey = (byte*)XMALLOC(kse->pubKeyLen, ssl->heap,
+                                     DYNAMIC_TYPE_PUBLIC_KEY);
+        if (kse->pubKey == NULL) {
+            WOLFSSL_MSG("pubkey memory allocation failure");
+            ret = MEMORY_ERROR;
+        }
+    }
+
+    if (ret == 0) {
+        ret = wc_KyberKey_MakeKey(kem, ssl->rng);
+        if (ret != 0) {
+            WOLFSSL_MSG("Kyber keygen failure");
+        }
+    }
+    if (ret == 0) {
+        ret = wc_KyberKey_EncodePublicKey(kem, kse->pubKey,
+                                          kse->pubKeyLen);
+    }
+
+    if (ret == 0) {
+        ret = wc_KyberKey_EncodePrivateKey(kem, privKey, privSz);
+    }
+
+    if (ret != 0) {
+        wc_KyberKey_Free(kem);
+        XFREE(kse->pubKey, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
+        kse->pubKey = NULL;
+        if (privKey) {
+            ForceZero(privKey, privSz);
+            XFREE(privKey, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
+            privKey = NULL;
+        }
+    } else {
+        wc_KyberKey_Free(kem);
+        kse->privKey = (byte*)privKey;
+        kse->privKeyLen = privSz;
+    }
+
+    return ret;
+}
+```
+
+- key struct `KyberKey` is allocated on the stack and needs to be cleaned-up (i.e. zero'd out) at before the function exits
+- `kse->privKey` and `kse->pubKey` are allocated on the heap; if anything goes wrong, they need to be freed, and `kse->privKey` needs to be additionally zero'd out
+- `EncodePublicKey` and `EncodePrivateKey` act more like "export", compared to `PublicKeyToDer` and `PrivateKeyToDer`, which encode bytes using ASN.1 and DER.
+
+WolfSSL used a clever trick to abstract over the difference between stack-allocated and heap-allocated key struct:
+
+```c
+#ifdef WOLFSSL_SMALL_STACK
+    KyberKey *key;
+    /* Allocate from heap */
+#else
+    KyberKey key[1];
+#endif
+/* In either case, key behaves like a pointer to a KyberKey struct */
+```
+
+Maybe the "array as pointer" trick is unnecessary:
+
+```c
+#ifdef WOLFSSL_SMALL_STACK
+    KyberKey *key;
+#else
+    KyberKey _key;
+    KbyerKey *key = &_key;
+#endif
+```
+
+Also, something I initially did not understand is why we need a `wc_MlKemKey_Free` if we are going to `XFREE` the pointer anyways.
+Now I think `wc_MlKemKey_Free` is for cleaning up, and for **when the key struct itself has heap-allocated pointers**, which did not happen with `KyberKey`/`MlKemKey`, so it seems redundant.
+
+Here is my implementation:
+
+```c
+static int TLSX_KeyShare_GenHqcKeyClient(WOLFSSL *ssl, KeyShareEntry *kse) {
+    WOLFSSL_ENTER("TLSX_KeyShare_GenHqcKeyClient");
+    int ret = 0;
+
+    HqcKey key;
+    int level;
+
+    if ((ret = wc_HqcKey_GetLevelFromNamedGroup(kse->group, &level)) < 0) {
+        WOLFSSL_MSG_EX("Invalid named group %d", kse->group);
+        goto cleanup;
+    }
+    if ((ret = wc_HqcKey_Init(&key)) < 0) {
+        WOLFSSL_MSG_EX("Failed to initialize HQC key (err=%d)", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_HqcKey_SetLevel(&key, level)) < 0) {
+        WOLFSSL_MSG_EX("Failed to set HQC level to %d (err=%d)", level, ret);
+        goto cleanup;
+    }
+    if ((ret = wc_HqcKey_PrivateKeySize(&key, &kse->privKeyLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to get private key size (err=%d)", ret);
+        goto cleanup;
+    }
+    if ((kse->privKey = XMALLOC(kse->privKeyLen, ssl->heap,
+                                DYNAMIC_TYPE_PRIVATE_KEY)) == NULL) {
+        WOLFSSL_MSG_EX("Failed to allocate %d bytes kse->privKey",
+                       kse->privKeyLen);
+        ret = MEMORY_ERROR;
+        goto cleanup;
+    }
+    if ((ret = wc_HqcKey_PublicKeySize(&key, &kse->pubKeyLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to get public key size (err=%d)", ret);
+        goto cleanup;
+    }
+    if ((kse->pubKey = XMALLOC(kse->pubKeyLen, ssl->heap,
+                               DYNAMIC_TYPE_PUBLIC_KEY)) == NULL) {
+        WOLFSSL_MSG_EX("Failed to allocate %d bytes kse->pubKey",
+                       kse->pubKeyLen);
+        ret = MEMORY_ERROR;
+        goto cleanup;
+    }
+    if ((ret = wc_HqcKey_MakeKey(&key, ssl->rng)) < 0) {
+        WOLFSSL_MSG_EX("Failed to generate HQC key (err=%d)", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_HqcKey_ExportPublicKey(&key, kse->pubKey,
+                                         kse->pubKeyLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to export HQC public key (err=%d)", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_HqcKey_ExportPrivateKey(&key, kse->privKey,
+                                          kse->privKeyLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to export HQC private key (err=%d)", ret);
+        goto cleanup;
+    }
+
+cleanup:
+    wc_HqcKey_Free(&key);
+    if (ret != 0) {
+        if (kse->pubKey) {
+            XFREE(kse->pubKey, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
+            kse->pubKey = NULL;
+        }
+        if (kse->privKey) {
+            ForceZero(kse->privKey, kse->privKeyLen);
+            XFREE(kse->privKey, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
+            kse->privKey = NULL;
+        }
+    }
+
+    WOLFSSL_LEAVE("TLSX_KeyShare_GenHqcKeyClient", ret);
+    return ret;
+}
+```
+
+This impl makes reference to APIs that need to be implemented in `hqc.h` and `hqc.c`:
+
+```c
+typedef struct HqcKey {
+} HqcKey;
+
+int wc_HqcKey_Init(HqcKey *key);
+int wc_HqcKey_Free(HqcKey *key);
+int wc_HqcKey_SetLevel(HqcKey *key, int level);
+int wc_HqcKey_GetLevel(HqcKey *key, int *level);
+int wc_HqcKey_PublicKeySize(HqcKey *key, word32 *len);
+int wc_HqcKey_PrivateKeySize(HqcKey *key, word32 *len);
+int wc_HqcKey_CiphertextSize(HqcKey *key, word32 *len);
+int wc_HqcKey_SharedSecretSize(HqcKey *key, word32 *len);
+int wc_HqcKey_MakeKey(HqcKey *key, WC_RNG *rng);
+int wc_HqcKey_ExportPublicKey(HqcKey *key, byte *buf, word32 len);
+int wc_HqcKey_ExportPrivateKey(HqcKey *key, byte *buf, word32 len);
+int wc_HqcKey_GetLevelFromNamedGroup(word16 namedgroup, int *level);
+```
