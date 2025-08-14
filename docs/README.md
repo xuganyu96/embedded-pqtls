@@ -953,3 +953,12 @@ At this point I found a bug in my `hqc.c` implementation and want to fix it as a
 - make the code change, in this case it was a missing `break;` in a switch-case block
 - Add the change, commit with `git commit --amend`
 - Exit the rebase with `git rebase --continue`
+
+Now return to the task at hand: implement `HandleHqcKeyServer`, just like `HandleMlKemKeyServer`:
+- Allocate space for the key struct, **under some circumstance `kse->key` might be a pointer to a key struct?**, but let's not go there just yet
+- Use `kse->group`, which is a NamedGroup enum, to decide the level
+- Get public key, ciphertext, and shared secret sizes
+- Check public key size match `clientLen` since client is sending over a public key
+- At encapsulation, shared secret goes into the input `ssOutput` buffer, and ciphertext goes into `kse->pubKey`
+    - `kse->pubKey` is heap-allocated
+- When `HandleMlKemKeyServer` exits, the key struct must be freed; if the key struct is allocated from heap, then the pointer must be freed
