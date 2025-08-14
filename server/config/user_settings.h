@@ -519,6 +519,7 @@ extern "C" {
     #define WOLFSSL_HAVE_MLKEM
     #define WOLFSSL_WC_MLKEM
     #define HAVE_HQC
+    #define CLEAN_HQC /* use "clean" impl */
 #endif
 
 /* ------------------------------------------------------------------------- */

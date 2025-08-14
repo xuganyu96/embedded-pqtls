@@ -28,7 +28,9 @@ include_directories(
 )
 file(GLOB PQCLEAN_SRC
     "${PQCLEAN_ROOT}/common/*.c"
-    "${PQCLEAN_ROOT}/crypto_kem/ml-kem-512/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_kem/hqc-128/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_kem/hqc-192/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_kem/hqc-256/clean/*.c"
 )
 
 # WolfSSL

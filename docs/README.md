@@ -924,3 +924,7 @@ int wc_HqcKey_ExportPublicKey(HqcKey *key, byte *buf, word32 len);
 int wc_HqcKey_ExportPrivateKey(HqcKey *key, byte *buf, word32 len);
 int wc_HqcKey_GetLevelFromNamedGroup(word16 namedgroup, int *level);
 ```
+
+`GetLevelFromNamedGroup` was removed because it requires a WolfCrypt module to know values found in the WolfSSL module.
+Other APIs are relatively easy to implement.
+`PQCLEAN_SRC` in the CMake list file in the `server` project needs to include the source files under `crypto_kem/hqc-xxx/clean/*.c`
