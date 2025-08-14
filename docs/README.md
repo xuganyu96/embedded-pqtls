@@ -945,3 +945,11 @@ The call stack:
 ```
 
 Similar to `TLSX_KeyShare_GenPqcKeyClient`, the existing implementation assumes ML-KEM/Kyber to be the only PQC KEM, but we need to abstract it to accommodate HQC.
+
+At this point I found a bug in my `hqc.c` implementation and want to fix it as an "amend" on the commit that did the buggy implementation.
+- identify the commit, previously it was `0e80f213a`
+- run `git rebase --interactive 0e80f213a~`
+- modify the line `pick 0e80f213a~ <commit message>`, change `pick` to `edit`
+- make the code change, in this case it was a missing `break;` in a switch-case block
+- Add the change, commit with `git commit --amend`
+- Exit the rebase with `git rebase --continue`
