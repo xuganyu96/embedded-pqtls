@@ -928,3 +928,20 @@ int wc_HqcKey_GetLevelFromNamedGroup(word16 namedgroup, int *level);
 `GetLevelFromNamedGroup` was removed because it requires a WolfCrypt module to know values found in the WolfSSL module.
 Other APIs are relatively easy to implement.
 `PQCLEAN_SRC` in the CMake list file in the `server` project needs to include the source files under `crypto_kem/hqc-xxx/clean/*.c`
+
+### Handle HQC public key
+Server needs to process the HQC public key.
+From debug messages we know server processes KEM public key in the function `TLSX_KeyShare_HandlePqcKeyServer`.
+The call stack:
+
+```
+#0: TLSX_KeyShare_HandlePqcKeyServer
+#1: TLSX_KeyShare_Use
+#2: TLSX_KeyShareEntry_Parse
+#3: TLSX_KeyShare_Parse_ClientHello
+#4: TLSX_KeyShare_Parse
+#5: TLSX_Parse
+#6: DoTls13ClientHello
+```
+
+Similar to `TLSX_KeyShare_GenPqcKeyClient`, the existing implementation assumes ML-KEM/Kyber to be the only PQC KEM, but we need to abstract it to accommodate HQC.
