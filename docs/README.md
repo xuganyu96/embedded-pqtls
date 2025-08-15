@@ -962,3 +962,10 @@ Now return to the task at hand: implement `HandleHqcKeyServer`, just like `Handl
 - At encapsulation, shared secret goes into the input `ssOutput` buffer, and ciphertext goes into `kse->pubKey`
     - `kse->pubKey` is heap-allocated
 - When `HandleMlKemKeyServer` exits, the key struct must be freed; if the key struct is allocated from heap, then the pointer must be freed
+
+### Handle HQC ciphertext
+The entrypoint is `TLSX_KeyShare_ProcessPqcClient_ex`
+
+Similar to `GenPqcKeyClient` and `HandlePqcKeyServer`, `ProcessPqcClient` is programmed under the assumption that ML-KEM/Kyber is the only PQC KEM,
+so we need to begin with the additional abstraction.
+The named group enum is stored at `keyShareEntry->group`.
