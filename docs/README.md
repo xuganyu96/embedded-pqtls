@@ -969,3 +969,120 @@ The entrypoint is `TLSX_KeyShare_ProcessPqcClient_ex`
 Similar to `GenPqcKeyClient` and `HandlePqcKeyServer`, `ProcessPqcClient` is programmed under the assumption that ML-KEM/Kyber is the only PQC KEM,
 so we need to begin with the additional abstraction.
 The named group enum is stored at `keyShareEntry->group`.
+
+Reading `GenMlKemKeyClient` and `ProcessMlKemClient`:
+- Private key bytes are stored on a heap-allocated buffer, owned by `kse->privKey` (if `WOLFSSL_TLSX_PQC_MLKEM_STORE_OBJ` is defined then an entire `KyberKey` struct is stored on the heap and owned by `kse->key`, but we will not worry about it).
+- The ciphertext is stored in `kse->ke` and the length of `kse->ke` is `kse->keLen`.
+- `kse->ke` (`DYNAMIC_TYPE_PUBLIC_KEY`) and `kse->key` (`DYNAMIC_TYPE_PRIVATE_KEY`) both need to be freed at exit
+- Do not resize `ssOutSz` unless decapsulation is successful
+
+The implementation is as follows:
+
+```c
+static int TLSX_KeyShare_ProcessHqcClient(WOLFSSL *ssl, KeyShareEntry *kse,
+                                          byte *ssOutput, word32 *ssOutSz) {
+    WOLFSSL_ENTER("TLSX_KeyShare_ProcessHqcClient");
+    int ret, level;
+    HqcKey *key = NULL;
+    word32 ctLen, privKeyLen, ssLen;
+
+    if (ssl->options.side == WOLFSSL_SERVER_END) {
+        return 0;
+    }
+
+    if (!ssl || !kse || !ssOutput || !ssOutSz) {
+        ret = BAD_FUNC_ARG;
+        goto exit;
+    }
+    if (!kse->privKey || !kse->ke) {
+        WOLFSSL_MSG_EX("KeyShare entry missing private key or ciphertext");
+        ret = BAD_FUNC_ARG;
+        goto exit;
+    }
+    switch (kse->group) {
+    case WOLFSSL_HQC_128:
+        level = 1;
+        break;
+    case WOLFSSL_HQC_192:
+        level = 3;
+        break;
+    case WOLFSSL_HQC_256:
+        level = 5;
+        break;
+    default:
+        ret = BAD_FUNC_ARG;  /* should not happen */
+        goto exit;
+    }
+
+    if ((key = XMALLOC(sizeof(*key), ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY))
+        == NULL) {
+        ret = MEMORY_E;
+        goto exit;
+    }
+    if ((ret = wc_HqcKey_Init(key)) < 0) {
+        WOLFSSL_MSG_EX("Failed to init HQC key (err=%d)", ret);
+        goto exit;
+    }
+    if ((ret = wc_HqcKey_SetLevel(key, level)) < 0) {
+        WOLFSSL_MSG_EX("Failed to set HQC level %d (err=%d)", level, ret);
+        goto exit;
+    }
+    if ((ret = wc_HqcKey_SharedSecretSize(key, &ssLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to get HQC shared secret size (err=%d)", ret);
+        goto exit;
+    }
+    if (ssLen > *ssOutSz) {
+        WOLFSSL_MSG_EX("Need %d bytes for ssOutput, has %d", ssLen, *ssOutSz);
+        ret = BUFFER_E;
+        goto exit;
+    }
+    if ((ret = wc_HqcKey_CiphertextSize(key, &ctLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to get HQC ciphertext size (err=%d)", ret);
+        goto exit;
+    }
+    if (ctLen != kse->keLen) {
+        WOLFSSL_MSG_EX("Expected ciphertext len=%d, found %d", ctLen,
+                       kse->keLen);
+        ret = BUFFER_E;
+        goto exit;
+    }
+    if ((ret = wc_HqcKey_PrivateKeySize(key, &privKeyLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to get HQC private key size (err=%d)", ret);
+        goto exit;
+    }
+    if (privKeyLen != kse->privKeyLen) {
+        WOLFSSL_MSG_EX("Expected private key len=%d, found %d", privKeyLen,
+                       kse->privKeyLen);
+        ret = BUFFER_E;
+        goto exit;
+    }
+    if ((ret = wc_HqcKey_ImportPrivateKey(key, kse->privKey, kse->privKeyLen))
+        < 0) {
+        WOLFSSL_MSG_EX("Failed to import HQC private key (err=%d)", ret);
+        goto exit;
+    }
+    if ((ret = wc_HqcKey_Decapsulate(key, ssOutput, kse->ke, kse->keLen)) < 0) {
+        WOLFSSL_MSG_EX("Failed to decapsulate HQC ciphertext (err=%d)", ret);
+        goto exit;
+    }
+    *ssOutSz = ssLen;
+
+exit:
+    if (key) {
+        XFREE(key, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
+        key = NULL;
+    }
+    if (kse->ke) {
+        XFREE(kse->ke, ssl->heap, DYNAMIC_TYPE_PUBLIC_KEY);
+        kse->ke = NULL;
+    }
+    if (kse->key) {
+        XFREE(kse->key, ssl->heap, DYNAMIC_TYPE_PRIVATE_KEY);
+        kse->key = NULL;
+    }
+    WOLFSSL_LEAVE("TLSX_KeyShare_ProcessHqcClient", ret);
+    return ret;
+}
+```
+
+Need to implement HQC private key import and decapsulation, which can be largely copied from encapsulate and public key import.
