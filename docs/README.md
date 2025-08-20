@@ -1090,7 +1090,6 @@ Need to implement HQC private key import and decapsulation, which can be largely
 ## Adding Falcon/SPHINCS for certificates and signatures
 SPHINCS+ (hash-based signature) and Falcon (lattice-based signature) have also been selected for standardization by NIST.
 SPHINCS+ became FIPS 205, while Falcon is still in the process.
-**However, the implementation we use from PQClean still calls it Falcon and SPHINCS so we will avoid using FN-DSA or SLH-DSA**.
 
 ### Generate Falcon/SPHINCS+ certificate and private key
 Before we can use Falcon or SPINCS+ for digital signature, 
@@ -1294,3 +1293,18 @@ On my MacBook `perl` is readily available, so running the script is easy:
 
 Remember to check that `WOLFSSL_OLD_OID_SUM` is turned off (should be off by default).
 Otherwise, WolfSSL's in-house way of identifying OIDs will have a collision.
+
+> **NOTS:** SLH-DSA was already standardized into [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final), 
+and Falcon will very likely be standardized in FIPS 206 and be called FN-DSA. 
+However, the implementations from PQClean still called them SPHINCS+ and Falcon,
+so we will stick with these names and their unofficial OIDs.
+
+> **NOTE:** There was a previous attempt to integrate `liboqs` into WolfSSL,
+which left some existing code referencing Falcon and/or SPHINCS+ that do not fully work,
+and that will be turned on if `HAVE_FALCON` and/or `HAVE_SPHINCS` is defined.
+The effort to wipe the code base clean and start from scratch doesn't seem worth it,
+so I try my best to retrofit a working PQClean integration that replaces or co-exists with the OQS integrations.
+
+The existing OQS integration is turned on with `HAVE_LIBOQS`,
+which is independent from `HAVE_FALCON` and `HAVE_SPHINCS`.
+I think it makes a lot of sense to define an extra `HAVE_PQCLEAN` that indicates the source of implementation.

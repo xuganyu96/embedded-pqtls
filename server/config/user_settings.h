@@ -518,10 +518,10 @@ extern "C" {
     #define WOLFSSL_SHAKE128 
     #define WOLFSSL_HAVE_MLKEM
     #define WOLFSSL_WC_MLKEM
+    #define HAVE_PQCLEAN
     #define HAVE_HQC
-    #define CLEAN_HQC /* use "clean" impl */
-    // #define HAVE_FALCON
-    // #define HAVE_SPHINCS
+    #define HAVE_FALCON
+    #define HAVE_SPHINCS
 #endif
 
 /* ------------------------------------------------------------------------- */
