@@ -519,6 +519,7 @@ extern "C" {
     #define WOLFSSL_HAVE_MLKEM
     #define WOLFSSL_WC_MLKEM
     #define HAVE_PQCLEAN
+    #undef HAVE_LIBOQS
     #define HAVE_HQC
     #define HAVE_FALCON
     #define HAVE_SPHINCS

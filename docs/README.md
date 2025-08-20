@@ -1294,7 +1294,7 @@ On my MacBook `perl` is readily available, so running the script is easy:
 Remember to check that `WOLFSSL_OLD_OID_SUM` is turned off (should be off by default).
 Otherwise, WolfSSL's in-house way of identifying OIDs will have a collision.
 
-> **NOTS:** SLH-DSA was already standardized into [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final), 
+> **NOTES:** SLH-DSA was already standardized into [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final), 
 and Falcon will very likely be standardized in FIPS 206 and be called FN-DSA. 
 However, the implementations from PQClean still called them SPHINCS+ and Falcon,
 so we will stick with these names and their unofficial OIDs.
@@ -1308,3 +1308,10 @@ so I try my best to retrofit a working PQClean integration that replaces or co-e
 The existing OQS integration is turned on with `HAVE_LIBOQS`,
 which is independent from `HAVE_FALCON` and `HAVE_SPHINCS`.
 I think it makes a lot of sense to define an extra `HAVE_PQCLEAN` that indicates the source of implementation.
+
+The previous `liboqs` integration erroneously defined `key` to mean "secret key" and `prv_key` to mean "secret key and public key".
+This is kind of right within the context of RSA/ECC, but no longer true with PQC schemes,
+where the secret key often already contains public keys.
+If we treat them as black boxes,
+then there is no need to separately define a "concatenation of public and secret key."
+Unfortunate there are a lot of search and replace to do.
