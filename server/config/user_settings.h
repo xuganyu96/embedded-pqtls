@@ -520,6 +520,8 @@ extern "C" {
     #define WOLFSSL_WC_MLKEM
     #define HAVE_HQC
     #define CLEAN_HQC /* use "clean" impl */
+    // #define HAVE_FALCON
+    // #define HAVE_SPHINCS
 #endif
 
 /* ------------------------------------------------------------------------- */

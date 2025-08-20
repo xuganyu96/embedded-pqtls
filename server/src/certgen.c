@@ -45,7 +45,16 @@
     "    - ed448: EdDSA with curve 448\n"                                      \
     "    - mldsa44: ML-DSA-44\n"                                               \
     "    - mldsa65: ML-DSA-65\n"                                               \
-    "    - mldsa87: ML-DSA-87"
+    "    - mldsa87: ML-DSA-87\n"                                               \
+    "    - falcon512: Falcon-512\n"                                            \
+    "    - falcon1024: Falcon-1024\n"                                          \
+    "    - sphincs128f: SPHINCS-SHAKE-128-FAST\n"                              \
+    "    - sphincs192f: SPHINCS-SHAKE-192-FAST\n"                              \
+    "    - sphincs256f: SPHINCS-SHAKE-256-FAST\n"                              \
+    "    - sphincs128s: SPHINCS-SHAKE-128-SMALL\n"                             \
+    "    - sphincs192s: SPHINCS-SHAKE-192-SMALL\n"                             \
+    "    - sphincs256s: SPHINCS-SHAKE-256-SMALL"
+
 #define SIGTYPE_SHA256RSA "sha256rsa"
 #define SIGTYPE_SHA384RSA "sha384rsa"
 #define SIGTYPE_SHA512RSA "sha512rsa"
@@ -57,6 +66,14 @@
 #define SIGTYPE_MLDSA44 "mldsa44"
 #define SIGTYPE_MLDSA65 "mldsa65"
 #define SIGTYPE_MLDSA87 "mldsa87"
+#define SIGTYPE_FALCON512 "falcon512"
+#define SIGTYPE_FALCON1024 "falcon1024"
+#define SIGTYPE_SPHINCS128F "sphincs128f"
+#define SIGTYPE_SPHINCS192F "sphincs192f"
+#define SIGTYPE_SPHINCS256F "sphincs256f"
+#define SIGTYPE_SPHINCS128S "sphincs128s"
+#define SIGTYPE_SPHINCS192S "sphincs192s"
+#define SIGTYPE_SPHINCS256S "sphincs256s"
 
 /* Write data to <dir>/<filename>
  *
@@ -276,6 +293,46 @@ static int get_keytype_sigtype(int *key_type, int *sig_type, const char *name) {
     if (strncmp(name, SIGTYPE_MLDSA87, sizeof(SIGTYPE_MLDSA87)) == 0) {
         *key_type = ML_DSA_LEVEL5_TYPE;
         *sig_type = CTC_ML_DSA_LEVEL5;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_FALCON512, sizeof(SIGTYPE_FALCON512)) == 0) {
+        *key_type = FALCON_LEVEL1_TYPE;
+        *sig_type = CTC_FALCON_LEVEL1;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_FALCON1024, sizeof(SIGTYPE_FALCON1024)) == 0) {
+        *key_type = FALCON_LEVEL5_TYPE;
+        *sig_type = CTC_FALCON_LEVEL5;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_SPHINCS128F, sizeof(SIGTYPE_SPHINCS128F)) == 0) {
+        *key_type = SPHINCS_FAST_LEVEL1_TYPE;
+        *sig_type = CTC_SPHINCS_FAST_LEVEL1;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_SPHINCS192F, sizeof(SIGTYPE_SPHINCS192F)) == 0) {
+        *key_type = SPHINCS_FAST_LEVEL3_TYPE;
+        *sig_type = CTC_SPHINCS_FAST_LEVEL3;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_SPHINCS256F, sizeof(SIGTYPE_SPHINCS256F)) == 0) {
+        *key_type = SPHINCS_FAST_LEVEL5_TYPE;
+        *sig_type = CTC_SPHINCS_FAST_LEVEL5;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_SPHINCS128S, sizeof(SIGTYPE_SPHINCS128S)) == 0) {
+        *key_type = SPHINCS_SMALL_LEVEL1_TYPE;
+        *sig_type = CTC_SPHINCS_SMALL_LEVEL1;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_SPHINCS192S, sizeof(SIGTYPE_SPHINCS192S)) == 0) {
+        *key_type = SPHINCS_SMALL_LEVEL3_TYPE;
+        *sig_type = CTC_SPHINCS_SMALL_LEVEL3;
+        return 0;
+    }
+    if (strncmp(name, SIGTYPE_SPHINCS256S, sizeof(SIGTYPE_SPHINCS256S)) == 0) {
+        *key_type = SPHINCS_SMALL_LEVEL5_TYPE;
+        *sig_type = CTC_SPHINCS_SMALL_LEVEL5;
         return 0;
     }
     return BAD_FUNC_ARG;
@@ -630,6 +687,20 @@ int alloc_make_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
     case ML_DSA_LEVEL5_TYPE:
         err = alloc_make_mldsa_key(key, key_type, sig_type, rng);
         break;
+#endif
+#ifdef HAVE_FALCON
+    case FALCON_LEVEL1_TYPE:
+    case FALCON_LEVEL5_TYPE:
+        err = NOT_COMPILED_IN;
+#endif
+#ifdef HAVE_SPHINCS
+    case SPHINCS_SMALL_LEVEL1_TYPE:
+    case SPHINCS_FAST_LEVEL1_TYPE:
+    case SPHINCS_SMALL_LEVEL3_TYPE:
+    case SPHINCS_FAST_LEVEL3_TYPE:
+    case SPHINCS_SMALL_LEVEL5_TYPE:
+    case SPHINCS_FAST_LEVEL5_TYPE:
+        err = NOT_COMPILED_IN;
 #endif
     default:
         err = BAD_FUNC_ARG;
