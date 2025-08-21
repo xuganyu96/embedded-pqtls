@@ -1327,3 +1327,25 @@ Now need to implement `alloc_make_falcon_key`, which needs the following API fro
 Also implement `wc_FalconKey_Sign` and `wc_FalconKey_Verify` so we can do a naive key check by signing a dummy message.
 
 `sphincs.h` and `sphincs.c` will implement the same set of API, which will then be used to implement `alloc_make_sphincs_key`.
+
+Next, we need to be able to DER-encode `FalconKey` and `SphincsKey` private keys,
+which means these two functions:
+
+- `wc_FalconKey_PrivKeyToDer`
+- `wc_SphincsKey_PrivKeyToDer`
+
+Fortunately, `<wolfssl/wolfcrypt/asn.h` has an easy function `SetAsymKeyDer` that just works,
+We only need to supply the arguments and the OID.
+
+After implementation test with `openssl asn1parse`:
+
+```bash
+openssl asn1parse -inform DER -i -in certs/server.key
+    0:d=0  hl=3 l= 147 cons: SEQUENCE
+    3:d=1  hl=2 l=   1 prim:  INTEGER           :00
+    6:d=1  hl=2 l=   8 cons:  SEQUENCE
+    8:d=2  hl=2 l=   6 prim:   OBJECT            :1.3.9999.6.9.7
+   16:d=1  hl=3 l= 131 prim:  OCTET STRING      [HEX DUMP]:0481801B0B8BEC5D6BB50EAAA6008368825C4F1F6C39BEE226614C310AC5EFF8A5A7E1209E01AF8A5E23B1A417081C0B4AB13029F701EEA1D82CA3927F03E2DE1D2E2C855F54EF7A6A6BB134D4EB42AC4A34F4B214328003813C6BFFE894CAB5FB6AE42274304B843606335C29BC29386F6DB9F0034E698703F50835337BC1F9EAD7CD
+```
+
+Check with `oid_sum.h` for the OID.

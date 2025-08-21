@@ -928,6 +928,22 @@ int key_to_der(void *key, int key_type, byte *buf, word32 bufcap) {
         err = wc_MlDsaKey_PrivateKeyToDer(key, buf, bufcap);
         break;
 #endif
+#ifdef HAVE_FALCON
+    case FALCON_LEVEL1_TYPE:
+    case FALCON_LEVEL5_TYPE:
+        err = wc_FalconKey_PrivateKeyToDer(key, buf, bufcap);
+        break;
+#endif
+#ifdef HAVE_SPHINCS
+    case SPHINCS_SMALL_LEVEL1_TYPE:
+    case SPHINCS_FAST_LEVEL1_TYPE:
+    case SPHINCS_SMALL_LEVEL3_TYPE:
+    case SPHINCS_FAST_LEVEL3_TYPE:
+    case SPHINCS_SMALL_LEVEL5_TYPE:
+    case SPHINCS_FAST_LEVEL5_TYPE:
+        err = wc_SphincsKey_PrivateKeyToDer(key, buf, bufcap);
+        break;
+#endif
     default:
         return NOT_COMPILED_IN;
     }
