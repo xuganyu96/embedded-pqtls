@@ -5,6 +5,9 @@
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/dilithium.h"
+#ifdef HAVE_FALCON
+#include "wolfssl/wolfcrypt/falcon.h"
+#endif
 #include "wolfssl/wolfcrypt/ecc.h"
 #include "wolfssl/wolfcrypt/ed25519.h"
 #include "wolfssl/wolfcrypt/ed448.h"
@@ -656,6 +659,67 @@ cleanup:
 }
 #endif
 
+#ifdef HAVE_FALCON
+/* Allocate memory for a Falcon keypair, then generate a keypair.
+ *
+ * The level is determined by key_type; sig_type is not used.
+ *
+ * Return:
+ *  MEMORY_E            Failed to allocate space for FalconKey
+ */
+static int alloc_make_falcon_key(void **key, int key_type, WC_RNG *rng) {
+    int ret;
+    FalconKey *falconkey = NULL;
+    int level;
+
+    if ((key == NULL) || (rng == NULL)) {
+        return BAD_FUNC_ARG;
+    }
+    switch (key_type) {
+    case FALCON_LEVEL1_TYPE:
+        level = 1;
+        break;
+    case FALCON_LEVEL5_TYPE:
+        level = 5;
+        break;
+    default:
+        return BAD_FUNC_ARG;
+    }
+    printf("level=%d\n", level);
+
+    if ((falconkey = malloc(sizeof(*falconkey))) == NULL) {
+        ret = MEMORY_E;
+        goto cleanup;
+    }
+    if ((ret = wc_FalconKey_Init(falconkey)) < 0) {
+        fprintf(stderr, "Failed to initialize Falcon key (err=%d)\n", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_FalconKey_SetLevel(falconkey, level)) < 0) {
+        fprintf(stderr, "Failed to set Falcon key level=%d (err=%d)\n", level,
+                ret);
+    }
+    if ((ret = wc_FalconKey_MakeKey(falconkey, rng)) < 0) {
+        fprintf(stderr, "Failed to make Falcon keypair (err=%d)\n", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_FalconKey_CheckKey(falconkey)) < 0) {
+        fprintf(stderr, "Falcon key check failed (err=%d)\n", ret);
+        goto cleanup;
+    }
+    *key = falconkey;
+
+cleanup:
+    if (ret != 0) {
+        if (falconkey) {
+            wc_FalconKey_Free(falconkey);
+            free(falconkey);
+        }
+    }
+    return ret;
+}
+#endif
+
 /* Using key_type and sig_type as hints, allocate space for the some
  * cryptographic key type, then generate a random key for that type
  */
@@ -691,7 +755,8 @@ int alloc_make_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
 #ifdef HAVE_FALCON
     case FALCON_LEVEL1_TYPE:
     case FALCON_LEVEL5_TYPE:
-        err = NOT_COMPILED_IN;
+        err = alloc_make_falcon_key(key, key_type, rng);
+        break;
 #endif
 #ifdef HAVE_SPHINCS
     case SPHINCS_SMALL_LEVEL1_TYPE:
@@ -701,6 +766,7 @@ int alloc_make_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
     case SPHINCS_SMALL_LEVEL5_TYPE:
     case SPHINCS_FAST_LEVEL5_TYPE:
         err = NOT_COMPILED_IN;
+        break;
 #endif
     default:
         err = BAD_FUNC_ARG;

@@ -1315,3 +1315,11 @@ where the secret key often already contains public keys.
 If we treat them as black boxes,
 then there is no need to separately define a "concatenation of public and secret key."
 Unfortunate there are a lot of search and replace to do.
+
+Now need to implement `alloc_make_falcon_key`, which needs the following API from the underlying implementation:
+- `FalconKey` type for `malloc`
+- `wc_FalconKey_Init`
+- `wc_FalconKey_SetLevel`
+- `wc_FalconKey_MakeKey`
+- `wc_FalconKey_CheckKey`
+- `wc_FalconKey_Free`

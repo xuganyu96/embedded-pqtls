@@ -31,6 +31,8 @@ file(GLOB PQCLEAN_SRC
     "${PQCLEAN_ROOT}/crypto_kem/hqc-128/clean/*.c"
     "${PQCLEAN_ROOT}/crypto_kem/hqc-192/clean/*.c"
     "${PQCLEAN_ROOT}/crypto_kem/hqc-256/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/falcon-512/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/falcon-1024/clean/*.c"
 )
 
 # WolfSSL
