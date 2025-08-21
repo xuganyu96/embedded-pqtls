@@ -33,6 +33,12 @@ file(GLOB PQCLEAN_SRC
     "${PQCLEAN_ROOT}/crypto_kem/hqc-256/clean/*.c"
     "${PQCLEAN_ROOT}/crypto_sign/falcon-512/clean/*.c"
     "${PQCLEAN_ROOT}/crypto_sign/falcon-1024/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/sphincs-shake-128f-simple/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/sphincs-shake-128s-simple/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/sphincs-shake-192f-simple/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/sphincs-shake-192s-simple/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/sphincs-shake-256f-simple/clean/*.c"
+    "${PQCLEAN_ROOT}/crypto_sign/sphincs-shake-256s-simple/clean/*.c"
 )
 
 # WolfSSL

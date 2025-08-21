@@ -5,6 +5,7 @@
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
 #include "wolfssl/wolfcrypt/dilithium.h"
+#include "wolfssl/wolfcrypt/sphincs.h"
 #ifdef HAVE_FALCON
 #include "wolfssl/wolfcrypt/falcon.h"
 #endif
@@ -14,6 +15,9 @@
 #include "wolfssl/wolfcrypt/oid_sum.h"
 #include "wolfssl/wolfcrypt/random.h"
 #include "wolfssl/wolfcrypt/rsa.h"
+
+#define NAIVE_KEY_CHECK 1
+#define NAIVE_KEY_CHECK_MSGLEN 80
 
 #define IS_CA 1
 #define NOT_CA 0
@@ -667,12 +671,12 @@ cleanup:
  * Return:
  *  MEMORY_E            Failed to allocate space for FalconKey
  */
-static int alloc_make_falcon_key(void **key, int key_type, WC_RNG *rng) {
+static int alloc_make_falcon_key(void **out, int key_type, WC_RNG *rng) {
     int ret;
-    FalconKey *falconkey = NULL;
+    FalconKey *key = NULL;
     int level;
 
-    if ((key == NULL) || (rng == NULL)) {
+    if ((out == NULL) || (rng == NULL)) {
         return BAD_FUNC_ARG;
     }
     switch (key_type) {
@@ -685,36 +689,147 @@ static int alloc_make_falcon_key(void **key, int key_type, WC_RNG *rng) {
     default:
         return BAD_FUNC_ARG;
     }
-    printf("level=%d\n", level);
 
-    if ((falconkey = malloc(sizeof(*falconkey))) == NULL) {
+    if ((key = malloc(sizeof(*key))) == NULL) {
         ret = MEMORY_E;
         goto cleanup;
     }
-    if ((ret = wc_FalconKey_Init(falconkey)) < 0) {
+    if ((ret = wc_FalconKey_Init(key)) < 0) {
         fprintf(stderr, "Failed to initialize Falcon key (err=%d)\n", ret);
         goto cleanup;
     }
-    if ((ret = wc_FalconKey_SetLevel(falconkey, level)) < 0) {
+    if ((ret = wc_FalconKey_SetLevel(key, level)) < 0) {
         fprintf(stderr, "Failed to set Falcon key level=%d (err=%d)\n", level,
                 ret);
     }
-    if ((ret = wc_FalconKey_MakeKey(falconkey, rng)) < 0) {
+    if ((ret = wc_FalconKey_MakeKey(key, rng)) < 0) {
         fprintf(stderr, "Failed to make Falcon keypair (err=%d)\n", ret);
         goto cleanup;
     }
-    if ((ret = wc_FalconKey_CheckKey(falconkey)) < 0) {
+    if ((ret = wc_FalconKey_CheckKey(key)) < 0) {
         fprintf(stderr, "Falcon key check failed (err=%d)\n", ret);
         goto cleanup;
     }
-    *key = falconkey;
+    *out = key;
+
+#if NAIVE_KEY_CHECK
+    byte msg[NAIVE_KEY_CHECK_MSGLEN];
+    byte sig[FALCON_MAX_SIG_SIZE];
+    word32 siglen;
+    int ok;
+    if ((ret = wc_FalconKey_Sign(key, msg, sizeof(msg), sig, &siglen, rng)) <
+        0) {
+        fprintf(stderr, "FalconKey failed to sign (err=%d)\n", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_FalconKey_Verify(key, msg, sizeof(msg), sig, siglen, &ok)) <
+        0) {
+        fprintf(stderr, "FalconKey failed to verify (err=%d)\n", ret);
+        goto cleanup;
+    }
+    if (!ok) {
+        fprintf(stderr, "Falcon key check not Ok\n");
+        ret = BAD_FUNC_ARG;
+        goto cleanup;
+    }
+    printf("FalconKey naive key check Ok.\n");
+#endif /* NAIVE_KEY_CHECK */
 
 cleanup:
     if (ret != 0) {
-        if (falconkey) {
-            wc_FalconKey_Free(falconkey);
-            free(falconkey);
+        if (key) {
+            wc_FalconKey_Free(key);
+            free(key);
         }
+    }
+    return ret;
+}
+#endif
+
+#ifdef HAVE_SPHINCS
+static int alloc_make_sphincs_key(void **out, int key_type, WC_RNG *rng) {
+    int ret = 0, level, optim;
+    SphincsKey *key = NULL;
+    if ((out == NULL) || (rng == NULL)) {
+        return BAD_FUNC_ARG;
+    }
+    switch (key_type) {
+    case SPHINCS_SMALL_LEVEL1_TYPE:
+        level = 1;
+        optim = SMALL_VARIANT;
+        break;
+    case SPHINCS_FAST_LEVEL1_TYPE:
+        level = 1;
+        optim = FAST_VARIANT;
+        break;
+    case SPHINCS_SMALL_LEVEL3_TYPE:
+        level = 3;
+        optim = SMALL_VARIANT;
+        break;
+    case SPHINCS_FAST_LEVEL3_TYPE:
+        level = 3;
+        optim = FAST_VARIANT;
+        break;
+    case SPHINCS_SMALL_LEVEL5_TYPE:
+        level = 5;
+        optim = SMALL_VARIANT;
+        break;
+    case SPHINCS_FAST_LEVEL5_TYPE:
+        level = 5;
+        optim = FAST_VARIANT;
+        break;
+    default:
+        return BAD_FUNC_ARG;
+    }
+    if ((key = malloc(sizeof(*key))) == NULL) {
+        ret = MEMORY_E;
+        goto cleanup;
+    }
+    if ((ret = wc_SphincsKey_Init(key)) < 0) {
+        fprintf(stderr, "SphincsKey failed to init (err=%d)\n", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_SphincsKey_SetLevelOptim(key, level, optim)) < 0) {
+        fprintf(stderr, "Failed to set level=%d optim=%d (err=%d)\n", level,
+                optim, ret);
+        goto cleanup;
+    }
+    if ((ret = wc_SphincsKey_MakeKey(key, rng)) < 0) {
+        fprintf(stderr, "Failed to make key (l=%d, v=%d, err=%d)\n", level,
+                optim, ret);
+        goto cleanup;
+    }
+#if NAIVE_KEY_CHECK
+    byte msg[NAIVE_KEY_CHECK_MSGLEN];
+    byte sig[SPHINCS_MAX_SIG_SIZE];
+    word32 siglen = sizeof(sig);
+    int ok;
+    if ((ret = wc_SphincsKey_Sign(msg, sizeof(msg), sig, &siglen, key, rng)) <
+        0) {
+        fprintf(stderr, "SphincsKey failed to sign (err=%d)\n", ret);
+        goto cleanup;
+    }
+    if ((ret = wc_SphincsKey_Verify(sig, siglen, msg, sizeof(msg), &ok, key)) <
+        0) {
+        fprintf(stderr, "SphincsKey failed to verify (err=%d)\n", ret);
+        goto cleanup;
+    }
+    if (!ok) {
+        fprintf(stderr, "Sphincs key check not Ok\n");
+        ret = BAD_FUNC_ARG;
+        goto cleanup;
+    }
+    printf("SphincsKey naive key check Ok.\n");
+#endif /* NAIVE_KEY_CHECK */
+
+cleanup:
+    if (ret != 0) {
+        if (key) {
+            wc_SphincsKey_Free(key);
+            free(key);
+        }
+    } else {
+        *out = key;
     }
     return ret;
 }
@@ -765,7 +880,7 @@ int alloc_make_key(void **key, int key_type, int sig_type, WC_RNG *rng) {
     case SPHINCS_FAST_LEVEL3_TYPE:
     case SPHINCS_SMALL_LEVEL5_TYPE:
     case SPHINCS_FAST_LEVEL5_TYPE:
-        err = NOT_COMPILED_IN;
+        err = alloc_make_sphincs_key(key, key_type, rng);
         break;
 #endif
     default:

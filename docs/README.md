@@ -1323,3 +1323,7 @@ Now need to implement `alloc_make_falcon_key`, which needs the following API fro
 - `wc_FalconKey_MakeKey`
 - `wc_FalconKey_CheckKey`
 - `wc_FalconKey_Free`
+
+Also implement `wc_FalconKey_Sign` and `wc_FalconKey_Verify` so we can do a naive key check by signing a dummy message.
+
+`sphincs.h` and `sphincs.c` will implement the same set of API, which will then be used to implement `alloc_make_sphincs_key`.
