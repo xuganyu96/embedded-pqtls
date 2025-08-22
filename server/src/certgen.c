@@ -4,17 +4,21 @@
 
 #include "wolfssl/wolfcrypt/asn.h"
 #include "wolfssl/wolfcrypt/asn_public.h"
-#include "wolfssl/wolfcrypt/dilithium.h"
-#include "wolfssl/wolfcrypt/sphincs.h"
-#ifdef HAVE_FALCON
-#include "wolfssl/wolfcrypt/falcon.h"
-#endif
 #include "wolfssl/wolfcrypt/ecc.h"
 #include "wolfssl/wolfcrypt/ed25519.h"
 #include "wolfssl/wolfcrypt/ed448.h"
 #include "wolfssl/wolfcrypt/oid_sum.h"
 #include "wolfssl/wolfcrypt/random.h"
 #include "wolfssl/wolfcrypt/rsa.h"
+#ifdef HAVE_DILITHIUM
+#include "wolfssl/wolfcrypt/dilithium.h"
+#endif
+#ifdef HAVE_FALCON
+#include "wolfssl/wolfcrypt/falcon.h"
+#endif
+#ifdef HAVE_SPHINCS
+#include "wolfssl/wolfcrypt/sphincs.h"
+#endif
 
 #define NAIVE_KEY_CHECK 1
 #define NAIVE_KEY_CHECK_MSGLEN 80
@@ -42,25 +46,13 @@
     "Usage: certgen <root> <int> <server> <client> <dir>\n"                    \
     "Generate a certificate chain and write the files to <dir>\n"              \
     "The first four arguments must be one of the supported signature type:\n"  \
-    "    - sha256rsa: 2048-bit RSA w/ SHA-256\n"                               \
-    "    - sha384rsa: 2048-bit RSA w/ SHA-384\n"                               \
-    "    - sha512rsa: 2048-bit RSA w/ SHA-512\n"                               \
-    "    - sha256ecdsa: ECDSA with P-256\n"                                    \
-    "    - sha384ecdsa: ECDSA with P-384\n"                                    \
-    "    - sha512ecdsa: ECDSA with P-521\n"                                    \
-    "    - ed25519: EdDSA with curve 25519\n"                                  \
-    "    - ed448: EdDSA with curve 448\n"                                      \
-    "    - mldsa44: ML-DSA-44\n"                                               \
-    "    - mldsa65: ML-DSA-65\n"                                               \
-    "    - mldsa87: ML-DSA-87\n"                                               \
-    "    - falcon512: Falcon-512\n"                                            \
-    "    - falcon1024: Falcon-1024\n"                                          \
-    "    - sphincs128f: SPHINCS-SHAKE-128-FAST\n"                              \
-    "    - sphincs192f: SPHINCS-SHAKE-192-FAST\n"                              \
-    "    - sphincs256f: SPHINCS-SHAKE-256-FAST\n"                              \
-    "    - sphincs128s: SPHINCS-SHAKE-128-SMALL\n"                             \
-    "    - sphincs192s: SPHINCS-SHAKE-192-SMALL\n"                             \
-    "    - sphincs256s: SPHINCS-SHAKE-256-SMALL"
+    "RSA:       sha256rsa|sha384rsa|sha512rsa\n"                               \
+    "ECDSA:     sha256ecdsa|sha384ecdsa|sha512ecdsa\n"                         \
+    "EdDSA:     ed25519|ed448\n"                                               \
+    "ML-DSA:    mldsa44|mldsa65|mldsa87\n"                                     \
+    "Falcon:    falcon512|falcon1024\n"                                        \
+    "SPHINCS+:  sphincs128s|sphincs128f|sphincs192s|sphincs192f|"              \
+    "sphincs256s|sphincs256f"
 
 #define SIGTYPE_SHA256RSA "sha256rsa"
 #define SIGTYPE_SHA384RSA "sha384rsa"
@@ -715,7 +707,7 @@ static int alloc_make_falcon_key(void **out, int key_type, WC_RNG *rng) {
 #if NAIVE_KEY_CHECK
     byte msg[NAIVE_KEY_CHECK_MSGLEN];
     byte sig[FALCON_MAX_SIG_SIZE];
-    word32 siglen;
+    word32 siglen = sizeof(sig);
     int ok;
     if ((ret = wc_FalconKey_Sign(key, msg, sizeof(msg), sig, &siglen, rng)) <
         0) {
@@ -1026,6 +1018,7 @@ int make_sign_cert(Cert *subj_cert, void *subj_key, int subj_key_type,
         subj_cert->keyUsage |= KEYUSE_KEY_CERT_SIGN;
     }
 
+    /* TODO: add support for Falcon and SPHINCS+ */
     if ((err = wc_MakeCert_ex(subj_cert, der, sizeof(der), subj_key_type,
                               subj_key, rng)) < 0) {
         fprintf(stderr, "Failed to make cert (err=%d)\n", err);

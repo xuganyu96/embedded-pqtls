@@ -1091,9 +1091,9 @@ Need to implement HQC private key import and decapsulation, which can be largely
 SPHINCS+ (hash-based signature) and Falcon (lattice-based signature) have also been selected for standardization by NIST.
 SPHINCS+ became FIPS 205, while Falcon is still in the process.
 
-### Generate Falcon/SPHINCS+ certificate and private key
+### Generate Falcon/SPHINCS+ private key
 Before we can use Falcon or SPINCS+ for digital signature, 
-we first need to generate public-key certificate and private keys:
+we first need to generate private keys:
 
 ```c
 int main() {
@@ -1349,3 +1349,33 @@ openssl asn1parse -inform DER -i -in certs/server.key
 ```
 
 Check with `oid_sum.h` for the OID.
+
+### Put Falcon/SPHINCS+ public key in certificate body
+Now `wc_MakeCert_ex` returns `BAD_FUNC_ARG` if `key_type` is one of Falcon or SPHINCS+ types.
+`wc_MakeCert_ex` implementation is in `wolfcrypt/src/asn.c`.
+`wc_MakeCert_ex` calls `MakeAnyCert`.
+`MakeAnyCert` already has support for Falcon and SPHINCS+,
+I just need to change the key types from `falcon_key|sphincs_key` to my types `FalconKey|SphincsKey`.
+`MakeAnyCert` calls `EncodePublicKey`.
+
+EncodePublicKey is there the `PublicKeyToDer` API is called.
+Need to implement:
+
+```c
+int wc_SphincsKey_PublicKeyToDer(SphincsKey *key, byte *out, word32 len, int withAlg);
+int wc_FalconKey_PublicKeyToDer(FalconKey *key, byte *out, word32 len, int withAlg);
+```
+
+Looking at `wc_Dilithium_PublicKeyToDer`, the implementation is straightforward;
+the encoding logic is given by `SetAsymKeyDerPublic`.
+The argument `withAlg` indicates that "Subject Public Key Info" header will be included in the encoding.
+
+After implementation, `wc_MakeCert_ex` reports success.
+We cannot sign certificates with Falcon/SPHINCS+ yet, 
+but we can make a leaf certificate and check the OID of the public key:
+
+```bash
+./certgen ed448 ed448 falcon512 falcon512 ./certs
+# look for Falcon512's OID (1.3.9999.3.6)
+openssl asn1parse -inform PEM -i -in certs/server.crt
+```
