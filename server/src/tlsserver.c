@@ -261,7 +261,11 @@ void echo_server(WOLFSSL *ssl) {
         ret = wolfSSL_read(ssl, buf, sizeof(buf));
         if (ret <= 0) {
             err = wolfSSL_get_error(ssl, ret);
-            fprintf(stderr, "SSL has nothing to read (err=%d)\n", err);
+            if (err < 0) {
+                fprintf(stderr, "SSL has nothing to read (err=%d)\n", err);
+            } else {
+                fprintf(stderr, "Peer has gracefully hung up\n");
+            }
             return;
         }
         buflen = ret;
