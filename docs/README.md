@@ -1375,7 +1375,161 @@ We cannot sign certificates with Falcon/SPHINCS+ yet,
 but we can make a leaf certificate and check the OID of the public key:
 
 ```bash
-./certgen ed448 ed448 falcon512 falcon512 ./certs
-# look for Falcon512's OID (1.3.9999.3.6)
+./certgen ed448 ed448 sphincs128f falcon512 ./certs
 openssl asn1parse -inform PEM -i -in certs/server.crt
+openssl asn1parse -inform PEM -i -in certs/client.crt
+```
+
+Some content from OpenSSL's `asn1parse`. `d` is depth, `hl` is "header length", including the tag and the length, and `l` is the length of the content.
+
+```
+>>> server.crt:
+270:d=2  hl=2 l=  45 cons:   SEQUENCE
+272:d=3  hl=2 l=   8 cons:    SEQUENCE
+274:d=4  hl=2 l=   6 prim:     OBJECT            :1.3.9999.6.7.4
+282:d=3  hl=2 l=  33 prim:    BIT STRING
+
+>>> client.crt:
+262:d=2  hl=4 l= 911 cons:   SEQUENCE
+266:d=3  hl=2 l=   7 cons:    SEQUENCE
+268:d=4  hl=2 l=   5 prim:     OBJECT            :1.3.9999.3.6
+275:d=3  hl=4 l= 898 prim:    BIT STRING
+```
+
+Notice that SPHINCS-SHAKE-128-SMALL's public key size is 32 bytes, 
+but the server's public key encoding (the `BIT STRING`)'s content length is 33 bytes.
+Similarly Falcon512's public key size is 897 bytes,
+but the encoding's content length is 898 bytes.
+The difference is due to the fact that [`BIT STRING` supports non-octet-aligned bit strings](https://luca.ntop.org/Teaching/Appunti/asn1.html) 
+(the number of bits might not be divisible by 8),
+so an extra octet/byte is used at the beginning of the bit string content to indicate the number of *unused bits* at the end, which can range from 0 (if bit string is octet-aligned) to 7.
+
+### Sign certificate body with Falcon/SPHINCS+ key
+Next we need to sign certificates with Falcon/SPHINCS+.
+The entrypoint is `wc_SignCert_ex`.
+Similar to `wc_MakeCert_ex` there is existing integrations that we need to modify.
+`wc_SignCert_ex` calls `SignCert`.
+`SignCert` calls `MakeSignature`.
+`MakeSignature` calls the various `sign_msg` functions such as `wc_ed448_sign_msg`.
+
+> The conventional `sign_msg` signature is `xxx_sign_msg(msg, msglen, sig, siglen, key, rng)`
+
+Note that SPHINCS+ signatures are large (see [FIPS 205 chapter 11](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.205.pdf)), so the DER buffer should be appropriately sized.
+
+Now we can quickly check the output of `certgen`:
+
+```bash
+./certgen sphincs192s sphincs192s sphincs128f falcon512 ./certs
+openssl asn1parse -inform PEM -i -in certs/server.crt
+openssl asn1parse -inform PEM -i -in certs/client.crt
+```
+
+Excerpt from the output. The signature corresponds to SPHINCS-SHAKE-192-SMALL's OID (1.3.9999.6.8.7), 
+and the length of the signature matches (16225 bytes).
+
+```
+>>> server.crt:
+  320:d=1  hl=2 l=   8 cons:  SEQUENCE
+  322:d=2  hl=2 l=   6 prim:   OBJECT            :1.3.9999.6.8.7
+  330:d=1  hl=4 l=16225 prim:  BIT STRING
+```
+
+On MacOS, I use Apple's LLVM toolchain, which means using `lldb` for debugger and `leaks` for memory profiling (mostly tracking memory leaks).
+Currently I did not implement "freeing malloc'ed Falcon/SPHINCS key",
+so this is a great chance to try `leaks`:
+
+```bash
+leaks -atExit -- ./certgen sphincs192s sphincs192s sphincs128f falcon512 ./certs
+```
+
+Relevant output:
+
+```
+Process:         certgen [71542]
+Path:            /Users/USER/*/certgen
+Load Address:    0x1026d0000
+Identifier:      certgen
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  leaks [71541]
+Target Type:     live task
+
+Date/Time:       2025-08-22 15:45:25.300 -0400
+Launch Time:     2025-08-22 15:44:37.060 -0400
+OS Version:      macOS 15.6.1 (24G90)
+Report Version:  7
+Analysis Tool:   /usr/bin/leaks
+
+Physical footprint:         3153K
+Physical footprint (peak):  3153K
+Idle exit:                  untracked
+----
+
+leaks Report Version: 4.0, multi-line stacks
+Process 71542: 191 nodes malloced for 20 KB
+Process 71542: 5 leaks for 5424 total leaked bytes.
+
+STACK OF 1 INSTANCE OF 'ROOT LEAK: <malloc in alloc_make_falcon_key>':
+5   dyld                                  0x1807eab98 start + 6076
+4   certgen                               0x1026d3bb8 main + 144  certgen.c:1206
+3   certgen                               0x1026d3348 generate_cert_chain + 492  certgen.c:1092
+2   certgen                               0x1026d21f4 alloc_make_key + 312  certgen.c:869
+1   certgen                               0x1026d255c alloc_make_falcon_key + 164  certgen.c:689
+0   libsystem_malloc.dylib                0x1809bd080 _malloc_zone_malloc_instrumented_or_legacy + 152
+====
+    1 (4.50K) ROOT LEAK: <malloc in alloc_make_falcon_key 0x159008200> [4608]
+
+STACK OF 1 INSTANCE OF 'ROOT LEAK: <malloc in alloc_make_sphincs_key>':
+5   dyld                                  0x1807eab98 start + 6076
+4   certgen                               0x1026d3bb8 main + 144  certgen.c:1206
+3   certgen                               0x1026d31cc generate_cert_chain + 112  certgen.c:1067
+2   certgen                               0x1026d220c alloc_make_key + 336  certgen.c:879
+1   certgen                               0x1026d293c alloc_make_sphincs_key + 344  certgen.c:780
+0   libsystem_malloc.dylib                0x1809bd080 _malloc_zone_malloc_instrumented_or_legacy + 152
+====
+    1 (224 bytes) ROOT LEAK: <malloc in alloc_make_sphincs_key 0x158804110> [224]
+
+STACK OF 1 INSTANCE OF 'ROOT LEAK: <malloc in alloc_make_sphincs_key>':
+5   dyld                                  0x1807eab98 start + 6076
+4   certgen                               0x1026d3bb8 main + 144  certgen.c:1206
+3   certgen                               0x1026d326c generate_cert_chain + 272  certgen.c:1077
+2   certgen                               0x1026d220c alloc_make_key + 336  certgen.c:879
+1   certgen                               0x1026d293c alloc_make_sphincs_key + 344  certgen.c:780
+0   libsystem_malloc.dylib                0x1809bd080 _malloc_zone_malloc_instrumented_or_legacy + 152
+====
+    1 (224 bytes) ROOT LEAK: <malloc in alloc_make_sphincs_key 0x1577042a0> [224]
+
+STACK OF 1 INSTANCE OF 'ROOT LEAK: <malloc in alloc_make_sphincs_key>':
+5   dyld                                  0x1807eab98 start + 6076
+4   certgen                               0x1026d3bb8 main + 144  certgen.c:1206
+3   certgen                               0x1026d321c generate_cert_chain + 192  certgen.c:1072
+2   certgen                               0x1026d220c alloc_make_key + 336  certgen.c:879
+1   certgen                               0x1026d293c alloc_make_sphincs_key + 344  certgen.c:780
+0   libsystem_malloc.dylib                0x1809bd080 _malloc_zone_malloc_instrumented_or_legacy + 152
+====
+    1 (224 bytes) ROOT LEAK: <malloc in alloc_make_sphincs_key 0x1577041c0> [224]
+
+STACK OF 1 INSTANCE OF 'ROOT LEAK: <malloc in _InitRng>':
+4   dyld                                  0x1807eab98 start + 6076
+3   certgen                               0x1026d3bac main + 132  certgen.c:1205
+2   certgen                               0x102789fcc wc_InitRng + 40  random.c:1933
+1   certgen                               0x102789af4 _InitRng + 252  random.c:1781
+0   libsystem_malloc.dylib                0x1809bd080 _malloc_zone_malloc_instrumented_or_legacy + 152
+====
+    1 (144 bytes) ROOT LEAK: <malloc in _InitRng 0x158804080> [144]
+```
+
+After implementing freeing `FalconKey` and `SphincsKey`:
+
+```
+leaks Report Version: 4.0, multi-line stacks
+Process 71818: 186 nodes malloced for 14 KB
+Process 71818: 0 leaks for 0 total leaked bytes.
+```
+
+But I also got this??? Oh well I don't have the patience to debug this.
+
+```
+certgen(71818,0x1eeb1e0c0) malloc: *** error for object 0x16cf3a7d0: pointer being freed was not allocated
 ```

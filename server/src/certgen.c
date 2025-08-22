@@ -26,7 +26,11 @@
 #define IS_CA 1
 #define NOT_CA 0
 #define MAX_DIRPATH_SZ 512
+#ifdef HAVE_SPHINCS
+#define MAX_DER_SZ 50000
+#else
 #define MAX_DER_SZ 12000
+#endif
 #define MAX_PEM_SZ MAX_DER_SZ
 #define COUNTRY "CA"
 #define STATE "ON"
@@ -709,7 +713,7 @@ static int alloc_make_falcon_key(void **out, int key_type, WC_RNG *rng) {
     byte sig[FALCON_MAX_SIG_SIZE];
     word32 siglen = sizeof(sig);
     int ok;
-    if ((ret = wc_FalconKey_Sign(key, msg, sizeof(msg), sig, &siglen, rng)) <
+    if ((ret = wc_FalconKey_Sign(msg, sizeof(msg), sig, &siglen, key, rng)) <
         0) {
         fprintf(stderr, "FalconKey failed to sign (err=%d)\n", ret);
         goto cleanup;
@@ -963,16 +967,35 @@ int free_key(void *key, int key_type, int sig_type) {
 #ifdef HAVE_ED25519
     case ED25519_TYPE:
         wc_ed25519_free(key);
+        break;
 #endif
 #ifdef HAVE_ED448
     case ED448_TYPE:
         wc_ed448_free(key);
+        break;
 #endif
 #ifdef HAVE_DILITHIUM
     case ML_DSA_LEVEL2_TYPE:
     case ML_DSA_LEVEL3_TYPE:
     case ML_DSA_LEVEL5_TYPE:
         wc_dilithium_free(key);
+        break;
+#endif
+#ifdef HAVE_FALCON
+    case FALCON_LEVEL1_TYPE:
+    case FALCON_LEVEL5_TYPE:
+        wc_FalconKey_Free(key);
+        break;
+#endif
+#ifdef HAVE_SPHINCS
+    case SPHINCS_SMALL_LEVEL1_TYPE:
+    case SPHINCS_FAST_LEVEL1_TYPE:
+    case SPHINCS_SMALL_LEVEL3_TYPE:
+    case SPHINCS_FAST_LEVEL3_TYPE:
+    case SPHINCS_SMALL_LEVEL5_TYPE:
+    case SPHINCS_FAST_LEVEL5_TYPE:
+        wc_SphincsKey_Free(key);
+        break;
 #endif
     default:
         return NOT_COMPILED_IN;
@@ -1203,5 +1226,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to generate cert chain (err=%d)\n", err);
         exit(EXIT_FAILURE);
     }
+    wc_rng_free(&rng);
     return 0;
 }
