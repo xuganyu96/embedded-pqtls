@@ -20,7 +20,7 @@
 #include "wolfssl/wolfcrypt/sphincs.h"
 #endif
 
-#define NAIVE_KEY_CHECK 1
+#define NAIVE_KEY_CHECK 0
 #define NAIVE_KEY_CHECK_MSGLEN 80
 
 #define IS_CA 1
@@ -1226,6 +1226,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to generate cert chain (err=%d)\n", err);
         exit(EXIT_FAILURE);
     }
-    wc_rng_free(&rng);
+    /* NOTE: wc_rng_free is used for rng obtained from wc_rng_new */
+    wc_FreeRng(&rng);
     return 0;
 }

@@ -277,9 +277,14 @@ static int test_ssl(WOLFSSL *ssl) {
     wc_InitRng(&rng);
     if ((err = wc_RNG_GenerateBlock(&rng, buf, sizeof(buf))) < 0) {
         fprintf(stderr, "Failed to generate random test data (err=%d)\n", err);
+        wc_FreeRng(&rng);
         return err;
     }
+    wc_FreeRng(&rng);
 
+    /* FIX: if server hangs up, wolfSSL_write will cause the program to exit
+     * ungracefully
+     */
     err = wolfSSL_write(ssl, buf, sizeof(buf));
     if (err <= 0) {
         err = wolfSSL_get_error(ssl, err);
