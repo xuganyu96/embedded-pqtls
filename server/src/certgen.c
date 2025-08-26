@@ -20,7 +20,7 @@
 #include "wolfssl/wolfcrypt/sphincs.h"
 #endif
 
-#define NAIVE_KEY_CHECK 0
+#define NAIVE_KEY_CHECK 1
 #define NAIVE_KEY_CHECK_MSGLEN 80
 
 #define IS_CA 1

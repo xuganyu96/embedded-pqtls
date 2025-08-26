@@ -1533,3 +1533,215 @@ But I also got this??? Oh well I don't have the patience to debug this.
 ```
 certgen(71818,0x1eeb1e0c0) malloc: *** error for object 0x16cf3a7d0: pointer being freed was not allocated
 ```
+
+## Using SPHINCS+/Falcon in a handshake
+Start with a dummy certificate chain: the certificate authorities will use SPHINCS-SHAKE-192-SMALL, server and client will use Falcon-512:
+
+```bash
+./certgen sphincs192s sphincs192s falcon512 falcon512 ./certs
+```
+
+If we try to load this certificate chain, `wolfSSL_CTX_use_PrivateKey_file` will return error:
+
+```
+wolfSSL Entering TLSv1_3_server_method_ex
+wolfSSL Entering wolfSSL_CTX_new_ex
+wolfSSL Entering wolfSSL_CertManagerNew
+heap param is null
+DYNAMIC_TYPE_CERT_MANAGER Allocating = 336 bytes
+wolfSSL Leaving wolfSSL_CTX_new_ex, return 0
+wolfSSL Entering wolfSSL_CTX_use_PrivateKey_file
+wolfSSL Entering ProcessBuffer
+Not an RSA key
+Not an ECC key
+Not an Ed25519 key
+Not an Ed448 key
+Not a Falcon key
+Not a Dilithium key
+Not a supported key type
+wolfSSL Leaving ProcessBuffer, return -463
+Failed to load private key file certs/server.key
+```
+
+The entrypoint is the function `int ProcessBuffer`.
+
+> `int ProcessBuffer` is implemented in `ssl_load.c`, which contains source code that is not compiled separately, but only as part of `ssl.c` to be included. This really messes with the LSP setup 😡😡😡!
+For now my workaround is `:LspStop` and just code without LSP.
+
+The call stack goes deeper: 
+1. `ProcessBufferTryDecode`
+1. `ProcessBufferPrivateKey`
+1. `ProcessBuffer`
+
+`ProcessBufferTryDecode` then cycles through "try decode RSA", "try decode ECC", ..., until one of them succeeds.
+Look at the function `ProcessBufferTryDecodeEd25519`:
+
+```c
+/* See if DER data is an Ed25519 private key.
+ *
+ * Checks size meets minimum ECC key size.
+ *
+ * @param [in, out] ctx        SSL context object.
+ * @param [in, out] ssl        SSL object.
+ * @param [in]      der        DER encoding.
+ * @param [in, out] keyFormat  On in, expected format. 0 means unknown.
+ * @param [in]      heap       Dynamic memory allocation hint.
+ * @param [in]      devId      Device identifier.
+ * @param [out]     keyType    Type of key.
+ * @param [out]     keySize    Size of key.
+ * @return  0 on success or not an Ed25519 key and format unknown.
+ * @return  ECC_KEY_SIZE_E when key size doesn't meet minimum required.
+ */
+static int ProcessBufferTryDecodeEd25519(WOLFSSL_CTX *ctx, WOLFSSL *ssl,
+                                         DerBuffer *der, int *keyFormat,
+                                         void *heap, int devId, byte *keyType,
+                                         int *keySize) {
+    int ret;
+    word32 idx;
+    /* make sure Ed25519 key can be used */
+#ifdef WOLFSSL_SMALL_STACK
+    ed25519_key *key;
+#else
+    ed25519_key key[1];
+#endif
+
+#ifdef WOLFSSL_SMALL_STACK
+    /* Allocate an Ed25519 key to parse into. */
+    key =
+        (ed25519_key *)XMALLOC(sizeof(ed25519_key), heap, DYNAMIC_TYPE_ED25519);
+    if (key == NULL)
+        return MEMORY_E;
+#endif
+
+    /* Initialize Ed25519 key. */
+    ret = wc_ed25519_init_ex(key, heap, devId);
+    if (ret == 0) {
+        /* Decode as an Ed25519 private key. */
+        idx = 0;
+        ret = wc_Ed25519PrivateKeyDecode(der->buffer, &idx, key, der->length);
+#ifdef WOLF_PRIVATE_KEY_ID
+        /* If that didn't work then maybe a public key if device ID or callback.
+         */
+        if ((ret != 0) &&
+            ((devId != INVALID_DEVID) || WOLFSSL_IS_PRIV_PK_SET(ctx, ssl))) {
+            /* Decode as an Ed25519 public key. */
+            idx = 0;
+            ret =
+                wc_Ed25519PublicKeyDecode(der->buffer, &idx, key, der->length);
+        }
+#endif
+        if (ret == 0) {
+            /* Get the minimum ECC key size from SSL or SSL context object. */
+            int minKeySz = ssl ? ssl->options.minEccKeySz : ctx->minEccKeySz;
+
+            /* Format is known. */
+            *keyFormat = ED25519k;
+            *keyType = ed25519_sa_algo;
+            *keySize = ED25519_KEY_SIZE;
+
+            /* Check that the size of the ECC key is enough. */
+            if (ED25519_KEY_SIZE < minKeySz) {
+                WOLFSSL_MSG("ED25519 private key too small");
+                ret = ECC_KEY_SIZE_E;
+            }
+            if (ssl != NULL) {
+#if !defined(WOLFSSL_NO_CLIENT_AUTH) && !defined(NO_ED25519_CLIENT_AUTH)
+                /* Ed25519 requires caching enabled for tracking message
+                 * hash used in EdDSA_Update for signing */
+                ssl->options.cacheMessages = 1;
+#endif
+            }
+        }
+        /* Not an Ed25519 key but check whether we know what it is. */
+        else if (*keyFormat == 0) {
+            WOLFSSL_MSG("Not an Ed25519 key");
+            /* Format unknown so keep trying. */
+            ret = 0;
+        }
+
+        /* Free dynamically allocated data in key. */
+        wc_ed25519_free(key);
+    }
+
+#ifdef WOLFSSL_SMALL_STACK
+    /* Dispose of allocated key. */
+    XFREE(key, heap, DYNAMIC_TYPE_ED25519);
+#endif
+    return ret;
+}
+
+```
+
+- `int *keyFormat` refers to the OID sum in `oid_sum.h`
+- `byte *keyType` refers to `enum SignatureAlgorithm` (in `internal.h`)
+- `int *keysize` can abstractly refer to many things; with `TryDecodeEcc` it is the output of some `wc_ecc_size`, but it could also just mean "how many bytes for an opaque private key". If we can assume that "larger key size means more security", then this can be used as a metric when enforcing some "minimum security level" policy (i.e. RSA key must be 2048-bit or above; if server tries to load a 512-bit RSA key, WolfSSL should reject it).
+
+The "try" in "try decode" means the following:
+- if `int *keyFormat` is set to UNKNOWN (0), then `DerBuffer *der` failing to decode into the expected key type should not be considered a fail; instead, `int *keyFormat` should stay 0 while the function should return 0.
+- if `int *keyFormat` is not set to UNKNOWN, then failure to decode should be considered a fail
+
+It remains to implement `ProcessBufferTryDecodeSphincs` and `ProcessBufferTryDecodeFalcon`.
+However, we first need to implement the underlying function for decoding DER-encoded Falcon/SPHINCS+ private keys:
+
+Look at `wc_Ed25519PublicKeyDecode` (`wolfcrypt/src/asn.c`) for inspiration:
+
+```c
+int wc_Ed25519PublicKeyDecode(const byte* input, word32* inOutIdx,
+                              ed25519_key* key, word32 inSz)
+{
+    int ret;
+    byte pubKey[2*ED25519_PUB_KEY_SIZE+1];
+    word32 pubKeyLen = (word32)sizeof(pubKey);
+
+    if (input == NULL || inOutIdx == NULL || key == NULL || inSz == 0) {
+        return BAD_FUNC_ARG;
+    }
+
+    /* init pubKey */
+    XMEMSET(pubKey, 0, sizeof(pubKey));
+
+    ret = DecodeAsymKeyPublic(input, inOutIdx, inSz,
+        pubKey, &pubKeyLen, ED25519k);
+    if (ret == 0) {
+        ret = wc_ed25519_import_public(pubKey, pubKeyLen, key);
+    }
+    return ret;
+}
+```
+
+Need to implement these:
+
+```c
+int wc_FalconKey_DerToPrivateKey(const byte *in, word32 *loc, word32 len, 
+                                 FalconKey *key);
+int wc_FalconKey_DerToPublicKey(const byte *in, word32 *loc, word32 len, 
+                                FalconKey *key);
+int wc_SphincsKey_DerToPrivateKey(const byte *in, word32 *loc, word32 len, 
+                                  SphincsKey *key);
+int wc_SphincsKey_DerToPublicKey(const byte *in, word32 *loc, word32 len, 
+                                 SphincsKey *key);
+```
+
+But how does `DecodeAsymKeyPublic` know where the public key bytes start?
+`DecodeAsymKeyPublic` calls `DecodeAsymKeyPublic_Assign`.
+`DecodeAsymKeyPublic_Assign` has the logic for detecting the OID in the DER buffer.
+
+```c
+    if (GetSequence(input, inOutIdx, &length, inSz) < 0)
+        return ASN_PARSE_E;
+
+    if (GetSequence(input, inOutIdx, &length, inSz) < 0)
+        return ASN_PARSE_E;
+
+    if (GetObjectId(input, inOutIdx, &oid, oidKeyType, inSz) < 0)
+        return ASN_PARSE_E;
+
+    /* If user supplies ANONk (0) key type, we want to auto-detect from
+     * DER and copy it back to user */
+    if (*inOutKeyType == ANONk) {
+        *inOutKeyType = oid;
+    }
+```
+
+I think I should use `DecodeAsymKeyPublic_Assign` instead.
+But how does WolfSSL know to parse OID to OID sum?
