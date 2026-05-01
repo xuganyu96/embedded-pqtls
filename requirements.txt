@@ -1,4 +1,4 @@
-pyserial==3.5  # required by scripts/readserial.py
-jupyterlab==4.4.3
-pandas==2.3.0
+pyserial  # required by scripts/readserial.py
+jupyterlab
+pandas
 matplotlib
